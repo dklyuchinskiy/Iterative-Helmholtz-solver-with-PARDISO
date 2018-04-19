@@ -1,5 +1,6 @@
 #include "definitions.h"
 #include "templates.h"
+#include "TemplatesForMatrixConstruction.h"
 
 /*****************************************************
 Source file contains functionality to work
@@ -28,7 +29,7 @@ int compare_str(int n, char *s1, char *s2)
 	return 1;
 }
 
-void print(int m, int n, double *u, int ldu, char *mess)
+void print(int m, int n, dtype *u, int ldu, char *mess)
 {
 	printf("%s\n", mess);
 	for (int i = 0; i < m; i++)
@@ -36,32 +37,12 @@ void print(int m, int n, double *u, int ldu, char *mess)
 		printf("%d ", i);
 		for (int j = 0; j < n; j++)
 		{
-			printf("%5.3lf ", u[i + ldu*j]);
+			printf("%5.3lf ", u[i + ldu*j].real());
 		}
 		printf("\n");
 	}
 
 	printf("\n");
-}
-
-double rel_error_complex(int n, int k, dtype *Hrec, dtype *Hinit, int ldh, double eps)
-{
-	double norm = 0;
-
-	// Norm of residual
-#pragma omp parallel for schedule(static)
-	for (int j = 0; j < k; j++)
-#pragma omp simd
-		for (int i = 0; i < n; i++)
-			Hrec[i + ldh * j] = Hrec[i + ldh * j] - Hinit[i + ldh * j];
-
-	norm = zlange("Frob", &n, &k, Hrec, &ldh, NULL);
-	norm = norm / zlange("Frob", &n, &k, Hinit, &ldh, NULL);
-
-	return norm;
-
-	//if (norm < eps) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
-	//else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
 }
 
 void Eye(int n, dtype *H, int ldh)
@@ -70,15 +51,6 @@ void Eye(int n, dtype *H, int ldh)
 #pragma omp simd
 		for (int i = 0; i < n; i++)
 			if (j == i) H[i + ldh * j] = 1.0;
-			else H[i + ldh * j] = 0.0;
-}
-
-void Diag(int n, dtype *H, int ldh, double value)
-{
-	for (int j = 0; j < n; j++)
-#pragma omp simd
-		for (int i = 0; i < n; i++)
-			if (j == i) H[i + ldh * j] = value;
 			else H[i + ldh * j] = 0.0;
 }
 
@@ -140,7 +112,7 @@ void Clear(int m, int n, dtype* A, int lda)
 			A[i + lda * j] = 0.0;
 }
 
-void GenerateDiagonal1DBlock(int w, int part_of_field, size_m y, size_m z, dtype *DD, int lddd)
+void GenerateDiagonal1DBlock(double w, int part_of_field, size_m y, size_m z, dtype *DD, int lddd)
 {
 	int n = y.n;
 
@@ -150,7 +122,7 @@ void GenerateDiagonal1DBlock(int w, int part_of_field, size_m y, size_m z, dtype
 #pragma omp parallel for simd schedule(simd:static)
 	for (int i = 0; i < n; i++)
 	{
-		DD[i + lddd * i] = -2.0 * (1.0 / (y.h * y.h) + 1.0 / (z.h * z.h)) - dtype{ w * w, 0 };
+		DD[i + lddd * i] = -2.0 * (1.0 / (y.h * y.h) + 1.0 / (z.h * z.h)) - dtype{ w , 0 };
 		if (i > 0) DD[i + lddd * (i - 1)] = 1.0 / (y.h * y.h);
 		if (i < n - 1) DD[i + lddd * (i + 1)] = 1.0 / (y.h * y.h);
 	}
@@ -162,6 +134,7 @@ void GenRhs2D(int w, size_m x, size_m y, size_m z, dtype* f, dtype* f2D)
 	int l = 0;
 	
 	// 0 < w < x.n
+#if 0
 	for (int k = 0; k < z.n; k++)
 		for(int j = 0; j < y.n; j++)
 			for (int i = 0; i < x.n; i++)
@@ -171,6 +144,10 @@ void GenRhs2D(int w, size_m x, size_m y, size_m z, dtype* f, dtype* f2D)
 					f2D[l++] = f[i + j * x.n + k * x.n * y.n];
 				}
 			}
+#else
+		for (int k = 0; k < y.n * z.n; k++)
+			f2D[k] = f[x.n * k + w];
+#endif
 }
 
 void GenSol1DBackward(int w, size_m x, size_m y, size_m z, dtype* x_sol_prd, dtype *u1D)
@@ -178,6 +155,8 @@ void GenSol1DBackward(int w, size_m x, size_m y, size_m z, dtype* x_sol_prd, dty
 	int l = 0;
 
 	// 0 < j < y.n * z.n
+
+#if 0
 	for (int k = 0; k < x.n; k++)
 		for (int j = 0; j < y.n * z.n; j++)
 			{
@@ -185,10 +164,14 @@ void GenSol1DBackward(int w, size_m x, size_m y, size_m z, dtype* x_sol_prd, dty
 				{
 					u1D[l++] = x_sol_prd[j + k * y.n * z.n];
 				}
-			}
+		}
+#else
+	for (int k = 0; k < x.n; k++)
+			u1D[k] = x_sol_prd[w + k * y.n * z.n];
+#endif
 }
 
-void GenerateDiagonal2DBlock(int part_of_field, size_m x, size_m y, size_m z, dtype *DD, int lddd)
+void GenerateDiagonal2DBlock(int part_of_field, size_m x, size_m y, size_m z, double *DD, int lddd)
 {
 	int n = x.n * y.n;
 	int size = n * z.n;
@@ -215,6 +198,11 @@ void GenerateDiagonal2DBlock(int part_of_field, size_m x, size_m y, size_m z, dt
 
 }
 
+void GenRHS2DandSolutionSyntetic(int i, size_m y, size_m z, dcsr* D2csr, dtype* u2Dsynt, dtype *f2D)
+{
+
+}
+
 // v[i] = D[i] * v[i]
 void DenseDiagMult(int n, dtype *diag, dtype *v, dtype *f)
 {
@@ -223,7 +211,7 @@ void DenseDiagMult(int n, dtype *diag, dtype *v, dtype *f)
 		f[i] = diag[i] * v[i];
 }
 
-void GenRHSandSolution(size_m x, size_m y, size_m z, /* output */ dtype* B, dtype *u, dtype *f)
+void GenRHSandSolution(size_m x, size_m y, size_m z, /* output */ double* B, double *u, double *f)
 {
 	int n = x.n * y.n;
 	int size = n * z.n;
@@ -241,7 +229,7 @@ void GenRHSandSolution(size_m x, size_m y, size_m z, /* output */ dtype* B, dtyp
 		for (int j = 0; j < y.n; j++)
 #pragma omp simd
 			for (int i = 0; i < x.n; i++)
-				f[k * n + j * x.n + i] = F_ex((i + 1) * x.h, (j + 1) * y.h, (k + 1) * z.h);
+				f[k * n + j * x.n + i] = F_ex(x, y, z, (i + 1) * x.h, (j + 1) * y.h, (k + 1) * z.h);
 
 	// for boundaries z = 0 and z = Lz we distract blocks B0 and Bm from the RHS
 #pragma omp parallel for schedule(dynamic)
@@ -249,8 +237,8 @@ void GenRHSandSolution(size_m x, size_m y, size_m z, /* output */ dtype* B, dtyp
 #pragma omp simd
 		for (int i = 0; i < x.n; i++)
 		{
-			f[ind(0, n) + ind(j, x.n) + i] -= u_ex((i + 1) * x.h, (j + 1) * y.h, 0) / (z.h * z.h); // u|z = 0
-			f[ind(z.n - 1, n) + ind(j, x.n) + i] -= u_ex((i + 1)  * x.h, (j + 1) * y.h, z.l) / (z.h * z.h); // u|z = h
+			f[ind(0, n) + ind(j, x.n) + i] -= u_ex(x, y, z, (i + 1) * x.h, (j + 1) * y.h, 0) / (z.h * z.h); // u|z = 0
+			f[ind(z.n - 1, n) + ind(j, x.n) + i] -= u_ex(z, y, z, (i + 1)  * x.h, (j + 1) * y.h, z.l) / (z.h * z.h); // u|z = h
 		}
 
 
@@ -262,13 +250,13 @@ void GenRHSandSolution(size_m x, size_m y, size_m z, /* output */ dtype* B, dtyp
 #pragma omp simd
 		for (int i = 0; i < x.n; i++)
 		{
-			f[k * n + 0 * x.n + i] -= u_ex((i + 1) * x.h, 0, (k + 1) * z.h) / (y.h * y.h);
-			f[k * n + (y.n - 1) * x.n + i] -= u_ex((i + 1) * x.h, y.l, (k + 1) * z.h) / (y.h * y.h);
+			f[k * n + 0 * x.n + i] -= u_ex(x, y, z, (i + 1) * x.h, 0, (k + 1) * z.h) / (y.h * y.h);
+			f[k * n + (y.n - 1) * x.n + i] -= u_ex(x, y, z, (i + 1) * x.h, y.l, (k + 1) * z.h) / (y.h * y.h);
 		}
 		for (int j = 0; j < y.n; j++)
 		{
-			f[k * n + j * x.n + 0] -= u_ex(0, (j + 1) * y.h, (k + 1) * z.h) / (x.h * x.h);
-			f[k * n + j * x.n + x.n - 1] -= u_ex(x.l, (j + 1) * y.h, (k + 1) * z.h) / (x.h * x.h);
+			f[k * n + j * x.n + 0] -= u_ex(x, y, z, 0, (j + 1) * y.h, (k + 1) * z.h) / (x.h * x.h);
+			f[k * n + j * x.n + x.n - 1] -= u_ex(x, y, z, x.l, (j + 1) * y.h, (k + 1) * z.h) / (x.h * x.h);
 		}
 	}
 
@@ -278,32 +266,71 @@ void GenRHSandSolution(size_m x, size_m y, size_m z, /* output */ dtype* B, dtyp
 		for (int j = 0; j < y.n; j++)
 #pragma omp simd
 			for (int i = 0; i < x.n; i++)
-				u[ind(k, n) + ind(j, x.n) + i] = u_ex((i + 1) * x.h, (j + 1) * y.h, (k + 1) * z.h);
+				u[k * n + j * x.n + i] = u_ex(x, y, z, (i + 1) * x.h, (j + 1) * y.h, (k + 1) * z.h);
 
 
 	printf("RHS and solution are constructed\n");
 }
 
-void GenSparseMatrixOnline(size_m x, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, dcsr* Acsr)
+
+void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, dcsr* Acsr)
 {
 	int n = x.n * y.n;
 	int size = n * z.n;
 	int non_zeros_on_prev_level = 0;
-	map<vector<int>, dtype> CSR;
+	map<vector<int>, double> CSR;
 
 	Diag(n, BL, ldbl, 1.0 / (z.h * z.h));
 	Diag(n, BR, ldbr, 1.0 / (z.h * z.h));
+
 
 	for (int blk = 0; blk < z.n; blk++)
 	{
 		GenerateDiagonal2DBlock(blk, x, y, z, A, lda);
 		CSR = BlockRowMat_to_CSR(blk, x.n, y.n, z.n, BL, ldbl, A, lda, BR, ldbr, Acsr, non_zeros_on_prev_level); // ВL, ВR and A - is 2D dimensional matrices (n x n)
+																												 //	print_map(CSR);
+																												 //	system("pause");
 	}
 	printf("Non_zeros inside generating function: %d\n", non_zeros_on_prev_level);
 
 }
 
-map<vector<int>, dtype> Block1DRowMat_to_CSR(int blk, int n1, int n2, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, dcsr* Acsr, int& non_zeros_on_prev_level)
+map<vector<int>, double> BlockRowMat_to_CSR(int blk, int n1, int n2, int n3, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, dcsr* Acsr, int& non_zeros_on_prev_level)
+{
+	map<vector<int>, double> CSR_A;
+	vector<int> v(2, 0);
+	int n = n1 * n2;
+	int k = 0;
+	double *Arow = alloc_arr<double>(n * 3 * n); int ldar = n;
+
+	if (blk == 0)
+	{
+		construct_block_row(dlacpy, n, n, (double*)NULL, ldbl, A, lda, BR, ldbr, Arow, ldar);
+		CSR_A = dense_to_CSR(n, 2 * n, Arow, ldar, &Acsr->ia[0], &Acsr->ja[0], &Acsr->values[0]);
+		non_zeros_on_prev_level = CSR_A.size();
+	}
+	else if (blk == n3 - 1)
+	{
+		construct_block_row(dlacpy, n, n, BL, ldbl, A, lda, (double*)NULL, ldbr, Arow, ldar);
+		CSR_A = dense_to_CSR(n, 2 * n, Arow, ldar, &Acsr->ia[ind(blk, n)], &Acsr->ja[non_zeros_on_prev_level], &Acsr->values[non_zeros_on_prev_level]);
+		shift_values(n, &Acsr->ia[ind(blk, n)], non_zeros_on_prev_level, CSR_A.size(), &Acsr->ja[non_zeros_on_prev_level], n * (blk - 1));
+		non_zeros_on_prev_level += CSR_A.size();
+	}
+	else
+	{
+		construct_block_row(dlacpy, n, n, BL, ldbl, A, lda, BR, ldbr, Arow, ldar);
+		CSR_A = dense_to_CSR(n, 3 * n, Arow, ldar, &Acsr->ia[ind(blk, n)], &Acsr->ja[non_zeros_on_prev_level], &Acsr->values[non_zeros_on_prev_level]);
+
+		// shift values of arrays according to previous level
+		shift_values(n, &Acsr->ia[ind(blk, n)], non_zeros_on_prev_level, CSR_A.size(), &Acsr->ja[non_zeros_on_prev_level], n * (blk - 1));
+		non_zeros_on_prev_level += CSR_A.size();
+	}
+
+	free(Arow);
+	return CSR_A;
+}
+
+map<vector<int>, dtype> Block1DRowMat_to_CSR(int blk, int n1, int n2, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, int& non_zeros_on_prev_level)
 {
 	map<vector<int>, dtype> CSR_A;
 	map<vector<int>, dtype> CSR;
@@ -314,20 +341,20 @@ map<vector<int>, dtype> Block1DRowMat_to_CSR(int blk, int n1, int n2, dtype *BL,
 
 	if (blk == 0)
 	{
-		construct_block_row(n, n, NULL, ldbl, A, lda, BR, ldbr, Arow, ldar);
+		construct_block_row(zlacpy, n, n, (dtype*)NULL, ldbl, A, lda, BR, ldbr, Arow, ldar);
 		CSR_A = dense_to_CSR(n, 2 * n, Arow, ldar, &Acsr->ia[0], &Acsr->ja[0], &Acsr->values[0]);
 		non_zeros_on_prev_level = CSR_A.size();
 	}
 	else if (blk == n2 - 1)
 	{
-		construct_block_row(n, n, BL, ldbl, A, lda, NULL, ldbr, Arow, ldar);
+		construct_block_row(zlacpy, n, n, BL, ldbl, A, lda, (dtype*)NULL, ldbr, Arow, ldar);
 		CSR_A = dense_to_CSR(n, 2 * n, Arow, ldar, &Acsr->ia[ind(blk, n)], &Acsr->ja[non_zeros_on_prev_level], &Acsr->values[non_zeros_on_prev_level]);
 		shift_values(n, &Acsr->ia[ind(blk, n)], non_zeros_on_prev_level, CSR_A.size(), &Acsr->ja[non_zeros_on_prev_level], n * (blk - 1));
 		non_zeros_on_prev_level += CSR_A.size();
 	}
 	else
 	{
-		construct_block_row(n, n, BL, ldbl, A, lda, BR, ldbr, Arow, ldar);
+		construct_block_row(zlacpy, n, n, BL, ldbl, A, lda, BR, ldbr, Arow, ldar);
 		CSR_A = dense_to_CSR(n, 3 * n, Arow, ldar, &Acsr->ia[ind(blk, n)], &Acsr->ja[non_zeros_on_prev_level], &Acsr->values[non_zeros_on_prev_level]);
 
 		// shift values of arrays according to previous level
@@ -340,21 +367,23 @@ map<vector<int>, dtype> Block1DRowMat_to_CSR(int blk, int n1, int n2, dtype *BL,
 	return CSR_A;
 }
 
-void GenSparseMatrixOnline2D(int w, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, dcsr* Acsr)
+void GenSparseMatrixOnline2D(int w, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr)
 {
 	int n = y.n;
+	int n2 = n / 2;
 	int size = n * z.n;
 	int non_zeros_on_prev_level = 0;
 	map<vector<int>, dtype> CSR;
 
-	Diag(n, BL, ldbl, 1.0 / (z.h * z.h));
-	Diag(n, BR, ldbr, 1.0 / (z.h * z.h));
+	Diag(n, BL, ldbl, dtype{ 1.0 / (z.h * z.h), 0 });
+	Diag(n, BR, ldbr, dtype{ 1.0 / (z.h * z.h), 0 });
 
-	printf("Gen 2D matrix for frequency w = %d\n", w);
+	double kww = 4 * PI * PI * (w - n2) * (w - n2) / (y.l * y.l);
+	printf("Gen 2D matrix for frequency w = %d\n", w - n2);
 	for (int blk = 0; blk < z.n; blk++)
 	{
 		//printf("Blk: %d\n", blk);
-		GenerateDiagonal1DBlock(w, blk, y, z, A, lda);
+		GenerateDiagonal1DBlock(kww, blk, y, z, A, lda);
 		CSR = Block1DRowMat_to_CSR(blk, y.n, z.n, BL, ldbl, A, lda, BR, ldbr, Acsr, non_zeros_on_prev_level); // ВL, ВR and A - is 2D dimensional matrices (n x n)
 	//	print_map(CSR);
 	}
@@ -362,74 +391,29 @@ void GenSparseMatrixOnline2D(int w, size_m y, size_m z, dtype *BL, int ldbl, dty
 	printf("Non_zeros in 2D block: %d\n", non_zeros_on_prev_level);
 }
 
-map<vector<int>, dtype> BlockRowMat_to_CSR(int blk, int n1, int n2, int n3, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, dcsr* Acsr, int& non_zeros_on_prev_level)
+void SolvePardiso3D(size_m x, size_m y, size_m z, dcsr* Dcsr, double* x_pard, double* f, double thresh)
 {
-	map<vector<int>, dtype> CSR_A;
-	vector<int> v(2, 0);
-	int n = n1 * n2;
-	int k = 0;
-	dtype *Arow = alloc_arr<dtype>(n * 3 * n); int ldar = n;
+	int size = x.n * y.n * z.n;
+	int mtype = 11;
+	int *iparm = alloc_arr<int>(64);
+	int *perm = alloc_arr<int>(size);
+	size_t *pt = alloc_arr<size_t>(64);
 
-	if (blk == 0)
-	{
-		construct_block_row(n, n, NULL, ldbl, A, lda, BR, ldbr, Arow, ldar);
-		CSR_A = dense_to_CSR(n, 2 * n, Arow, ldar, &Acsr->ia[0], &Acsr->ja[0], &Acsr->values[0]);
-		non_zeros_on_prev_level = CSR_A.size();
-	}
-	else if (blk == n3 - 1)
-	{
-		construct_block_row(n, n, BL, ldbl, A, lda, NULL, ldbr, Arow, ldar);
-		CSR_A = dense_to_CSR(n, 2 * n, Arow, ldar, &Acsr->ia[ind(blk, n)], &Acsr->ja[non_zeros_on_prev_level], &Acsr->values[non_zeros_on_prev_level]);
-		shift_values(n, &Acsr->ia[ind(blk, n)], non_zeros_on_prev_level, CSR_A.size(), &Acsr->ja[non_zeros_on_prev_level], n * (blk - 1));
-		non_zeros_on_prev_level += CSR_A.size();
-	}
-	else
-	{
-		construct_block_row(n, n, BL, ldbl, A, lda, BR, ldbr, Arow, ldar);
-		CSR_A = dense_to_CSR(n, 3 * n, Arow, ldar, &Acsr->ia[ind(blk, n)], &Acsr->ja[non_zeros_on_prev_level], &Acsr->values[non_zeros_on_prev_level]);
+	int maxfct = 1;
+	int mnum = 1;
+	int phase = 0;
+	int rhs = 1;
+	int msglvl = 0;
+	int error = 0;
+	phase = 13;
 
-		// shift values of arrays according to previous level
-		shift_values(n, &Acsr->ia[ind(blk, n)], non_zeros_on_prev_level, CSR_A.size(), &Acsr->ja[non_zeros_on_prev_level], n * (blk - 1));
-		non_zeros_on_prev_level += CSR_A.size();
-	}
-
-	free(Arow);
-	return CSR_A;
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, Dcsr->values, Dcsr->ia, Dcsr->ja, perm, &rhs, iparm, &msglvl, f, x_pard, &error);
 }
 
-map<vector<int>, dtype> dense_to_CSR(int m, int n, dtype *A, int lda, int *ia, int *ja, dtype *values)
+void print_csr(int n, dcsr* A)
 {
-	map<vector<int>, dtype> CSR;
-	vector<int> v(2, 0);
-	int k = 0;
-	int ik = 0;
-	int first_elem_in_row = 0;
-	for (int i = 0; i < m; i++)
-	{
-		first_elem_in_row = 0;
-		for (int j = 0; j < n; j++)
-		{
-			if (abs(A[i + lda * j]) != 0)
-			{
-				values[k] = A[i + lda * j];
-				if (first_elem_in_row == 0)
-				{
-					ia[ik] = k + 1;
-					ik++;
-					first_elem_in_row = 1;
-				}
-				ja[k] = j + 1;
-
-				v[0] = ia[ik - 1];
-				v[1] = ja[k];
-				CSR[v] = values[k];
-
-				k++;
-			}
-		}
-	}
-
-	return CSR;
+	for (int i = 0; i < n; i++)
+		printf("i = %d j = %d value = %lf\n", A->ia[i], A->ja[i], A->values[i]);
 }
 
 void shift_values(int rows, int *ia, int shift_non_zeros, int non_zeros, int *ja, int shift_columns)
@@ -443,37 +427,25 @@ void shift_values(int rows, int *ia, int shift_non_zeros, int non_zeros, int *ja
 		ja[i] += shift_columns;
 }
 
-void construct_block_row(int m, int n, dtype* BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, dtype* Arow, int ldar)
+double F_ex(size_m xx, size_m yy, size_m zz, double x, double y, double z)
 {
-	if (BL == NULL)
-	{
-		zlacpy("All", &m, &n, A, &lda, &Arow[0 + ldar * 0], &ldar);
-		zlacpy("All", &m, &n, BR, &ldbr, &Arow[0 + ldar * n], &ldar);
-	}
-	else if (BR == NULL)
-	{
-		zlacpy("All", &m, &n, BL, &ldbl, &Arow[0 + ldar * 0], &ldar);
-		zlacpy("All", &m, &n, A, &lda, &Arow[0 + ldar * n], &ldar);
-	}
-	else
-	{
-		zlacpy("All", &m, &n, BL, &ldbl, &Arow[0 + ldar * 0], &ldar);
-		zlacpy("All", &m, &n, A, &lda, &Arow[0 + ldar * n], &ldar);
-		zlacpy("All", &m, &n, BR, &ldbr, &Arow[0 + ldar * 2 * n], &ldar);
-	}
+//	return -4.0 * PI * PI * (1.0 / (xx.n * xx.n) + 1.0 / (yy.n * yy.n) + 1.0 / (zz.n * zz.n)) * sin(2 * PI * x / xx.n) * sin(2 * PI * y / yy.n) * sin(2 * PI * z / zz.n);
+//	return 0;
+
+//	return 2.0 * (x * (x - xx.l) * z * (z - zz.l) + y * (y - yy.l) * z * (z - zz.l) + x * (x - xx.l) * y * (y - yy.l));
+
+  return sin(2 * PI * x) * sin(2 * PI * y) * sin(2 * PI * z);
 }
 
-double F_ex(double x, double y, double z)
+double u_ex(size_m xx, size_m yy, size_m zz, double x, double y, double z)
 {
-//	return -12.0 * PI * PI * sin(2 * PI * x) * sin(2 * PI * y) * sin(2 * PI * z);
-	return 0;
-}
-
-double u_ex(double x, double y, double z)
-{
-//	return 2.0 + sin(2 * PI * x) * sin(2 * PI * y) * sin(2 * PI * z);
-	return x * x + y * y - 2.0 * z * z;
+//	return 2.0 + sin(2.0 * PI * x / xx.n) * sin(2.0 * PI * y / yy.n) * sin(2.0 * PI * z / zz.n);
+//	return x * x + y * y - 2.0 * z * z;
 //	return x * x - y * y;
+
+//	return x * y * z * (x - xx.l) * (y - yy.l) * (z - zz.l);
+
+	return -sin(2 * PI * x) * sin(2 * PI * y) * sin(2 * PI * z) / (12.0 * PI * PI + 1.0);
 }
 
 void print_map(const map<vector<int>, dtype>& SD)
@@ -504,7 +476,36 @@ double rel_error(int n, int k, double *Hrec, double *Hinit, int ldh, double eps)
 	//else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
 }
 
-void GenRHSandSolution2D_Syntetic(size_m x, size_m y, dcsr *Dcsr, dtype *u, dtype *f)
+void ResidCSR(int n1, int n2, int n3, dcsr* Dcsr, double* x_sol, double *f, double* g, double &RelRes)
+{
+	int n = n1 * n2;
+	int size = n * n3;
+	double *f1 = alloc_arr<double>(size);
+	int ione = 1;
+
+	// Multiply matrix A in CSR format by vector x_sol to obtain f1
+	mkl_dcsrgemv("No", &size, Dcsr->values, Dcsr->ia, Dcsr->ja, x_sol, f1);
+
+#pragma omp parallel for simd schedule(simd:static)
+	for (int i = 0; i < size; i++)
+		g[i] = f[i] - f1[i];
+
+	//	for (int i = 0; i < size; i++)
+	//		printf("%lf %lf\n", f[i], f1[i]);
+
+#ifdef DEBUG
+	print_vec(size, f, g, "f and g");
+#endif
+
+	RelRes = dlange("Frob", &size, &ione, g, &size, NULL);
+	RelRes = RelRes / dlange("Frob", &size, &ione, f, &size, NULL);
+
+	free_arr(f1);
+}
+
+
+
+void GenRHSandSolution2D_Syntetic(size_m x, size_m y, ccsr *Dcsr, dtype *u, dtype *f)
 {
 	printf("GenRHSandSolution2D_Syntetic...\n");
 	int n = x.n;
@@ -518,7 +519,6 @@ void GenRHSandSolution2D_Syntetic(size_m x, size_m y, dcsr *Dcsr, dtype *u, dtyp
 
 	printf("RHS and solution are constructed\n");
 }
-
 
 void GenSolVector(int size, dtype *vector)
 {

@@ -1,6 +1,7 @@
 #include "definitions.h"
 #include "templates.h"
 #include "TestSuite.h"
+#include "TemplatesForMatrixConstruction.h"
 
 /***************************************************
 Test for solving Laplace equation with Dirichlet
@@ -194,12 +195,13 @@ int main()
 
 int main()
 {
-	//TestAll();
-	//system("pause");
+	TestAll();
+	system("pause");
+//	return 0;
 #if 1
-	int n1 = 40;		    // number of point across the directions
-	int n2 = 40;
-	int n3 = 40;
+	int n1 = 49;		    // number of point across the directions
+	int n2 = 49;
+	int n3 = 49;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 	int size = n * NB;		// size of vector x and f: n1 * n2 * n3
@@ -209,6 +211,7 @@ int main()
 	char bench[255] = "display"; // parameter into solver to show internal results
 	int sparse_size = n + 2 * (n - 1) + 2 * (n - n1);
 	int non_zeros_in_3diag = n + (n - 1) * 2 + (n - n1) * 2 - (n1 - 1) * 2;
+	int ione = 1;
 
 	size_m x, y, z;
 
@@ -216,13 +219,11 @@ int main()
 	y.n = n2;
 	z.n = n3;
 
-	x.l = y.l = z.l = n1 + 1;
-	x.h = x.l / (double)(x.n + 1);
-	y.h = y.l / (double)(y.n + 1);
-	z.h = z.l / (double)(z.n + 1);
+	x.l = y.l = z.l = 1;
+	x.h = x.l / (double)(x.n + 1);  // x.n + 1 grid points of the whole domain
+	y.h = y.l / (double)(y.n + 1);  // x.n - 1 - inner points
+	z.h = z.l / (double)(z.n + 1);  // 2 points - for the boundaries
 
-	dtype *D;
-	dtype *B_mat;
 
 	// Memory allocation for coefficient matrix A
 	// the size of matrix A: n^3 * n^3 = n^6
@@ -232,8 +233,8 @@ int main()
 	int ldd = size;
 	int ldb = size - n;
 #else
-	D = alloc_arr<dtype>(n * n); // it's a matrix with size n^3 * n^2 = size * n
-	B_mat = alloc_arr<dtype>(n * n);
+	double *D = alloc_arr<double>(n * n); // it's a matrix with size n^3 * n^2 = size * n
+	double *B_mat = alloc_arr<double>(n * n);
 	int ldd = n;
 	int ldb = n;
 #endif
@@ -247,19 +248,22 @@ int main()
 #endif
 
 	// Solution, right hand side and block B
-	dtype *B = alloc_arr<dtype>(size - n); // vector of diagonal elementes
-	dtype *x_orig = alloc_arr<dtype>(size);
-	dtype *x_sol = alloc_arr<dtype>(size);
-	dtype *f = alloc_arr<dtype>(size);
+	double *B = alloc_arr<double>(size - n); // vector of diagonal elementes
+	double *x_orig = alloc_arr<double>(size);
+	double *x_sol = alloc_arr<double>(size);
+	double *x_pard = alloc_arr<double>(size);
+	double *x_pard_cpy = alloc_arr<double>(size);
+	double *f = alloc_arr<double>(size);
 	dtype *f_FFT = alloc_arr<dtype>(size);
-	dtype *f2D = alloc_arr<dtype>(n2 * n3);
+	dtype *x_sol_prd = alloc_arr<dtype>(size);
+	dtype *u2Dsynt = alloc_arr<dtype>(size);
 
 #ifdef STRUCT_CSR
 	// Memory for 3D CSR matrix
 	dcsr *Dcsr;
 	int non_zeros_in_3Dblock3diag = (n + (n - 1) * 2 + (n - x.n) * 2 - (x.n - 1) * 2) * z.n + 2 * (size - n);
 	Dcsr = (dcsr*)malloc(sizeof(dcsr));
-	Dcsr->values = alloc_arr<dtype>(non_zeros_in_3Dblock3diag);
+	Dcsr->values = alloc_arr<double>(non_zeros_in_3Dblock3diag);
 	Dcsr->ia = alloc_arr<int>(size + 1);
 	Dcsr->ja = alloc_arr<int>(non_zeros_in_3Dblock3diag);
 	Dcsr->ia[size] = non_zeros_in_3Dblock3diag + 1;
@@ -294,17 +298,30 @@ int main()
 #ifndef ONLINE
 	GenSparseMatrix(x, y, z, B_mat, ldb, D, ldd, B_mat, ldb, Dcsr);
 #else
-	GenSparseMatrixOnline(x, y, z, B_mat, n, D, n, B_mat, n, Dcsr);
-//	free_arr(D);
-#endif
-//	free_arr(B_mat);
+	GenSparseMatrixOnline3D(x, y, z, B_mat, n, D, n, B_mat, n, Dcsr);
 
+#endif
+	free_arr(D);
+	free_arr(B_mat);
 
 	printf("Non_zeros in 3D block-tridiagonal matrix: %d\n", non_zeros_in_3Dblock3diag);
 
+#if 1
 	//	Test_CompareColumnsOfMatrix(n1, n2, n3, D, ldd, B, Dcsr, thresh);
 	Test_TransferBlock3Diag_to_CSR(n1, n2, n3, Dcsr, x_orig, f, thresh);
 
+	// Solve Pardiso
+	SolvePardiso3D(x, y, z, Dcsr, x_pard, f, thresh);
+	printf("Computing error for 3D PARDISO ||x_{exact}-x_{comp}||/||x_{exact}||\n");
+
+	dlacpy("All", &size, &ione, x_pard, &size, x_pard_cpy, &size);
+
+	norm = rel_error(dlange, size, 1, x_pard_cpy, x_orig, size, thresh);
+
+	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
+	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
+
+#endif
 	system("pause");
 #endif
 
@@ -318,23 +335,28 @@ int main()
 	MKL_LONG status;
 
 	// Create 1D FFT of COMPLEX DOUBLE case
-	status = DftiCreateDescriptor(&my_desc1_handle, DFTI_DOUBLE, DFTI_COMPLEX, 1, n1);
+	status = DftiCreateDescriptor(&my_desc1_handle, DFTI_DOUBLE, DFTI_REAL, 1, n1);
 	status = DftiSetValue(my_desc1_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
+	status = DftiSetValue(my_desc1_handle, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
 	status = DftiCommitDescriptor(my_desc1_handle);
 
 	// We make n2 * n3 FFT's for one dimensional direction x with n1 grid points
 	printf("Applying 1D Fourier transformation for 3D RHS\n");
 	for (int k = 0; k < n2 * n3; k++)
 	{
-		status = DftiComputeForward(my_desc1_handle, &f[n1 * k], &f_FFT[n1 * k]);
+		//status = DftiComputeForward(my_desc1_handle, &f[n1 * k], &f_FFT[n1 * k]);
+		//MyFFT1D_ForwardComplexSin(n1, &f[n1 * k], &f_FFT[n1 * k]);
+		MyFT1D_ForwardReal(n1, x.h, &f[n1 * k], &f_FFT[n1 * k]);
 	}
+
+#undef REAL
+#define COMPLEX
 
 	// Calling the solver
 	int size2D = y.n * z.n;
 	int mtype = 13;
 	int *iparm = alloc_arr<int>(64);
 	int *perm = alloc_arr<int>(size2D);
-	dtype *x_sol_prd = alloc_arr<dtype>(size);
 	size_t *pt = alloc_arr<size_t>(64);
 
 	int maxfct = 1;
@@ -345,10 +367,14 @@ int main()
 	int error = 0;
 	phase = 13;
 
+	// Memory for coefficient matrix
+	dtype *Dc = alloc_arr<dtype>(n1 * n1);
+	dtype *Bc_mat = alloc_arr<dtype>(n1 * n1);
+
 	// Memory for 2D CSR matrix
-	dcsr *D2csr;
+	ccsr *D2csr;
 	int non_zeros_in_2Dblock3diag = (y.n + (y.n - 1) * 2) * z.n + 2 * (size2D - y.n);
-	D2csr = (dcsr*)malloc(sizeof(dcsr));
+	D2csr = (ccsr*)malloc(sizeof(ccsr));
 	D2csr->values = alloc_arr<dtype>(non_zeros_in_2Dblock3diag);
 	D2csr->ia = alloc_arr<int>(size2D + 1);
 	D2csr->ja = alloc_arr<int>(non_zeros_in_2Dblock3diag);
@@ -359,33 +385,50 @@ int main()
 	for (int i = 0; i < n1; i++)
 	{
 		printf("Iter: %d\n", i);
-		GenSparseMatrixOnline2D(i, y, z, B_mat, n, D, n, B_mat, n, D2csr);
+		dtype *f2D = alloc_arr<dtype>(n2 * n3);
+		GenSparseMatrixOnline2D(i, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
 		GenRhs2D(i, x, y, z, f_FFT, f2D);
+	//	GenRHSandSolution2D_Syntetic(y, z, D2csr, &u2Dsynt[i * size2D], f2D);
 		pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f2D, &x_sol_prd[i * size2D], &error);
-		//printf("Error = %d\n", error);
+//		norm = rel_error(zlange, n2 * n3, 1, &u2Dsynt[i * size2D], &x_sol_prd[i * size2D], n2 * n3, thresh);
+	//	printf("ErrorNorm = %12.10e\n", norm);
+		free(f2D);
 	}
+
+
 
 	printf("Backward 1D FFT's of %d x %d times to each point of 2D solution\n", n2, n3);
 	for (int k = 0; k < n2 * n3; k++)
 	{
 		dtype* u1D = alloc_arr<dtype>(n1);
 		GenSol1DBackward(k, x, y, z, x_sol_prd, u1D);
-		status = DftiComputeBackward(my_desc1_handle, u1D, &x_sol[k * n1]);
+	//	status = DftiComputeBackward(my_desc1_handle, u1D, &x_sol[k * n1]);
+	//	MyFFT1D_BackwardComplexSin(n1, u1D, &x_sol[k * n1]);
+		MyFT1D_BackwardReal(n1, x.h, u1D, &x_sol[k * n1]);
 		free(u1D);
 	}
 
-	for (int i = 0; i < size; i++)
-		x_sol[i] /= n1;
+
+	//for (int i = 0; i < size; i++)
+	//	x_sol[i] /= n1;
 
 	status = DftiFreeDescriptor(&my_desc1_handle);
 	printf("-----------------------------------\n");
 
 	printf("Computing error ||x_{exact}-x_{comp}||/||x_{exact}||\n");
 
-	for (int i = 0; i < size; i++)
-		printf("%lf + I * %lf,  %lf + I * %lf\n",x_sol[i].real(), x_sol[i].imag(), x_orig[i].real(), x_orig[i].imag());
+	//for (int i = 0; i < size; i++)
+	//	printf("%lf ,  %lf \n", x_sol[i], x_pard[i]);
 
-	norm = rel_error_complex(n, 1, x_sol, x_orig, size, thresh);
+	dlacpy("All", &size, &ione, x_sol, &size, x_pard_cpy, &size);
+
+	norm = rel_error(dlange, n, 1, x_sol, x_orig, size, thresh);
+
+	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
+	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
+
+	printf("Computing error ||x_{comp_prd}-x_{comp_fft}||/||x_{comp_prd}||\n");
+	norm = rel_error(dlange, n, 1, x_pard_cpy, x_pard, size, thresh);
 
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);

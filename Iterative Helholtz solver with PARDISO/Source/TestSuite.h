@@ -40,11 +40,16 @@ void Shell_FFT1D_Complex(ptr_test_fft func, const string& test_name, int& numb, 
 
 // Solver
 void Test_DirFactFastDiagStructOnline(size_m x, size_m y, size_m z, cmnode** Gstr, dtype *B, double thresh, int smallsize);
-void Test_TransferBlock3Diag_to_CSR(int n1, int n2, int n3, dcsr* Dcsr, dtype* x_orig, dtype *f, double eps);
+void Test_TransferBlock3Diag_to_CSR(int n1, int n2, int n3, dcsr* Dcsr, double* x_orig, double *f, double eps);
 
 // FFT
 void Test_FFT1D_Real(int n /* grid points in 1 dim */, double eps);
 void Test_FFT1D_Complex(int n /* grid points in 1 dim */, double eps);
+void Test_Poisson_FFT1D_Real(int n /* grid points in 1 dim */, double eps);
+
+// FT
+void Test_Poisson_FT1D_Real(int n /* grid points in 1 dim */, double eps);
+void Test_ExactSolution_1D(int n, double h, double* u, double *f, double eps);
 
 #if 0
 

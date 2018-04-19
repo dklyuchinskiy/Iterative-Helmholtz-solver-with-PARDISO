@@ -143,9 +143,9 @@ void PrintStruct(int n, mnode *root)
 		int n2 = ceil(n / 2.0);
 		int n1 = n - n2;
 		printf("%3d ", root->p);
-		print(n2, root->p, root->U, n2, "U");
+	//	print(n2, root->p, root->U, n2, "U");
 		printf("\n");
-		print(root->p, n1, root->VT, root->p, "VT");
+	//	print(root->p, n1, root->VT, root->p, "VT");
 
 		PrintStruct(n1, root->left);
 		PrintStruct(n2, root->right);
@@ -719,7 +719,6 @@ void SymResRestoreStruct(int n, cmnode* H1str, dtype *H2 /*recovered*/, int ldh,
 	}
 }
 
-
 // Solver
 
 void Block3DSPDSolveFastStruct(size_m x, size_m y, size_m z, dtype *D, int ldd, dtype *B, dtype *f, dcsr* Dcsr, double thresh, int smallsize, int ItRef, char *bench,
@@ -931,31 +930,6 @@ void DirSolveFastDiagStruct(int n1, int n2, int n3, cmnode* *Gstr, dtype *B, dty
 	free_arr(tb);
 	free_arr(y);
 }
-
-void ResidCSR(int n1, int n2, int n3, dcsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, double &RelRes)
-{
-	int n = n1 * n2;
-	int size = n * n3;
-	dtype *f1 = alloc_arr<dtype>(size);
-	int ione = 1;
-
-	// Multiply matrix A in CSR format by vector x_sol to obtain f1
-	mkl_zcsrgemv("No", &size, Dcsr->values, Dcsr->ia, Dcsr->ja, x_sol, f1);
-
-#pragma omp parallel for simd schedule(simd:static)
-	for (int i = 0; i < size; i++)
-		g[i] = f[i] - f1[i];
-
-#ifdef DEBUG
-	print_vec(size, f, g, "f and g");
-#endif
-
-	RelRes = zlange("Frob", &size, &ione, g, &size, NULL);
-	RelRes = RelRes / zlange("Frob", &size, &ione, f, &size, NULL);
-
-	free_arr(f1);
-}
-
 
 void alloc_dense_node(int n, cmnode* &Cstr)
 {

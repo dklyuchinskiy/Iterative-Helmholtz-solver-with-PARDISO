@@ -23,6 +23,7 @@ declaration of used structures
 #include <vector>
 #include <complex>
 
+typedef double rtype;
 typedef std::complex<double> dtype;
 #define MKL_Complex16 dtype
 
@@ -34,6 +35,25 @@ typedef std::complex<double> dtype;
 #define EPS 0.00000001
 
 #define min(a,b) ((a) <= (b)) ? (a) : (b)
+
+struct MatrixCSRReal {
+
+	int *ia = NULL;
+	int *ja = NULL;
+	double *values = NULL;
+};
+
+typedef struct MatrixCSRReal dcsr;
+
+struct MatrixCSRComplex {
+
+	int *ia = NULL;
+	int *ja = NULL;
+	dtype *values = NULL;
+};
+
+typedef struct MatrixCSRComplex ccsr;
+
 
 struct size_m {
 	int l;
@@ -64,15 +84,6 @@ struct ComplexBinaryMatrixTreeNode {
 };
 
 typedef struct ComplexBinaryMatrixTreeNode cmnode;
-
-struct MatrixCSR {
-
-	int *ia = NULL;
-	int *ja = NULL;
-	dtype *values = NULL;
-};
-
-typedef struct MatrixCSR dcsr;
 
 struct list {
 	mnode* node;

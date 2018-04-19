@@ -2,6 +2,7 @@
 #include "templates.h"
 #include "TestSuite.h"
 #include "TestFramework.h"
+#include "TemplatesForMatrixConstruction.h"
 
 /***************************************
 Source file contains tests for testing
@@ -11,6 +12,311 @@ functions.cpp and BinaryTrees.cpp.
 The interface is declared in TestSuite.h
 ****************************************/
 
+void Test_TransferBlock3Diag_to_CSR(int n1, int n2, int n3, dcsr* Dcsr, double* x_orig, double *f, double eps)
+{
+	int n = n1 * n2;
+	int size = n * n3;
+	double RelRes = 0;
+	double *g = alloc_arr<double>(size);
+	ResidCSR(n1, n2, n3, Dcsr, x_orig, f, g, RelRes);
+
+
+	if (RelRes < eps) printf("A * u_ex = f. Norm %10.8e < eps %10.8lf: PASSED\n", RelRes, eps);
+	else printf("A * u_ex = f. Norm %10.8lf > eps %10.8e : FAILED\n", RelRes, eps);
+
+	free_arr(g);
+}
+
+void Test_Poisson_FFT1D_Real(int n /* grid points in 1 dim */, double eps)
+{
+	DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
+	DFTI_DESCRIPTOR_HANDLE my_desc2_handle;
+	DFTI_DESCRIPTOR_HANDLE hand = 0;
+	MKL_LONG status;
+
+	double L = 1.0;
+	double h = L / (n + 1);
+	double norm;
+	double sum = 0;
+
+	double *f = alloc_arr<double>(n);
+	double *u = alloc_arr <double>(n);
+	dtype *u_obt = alloc_arr<dtype>(n);
+	dtype *f_FFT = alloc_arr<dtype>(n);
+	dtype *f_MYFFT = alloc_arr<dtype>(n);
+
+	double *u_FFT = alloc_arr<double>(n);
+	double *u_MYFFT = alloc_arr<double>(n);
+
+	double* x = alloc_arr<double>(n);
+	double *lambda = alloc_arr<double>(n);
+
+	for (int i = 0; i < n; i++)
+	{
+		x[i] = (i + 1) * h; // inner pointas only
+		printf("%lf ", x[i]);
+	}
+
+
+	// u_xx = f
+	// u = sin(2 * PI * x) , f = - 4 * PI * PI * sin(2 * PI * x)
+
+	for (int i = 0; i < n; i++)
+	{
+		u[i] = -sin(2.0 * PI * x[i]) / (4.0 * PI * PI + 1.0);
+		f[i] = sin(2.0 * PI * x[i]);
+
+		//u[i] = x[i] * (x[i] - L) * (x[i] - L);
+		//f[i] = 6 * x[i] - 4 * L - x[i] * (x[i] - L) * (x[i] - L);
+	}
+
+
+	status = DftiCreateDescriptor(&hand, DFTI_DOUBLE, DFTI_REAL, 1, (MKL_LONG)(n));
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	printf("Set configuration: out-of-place\n");
+	status = DftiSetValue(hand, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	printf("Set configuration: CCE storage\n");
+	status = DftiSetValue(hand, DFTI_CONJUGATE_EVEN_STORAGE,
+		DFTI_COMPLEX_COMPLEX);
+
+	//	status = DftiSetValue(hand, DFTI_FORWARD_SCALE, 1.0 / n);
+
+	status = DftiCommitDescriptor(hand);
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	status = DftiComputeForward(hand, f, f_FFT);
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	MyFFT1D_ForwardReal(n, f, f_MYFFT);
+	for (int i = 0; i < n; i++)
+		printf("f_FFT[%d]: %14.12lf + I * %14.12lf  f_MYFFT[%d]: %14.12lf + I * %14.12lf\n", i, f_FFT[i].real(), f_FFT[i].imag(),
+			i, f_MYFFT[i].real(), f_MYFFT[i].imag());
+
+	//	norm = rel_error_complex(n / 2, 1, f_MYFFT, f_FFT, n, eps);
+	//	if (norm < eps) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
+	//	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+	//	system("pause");
+
+	/*	for (int i = 0; i < n; i++)
+	if (i < n / 2 - 1) lambda[i] = -(2.0 * PI * i / L) * (2.0 * PI * i / L) - 1.0;
+	else lambda[i] = -(2.0 * PI * (n - i) / L) * (2.0 * PI * (n - i) / L) - 1.0;*/
+
+	for (int i = 0; i < n; i++)
+		lambda[i] = -((2 * PI * (i + 1) / L) * (2 * PI * (i + 1) / L) + 1);
+
+	for (int i = 1; i < n; i++)
+	{
+		f_FFT[i] /= lambda[i];
+		f_MYFFT[i] /= lambda[i];
+		//	printf("lambda[%d] = %lf\n", i, lambda[i]);
+	}
+
+	MyFFT1D_BackwardReal(n, f_MYFFT, u_MYFFT);
+
+	status = DftiComputeBackward(hand, f_FFT, u_FFT);
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	for (int i = 0; i < n; i++)
+	{
+		u_FFT[i] /= n;
+	}
+
+	for (int i = 0; i < n; i++)
+		printf("u_backward[%d]: %14.12lf  u_MKL[%d]: %14.12lf, u_ex[%d]:  %14.12lf\n", i, u_MYFFT[i],
+			i, u_FFT[i], i, u[i]);
+
+	norm = rel_error(dlange, n, 1, u_FFT, u, n, eps);
+	if (norm < eps) printf("MKL: Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
+	else printf("MKL: Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+
+	norm = rel_error(dlange, n, 1, u_MYFFT, u, n, eps);
+	if (norm < eps) printf("MyFFT: Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
+	else printf("MyFFT: Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+	system("pause");
+
+	printf("Free DFTI descriptor\n");
+	DftiFreeDescriptor(&hand);
+
+	return;
+failed:
+	printf("ERROR\n");
+	return;
+}
+
+void Test_ExactSolution_1D(int n, double h, double* u, double *f, double eps)
+{
+	double *u_left = alloc_arr<double>(n - 2);
+
+	for (int i = 0; i < n - 2; i++)
+	{
+		u_left[i] = (u[i + 2] - 2 * u[i + 1] + u[i]) / (h * h) - u[i + 1];
+		printf("%d: u_xx - u: %lf  f: %lf\n", i + 1, u_left[i], f[i + 1]);
+	}
+
+	double norm = rel_error(dlange, n - 2, 1, u_left, &f[1], n - 2, eps);
+	if (norm < eps) printf("u_xx - u = f: Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
+	else printf("u_xx - u = f: Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+	system("pause");
+}
+
+void Test_Poisson_FT1D_Real(int n /* grid points in 1 dim */, double eps)
+{
+	DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
+	DFTI_DESCRIPTOR_HANDLE my_desc2_handle;
+	DFTI_DESCRIPTOR_HANDLE hand = 0;
+	MKL_LONG status;
+
+	n = 79;
+
+	double L = 1.0;
+	double h = L / (n - 1);
+	double norm;
+	double sum = 0;
+
+	double *f = alloc_arr<double>(n);
+	double *u = alloc_arr <double>(n);
+	dtype *u_obt = alloc_arr<dtype>(n);
+	dtype *f_FFT = alloc_arr<dtype>(n);
+	dtype *f_MYFFT = alloc_arr<dtype>(n);
+
+	double *u_FFT = alloc_arr<double>(n);
+	double *u_MYFFT = alloc_arr<double>(n);
+
+	double* x = alloc_arr<double>(n);
+	double *lambda_my = alloc_arr<double>(n);
+	double *lambda_mkl = alloc_arr<double>(n);
+
+	for (int i = 0; i < n; i++)
+	{
+		x[i] = i * h; // all points from 0 to 1
+		printf("%lf ", x[i]);
+	}
+
+
+	// u_xx = f
+	// u = sin(2 * PI * x) , f = - 4 * PI * PI * sin(2 * PI * x)
+
+	for (int i = 0; i < n; i++)
+	{
+		u[i] = -sin(2.0 * PI * x[i]) / (4.0 * PI * PI + 1.0);
+		f[i] = sin(2.0 * PI * x[i]);
+
+	//	u[i] = x[i] * (x[i] - L) * (x[i] - L);
+	//	f[i] = 6 * x[i] - 4 * L - x[i] * (x[i] - L) * (x[i] - L);
+	}
+
+	Test_ExactSolution_1D(n, h, u, f, eps);
+
+
+	status = DftiCreateDescriptor(&hand, DFTI_DOUBLE, DFTI_REAL, 1, (MKL_LONG)(n));
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	printf("Set configuration: out-of-place\n");
+	status = DftiSetValue(hand, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	printf("Set configuration: CCE storage\n");
+	status = DftiSetValue(hand, DFTI_CONJUGATE_EVEN_STORAGE,
+		DFTI_COMPLEX_COMPLEX);
+
+	//	status = DftiSetValue(hand, DFTI_FORWARD_SCALE, 1.0 / n);
+
+	status = DftiCommitDescriptor(hand);
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	status = DftiComputeForward(hand, f, f_FFT);
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	MyFT1D_ForwardReal(n, h, f, f_MYFFT);
+	printf("h = %lf\n", h);
+	for (int i = 0; i < n; i++)
+		printf("f_MYFFT[%d]: %14.12lf + I * %14.12lf, exact: %14.12lf\n",
+			i, f_MYFFT[i].real(), f_MYFFT[i].imag(), -2.0 / (PI * (4 * (i - n/2) * (i - n / 2) - 1)));
+
+	//	norm = rel_error_complex(n / 2, 1, f_MYFFT, f_FFT, n, eps);
+	//	if (norm < eps) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
+	//	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+	//	system("pause");
+
+	/*	for (int i = 0; i < n; i++)
+	if (i < n / 2 - 1) lambda[i] = -(2.0 * PI * i / L) * (2.0 * PI * i / L) - 1.0;
+	else lambda[i] = -(2.0 * PI * (n - i) / L) * (2.0 * PI * (n - i) / L) - 1.0;*/
+
+	for (int i = 0; i < n; i++)
+	{
+		lambda_my[i] = -((2 * PI * (i - n / 2) / L) * (2 * PI * (i - n / 2) / L) + 1);
+		lambda_mkl[i] = -((2 * PI * i / L) * (2 * PI * i / L) + 1);
+
+	}
+
+	for (int i = 0; i < n; i++)
+	{
+		f_FFT[i] /= lambda_mkl[i];
+		f_MYFFT[i] /= lambda_my[i];
+		//	printf("lambda[%d] = %lf\n", i, lambda[i]);
+	}
+
+	MyFT1D_BackwardReal(n, h, f_MYFFT, u_MYFFT);
+
+	status = DftiComputeBackward(hand, f_FFT, u_FFT);
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	for (int i = 0; i < n; i++)
+	{
+		u_FFT[i] /= n;
+	}
+
+	for (int i = 0; i < n; i++)
+		printf("u_backward[%d]: %14.12lf  u_MKL[%d]: %14.12lf, u_ex[%d]:  %14.12lf\n", i, u_MYFFT[i],
+			i, u_FFT[i], i, u[i]);
+	
+
+	norm = rel_error(dlange, n, 1, u_FFT, u, n, eps);
+	if (norm < eps) printf("MKL: Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
+	else printf("MKL: Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+
+	norm = rel_error(dlange, n, 1, u_MYFFT, u, n, eps);
+	if (norm < eps) printf("MyFFT: Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
+	else printf("MyFFT: Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+	system("pause");
+
+	printf("Free DFTI descriptor\n");
+	DftiFreeDescriptor(&hand);
+
+	return;
+failed:
+	printf("ERROR\n");
+	return;
+}
+
+
+void Shell_FFT1D_Complex(ptr_test_fft func, const string& test_name, int& numb, int& fail_count)
+{
+	double eps = 10e-6;
+	//	for (double eps = 1e-2; eps > 1e-8; eps /= 10)
+	for (int n = 1001; n <= 1001; n += 1001)
+	{
+		try
+		{
+			numb++;
+			func(n, eps);
+		}
+		catch (runtime_error& e)
+		{
+			++fail_count;
+			cerr << test_name << " fail: " << e.what() << endl;
+		}
+		catch (...) {
+			++fail_count;
+			cerr << "Unknown exception caught" << endl;
+		}
+	}
+}
+
+
 void TestAll()
 {
 	TestRunner runner;
@@ -19,17 +325,18 @@ void TestAll()
 
 	printf("***** TEST LIBRARY FUNCTIONS *******\n");
 	printf("****Complex precision****\n");
-	runner.RunTest(Shell_LowRankApprox, Test_LowRankApproxStruct, "Test_LowRankApprox");
-	runner.RunTest(Shell_SymRecCompress, Test_SymRecCompressStruct, "Test_SymRecCompress");
-	runner.RunTest(Shell_DiagMult, Test_DiagMultStruct, "Test_DiagMult");
-	runner.RunTest(Shell_RecMultL, Test_RecMultLStruct, "Test_RecMultL");
-	runner.RunTest(Shell_Add, Test_AddStruct, "Test_Add");
-	runner.RunTest(Shell_SymCompUpdate2, Test_SymCompUpdate2Struct, "Test_SymCompUpdate2");
-	runner.RunTest(Shell_SymCompRecInv, Test_SymCompRecInvStruct, "Test_SymCompRecInv");
-	runner.RunTest(Shell_CopyStruct, Test_CopyStruct,  "Test_CopyStruct");
+//	runner.RunTest(Shell_LowRankApprox, Test_LowRankApproxStruct, "Test_LowRankApprox");
+//	runner.RunTest(Shell_SymRecCompress, Test_SymRecCompressStruct, "Test_SymRecCompress");
+//	runner.RunTest(Shell_DiagMult, Test_DiagMultStruct, "Test_DiagMult");
+//	runner.RunTest(Shell_RecMultL, Test_RecMultLStruct, "Test_RecMultL");
+//	runner.RunTest(Shell_Add, Test_AddStruct, "Test_Add");
+//	runner.RunTest(Shell_SymCompUpdate2, Test_SymCompUpdate2Struct, "Test_SymCompUpdate2");
+//	runner.RunTest(Shell_SymCompRecInv, Test_SymCompRecInvStruct, "Test_SymCompRecInv");
+//	runner.RunTest(Shell_CopyStruct, Test_CopyStruct,  "Test_CopyStruct");
 	printf("*******FFT*******\n");
 //	runner.RunTest(Shell_FFT1D_Real, Test_FFT1D_Real, "Test_FFT1D");
-	runner.RunTest(Shell_FFT1D_Complex, Test_FFT1D_Complex, "Test_FFT1D_Complex");
+//	runner.RunTest(Shell_FFT1D_Complex, Test_FFT1D_Complex, "Test_FFT1D_Complex");
+	runner.RunTest(Shell_FFT1D_Complex, Test_Poisson_FT1D_Real, "Test_Poisson_FFT1D_Real");
 
 
 	printf("********************\n");
@@ -38,7 +345,7 @@ void TestAll()
 	printf("***** THE END OF TESTING*******\n\n");
 
 }
-
+#if 0
 void Shell_LowRankApprox(ptr_test_low_rank func, const string& test_name, int &numb, int &fail_count)
 {
 	char method[255] = "SVD";
@@ -274,29 +581,6 @@ void Shell_FFT1D_Real(ptr_test_fft func, const string& test_name, int& numb, int
 		}
 }
 
-void Shell_FFT1D_Complex(ptr_test_fft func, const string& test_name, int& numb, int& fail_count)
-{
-	double eps = 10e-6;
-	//	for (double eps = 1e-2; eps > 1e-8; eps /= 10)
-	for (int n = 1000; n <= 1000; n += 1000)
-	{
-		try
-		{
-			numb++;
-			func(n, eps);
-		}
-		catch (runtime_error& e)
-		{
-			++fail_count;
-			cerr << test_name << " fail: " << e.what() << endl;
-		}
-		catch (...) {
-			++fail_count;
-			cerr << "Unknown exception caught" << endl;
-		}
-	}
-}
-
 #if 0
 void Test_FFT1D(int n /* grid points in 1 dim */, double eps)
 {
@@ -427,13 +711,13 @@ void Test_FFT1D_Real(int n /* grid points in 1 dim */, double eps)
 	status = DftiComputeForward(hand, f, f_FFT);
 	if (status != DFTI_NO_ERROR) goto failed;
 
-	MyFFT1D_Forward(n + 1, f, f_MYFFT);
+	MyFFT1D_ForwardReal(n + 1, f, f_MYFFT);
 
 	for (int i = 0; i < n + 1; i++)
 		printf("f_FFT[%d]: %14.12lf + I * %14.12lf  f_MYFFT[%d]: %14.12lf + I * %14.12lf\n", i, f_FFT[i].real(), f_FFT[i].imag(),
 			i, f_MYFFT[i].real(), f_MYFFT[i].imag());
 
-	MyFFT1D_Backward(n + 1, f_MYFFT, u_MYFFT);
+	MyFFT1D_BackwardComplex(n + 1, f_MYFFT, u_MYFFT);
 
 	status = DftiComputeBackward(hand, f_FFT, u_FFT);
 	if (status != DFTI_NO_ERROR) goto failed;
@@ -539,7 +823,6 @@ void Test_FFT1D_Complex(int n /* grid points in 1 dim */, double eps)
 	status = DftiSetValue(hand, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
 	if (status != DFTI_NO_ERROR) goto failed;
 
-
 	status = DftiCommitDescriptor(hand);
 	if (status != DFTI_NO_ERROR) goto failed;
 
@@ -552,7 +835,7 @@ void Test_FFT1D_Complex(int n /* grid points in 1 dim */, double eps)
 		printf("f_FFT[%d]: %14.12lf + I * %14.12lf  f_MYFFT[%d]: %14.12lf + I * %14.12lf\n", i, f_FFT[i].real(), f_FFT[i].imag(),
 			i, f_MYFFT[i].real(), f_MYFFT[i].imag());
 
-	MyFFT1D_Backward(n + 1, f_MYFFT, u_MYFFT);
+	MyFFT1D_BackwardComplex(n + 1, f_MYFFT, u_MYFFT);
 
 	status = DftiComputeBackward(hand, f_FFT, u_FFT);
 	if (status != DFTI_NO_ERROR) goto failed;
@@ -573,8 +856,6 @@ failed:
 }
 
 #endif
-
-
 
 
 void Test_LowRankApproxStruct(int m, int n, double eps, char *method)
@@ -610,7 +891,7 @@ void Test_LowRankApproxStruct(int m, int n, double eps, char *method)
 
 	zgemm("no", "no", &m, &n, &Astr->p, &alpha, Astr->U, &m, Astr->VT, &Astr->p, &beta, A_rec, &lda);
 
-	norm = rel_error_complex(m, n, A_rec, A_init, lda, eps);
+	norm = rel_error(zlange, m, n, A_rec, A_init, lda, eps);
 	sprintf(str, "Struct: n = %d m = %d ", n, m);
 	AssertLess(norm, eps, str);
 
@@ -655,7 +936,7 @@ void Test_SymRecCompressStruct(int n, double eps, char *method, int smallsize)
 #endif
 
 	// Norm of residual || A - L * U ||
-	norm = rel_error_complex(n, n, H2, H, ldh, eps);
+	norm = rel_error(zlange, n, n, H2, H, ldh, eps);
 
 #ifdef DEBUG
 	print(n, n, H, ldh, "H init");
@@ -717,7 +998,7 @@ void Test_DiagMultStruct(int n, double eps, char *method, int smallsize)
 #endif
 
 	// Compare Hd and H2
-	norm = rel_error_complex(n, n, H2, Hd, ldh, eps);
+	norm = rel_error(zlange, n, n, H2, Hd, ldh, eps);
 
 	sprintf(str, "Struct: n = %d ", n);
 	AssertLess(norm, eps, str);
@@ -773,7 +1054,7 @@ void Test_RecMultLStruct(int n, int k, double eps, char *method, int smallsize)
 	// RecMult Y1 = comp(H) * X
 	RecMultLStruct(n, k, Hstr, X, ldx, Y1, ldy, smallsize);
 
-	norm = rel_error_complex(n, k, Y1, Y, ldy, eps);
+	norm = rel_error(zlange, n, k, Y1, Y, ldy, eps);
 	sprintf(str, "Struct: n = %d k = %d ", n, k);
 	AssertLess(norm, eps, str);
 
@@ -844,7 +1125,7 @@ void Test_AddStruct(int n, dtype alpha, dtype beta, double eps, char *method, in
 	print(n, n, GcR, ldg, "res_comp_restore");
 #endif
 	// |GcR - G| / |G|
-	norm = rel_error_complex(n, n, GcR, G, ldg, eps);
+	norm = rel_error(zlange, n, n, GcR, G, ldg, eps);
 	sprintf(str, "Struct: n = %d n = %d alpha = %lf", n, n, alpha, beta);
 	AssertLess(norm, eps, str);
 
@@ -911,7 +1192,7 @@ void Test_SymCompUpdate2Struct(int n, int k, dtype alpha, double eps, char* meth
 #endif
 
 	// || B_rec - H || / || H ||
-	norm = rel_error_complex(n, n, B_rec, H, ldh, eps);
+	norm = rel_error(zlange, n, n, B_rec, H, ldh, eps);
 	sprintf(str, "Struct: n = %d k = %d alpha = %lf", n, k, alpha);
 	AssertLess(norm, eps, str);
 
@@ -1000,7 +1281,7 @@ void Test_CopyStruct(int n, double eps, char *method, int smallsize)
 	CopyStruct(n, Hstr, Hcopy_str, smallsize);
 	SymResRestoreStruct(n, Hcopy_str, H2, ldh, smallsize);
 
-	norm = rel_error_complex(n, n, H2, H1, ldh, eps);
+	norm = rel_error(zlange, n, n, H2, H1, ldh, eps);
 	sprintf(str, "Struct: n = %d", n);
 	AssertLess(norm, eps, str);
 
@@ -1010,14 +1291,14 @@ void Test_CopyStruct(int n, double eps, char *method, int smallsize)
 	free_arr(H1);
 	free_arr(H);
 }
-
+#if 0
 void Test_DirFactFastDiagStructOnline(size_m x, size_m y, size_m z, cmnode** Gstr, dtype *B, double eps, int smallsize)
 {
 	printf("Testing factorization...\n");
 	int n = x.n * y.n;
 	int size = n * z.n;
 	char bench[255] = "No";
-	dtype *DD = alloc_arr<dtype>(n * n); int lddd = n;
+	dtype *DD = alloc_arr<double>(n * n); int lddd = n;
 	dtype *DR = alloc_arr<dtype>(n * n); int lddr = n;
 	double norm = 0;
 
@@ -1031,7 +1312,7 @@ void Test_DirFactFastDiagStructOnline(size_m x, size_m y, size_m z, cmnode** Gst
 	SymResRestoreStruct(n, DCstr, DR, lddr, smallsize);
 
 	printf("Block %d. ", 0);
-	norm = rel_error_complex(n, n, DR, DD, lddd, eps);
+	norm = rel_error(n, n, DR, DD, lddd, eps);
 
 	if (norm < eps) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
@@ -1061,7 +1342,7 @@ void Test_DirFactFastDiagStructOnline(size_m x, size_m y, size_m z, cmnode** Gst
 			for (int i = 0; i < n; i++)
 				HR[i + ldhr * j] = HR[i + ldhr * j] + DR[i + lddr * j];
 
-		norm = rel_error_complex(n, n, HR, DD, lddd, eps);
+		norm = rel_error(n, n, HR, DD, lddd, eps);
 
 		if (norm < eps) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
 		else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
@@ -1077,21 +1358,7 @@ void Test_DirFactFastDiagStructOnline(size_m x, size_m y, size_m z, cmnode** Gst
 	free_arr(DD);
 
 }
-
-void Test_TransferBlock3Diag_to_CSR(int n1, int n2, int n3, dcsr* Dcsr, dtype* x_orig, dtype *f, double eps)
-{
-	int n = n1 * n2;
-	int size = n * n3;
-	double RelRes = 0;
-	dtype *g = alloc_arr<dtype>(size);
-	ResidCSR(n1, n2, n3, Dcsr, x_orig, f, g, RelRes);
-
-	if (RelRes < eps) printf("Norm %10.8e < eps %10.8lf: PASSED\n", RelRes, eps);
-	else printf("Norm %10.8lf > eps %10.8e : FAILED\n", RelRes, eps);
-
-	free_arr(g);
-}
-
+#endif
 
 
 
@@ -1283,3 +1550,4 @@ void Test_CompareColumnsOfMatrix(int n1, int n2, int n3, double* D, int ldd, dou
 #endif
 
 
+#endif
