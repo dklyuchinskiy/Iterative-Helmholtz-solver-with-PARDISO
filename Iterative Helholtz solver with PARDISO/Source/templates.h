@@ -85,31 +85,32 @@ void Block3DSPDSolveFastStruct(size_m x, size_m y, size_m z, dtype *D, int ldd, 
 void DirFactFastDiagStructOnline(size_m x, size_m y, size_m z, cmnode** &Gstr, dtype *B, double thresh, int smallsize, char *bench);
 void DirSolveFastDiagStruct(int n1, int n2, int n3, cmnode* *Gstr, dtype *B, dtype *f, dtype *x, double eps, int smallsize);
 
-void GenerateDiagonal2DBlock(int part_of_field, size_m x, size_m y, size_m z, double *DD, int lddd);
+void GenerateDiagonal2DBlock(int part_of_field, size_m x, size_m y, size_m z, dtype *DD, int lddd);
 void GenerateDiagonal1DBlock(double w, int part_of_field, size_m y, size_m z, dtype *DD, int lddd);
 
 void DirFactFastDiagStruct(int n1, int n2, int n3, double *D, int ldd, double *B, mnode** &Gstr, 
 	double eps, int smallsize, char *bench);
 
 
-void ResidCSR(int n1, int n2, int n3, dcsr* Dcsr, double* x_sol, double *f, double* g, double &RelRes);
+void ResidCSR(int n1, int n2, int n3, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, double &RelRes);
 void GenSparseMatrix(size_m x, size_m y, size_m z, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, dcsr* Acsr);
 
-void GenRHSandSolution(size_m x, size_m y, size_m z, double* B, double *u, double *f);
+void GenRHSandSolution(size_m x, size_m y, size_m z, dtype* B, dtype *u, dtype *f);
 void GenSparseMatrixOnline2D(int w, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
-void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, dcsr* Acsr);
+void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
 map<vector<int>, dtype> Block1DRowMat_to_CSR(int blk, int n1, int n2, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, int& non_zeros_on_prev_level);
 void GenRhs2D(int w, size_m x, size_m y, size_m z, dtype* f, dtype* f2D);
 void Clear(int m, int n, dtype* A, int lda);
 void GenSol1DBackward(int w, size_m x, size_m y, size_m z, dtype* x_sol_prd, dtype *u1D);
 
 //map<vector<int>, dtype> dense_to_CSR(int m, int n, dtype *A, int lda, int *ia, int *ja, dtype *values);
-map<vector<int>, double> BlockRowMat_to_CSR(int blk, int n1, int n2, int n3, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, dcsr* Acsr, int& non_zeros_on_prev_level);
+map<vector<int>, dtype> BlockRowMat_to_CSR(int blk, int n1, int n2, int n3, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, int& non_zeros_on_prev_level);
 //void construct_block_row(int m, int n, dtype* BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, dtype* AR, int ldar);
 void shift_values(int rows, int *ia, int shift_non_zeros, int non_zeros, int *ja, int shift_columns);
 
 void count_dense_elements(int m, int n, double *A, int lda, int& non_zeros);
-void SolvePardiso3D(size_m x, size_m y, size_m z, dcsr* Dcsr, double* x_pard, double* f, double thresh);
+void SolvePardiso3D(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_pard, dtype* f, double thresh);
+dtype my_exp(double val);
 
 // Queue
 void init(struct my_queue* &q);
@@ -132,6 +133,8 @@ void MyFFT1D_ForwardComplexSin(int N, dtype* f, dtype *f_MYFFT);
 
 void MyFT1D_ForwardReal(int N, double h, double* f, dtype *f_MYFFT);
 void MyFT1D_BackwardReal(int N, double h, dtype *f_MYFFT, double* f);
+void MyFT1D_BackwardComplex(int N, double h, dtype *f_MYFFT, dtype* f);
+void MyFT1D_ForwardComplex(int N, double h, dtype* f, dtype *f_MYFFT);
 
 
 //

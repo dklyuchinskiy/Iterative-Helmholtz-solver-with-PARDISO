@@ -12,12 +12,12 @@ functions.cpp and BinaryTrees.cpp.
 The interface is declared in TestSuite.h
 ****************************************/
 
-void Test_TransferBlock3Diag_to_CSR(int n1, int n2, int n3, dcsr* Dcsr, double* x_orig, double *f, double eps)
+void Test_TransferBlock3Diag_to_CSR(int n1, int n2, int n3, ccsr* Dcsr, dtype* x_orig, dtype *f, double eps)
 {
 	int n = n1 * n2;
 	int size = n * n3;
 	double RelRes = 0;
-	double *g = alloc_arr<double>(size);
+	dtype *g = alloc_arr<dtype>(size);
 	ResidCSR(n1, n2, n3, Dcsr, x_orig, f, g, RelRes);
 
 

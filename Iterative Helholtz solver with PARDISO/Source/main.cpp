@@ -233,8 +233,8 @@ int main()
 	int ldd = size;
 	int ldb = size - n;
 #else
-	double *D = alloc_arr<double>(n * n); // it's a matrix with size n^3 * n^2 = size * n
-	double *B_mat = alloc_arr<double>(n * n);
+	dtype *D = alloc_arr<dtype>(n * n); // it's a matrix with size n^3 * n^2 = size * n
+	dtype *B_mat = alloc_arr<dtype>(n * n);
 	int ldd = n;
 	int ldb = n;
 #endif
@@ -248,22 +248,22 @@ int main()
 #endif
 
 	// Solution, right hand side and block B
-	double *B = alloc_arr<double>(size - n); // vector of diagonal elementes
-	double *x_orig = alloc_arr<double>(size);
-	double *x_sol = alloc_arr<double>(size);
-	double *x_pard = alloc_arr<double>(size);
-	double *x_pard_cpy = alloc_arr<double>(size);
-	double *f = alloc_arr<double>(size);
+	dtype *B = alloc_arr<dtype>(size - n); // vector of diagonal elementes
+	dtype *x_orig = alloc_arr<dtype>(size);
+	dtype *x_sol = alloc_arr<dtype>(size);
+	dtype *x_pard = alloc_arr<dtype>(size);
+	dtype *x_pard_cpy = alloc_arr<dtype>(size);
+	dtype *f = alloc_arr<dtype>(size);
 	dtype *f_FFT = alloc_arr<dtype>(size);
 	dtype *x_sol_prd = alloc_arr<dtype>(size);
 	dtype *u2Dsynt = alloc_arr<dtype>(size);
 
 #ifdef STRUCT_CSR
 	// Memory for 3D CSR matrix
-	dcsr *Dcsr;
+	ccsr *Dcsr;
 	int non_zeros_in_3Dblock3diag = (n + (n - 1) * 2 + (n - x.n) * 2 - (x.n - 1) * 2) * z.n + 2 * (size - n);
-	Dcsr = (dcsr*)malloc(sizeof(dcsr));
-	Dcsr->values = alloc_arr<double>(non_zeros_in_3Dblock3diag);
+	Dcsr = (ccsr*)malloc(sizeof(dcsr));
+	Dcsr->values = alloc_arr<dtype>(non_zeros_in_3Dblock3diag);
 	Dcsr->ia = alloc_arr<int>(size + 1);
 	Dcsr->ja = alloc_arr<int>(non_zeros_in_3Dblock3diag);
 	Dcsr->ia[size] = non_zeros_in_3Dblock3diag + 1;
@@ -314,9 +314,9 @@ int main()
 	SolvePardiso3D(x, y, z, Dcsr, x_pard, f, thresh);
 	printf("Computing error for 3D PARDISO ||x_{exact}-x_{comp}||/||x_{exact}||\n");
 
-	dlacpy("All", &size, &ione, x_pard, &size, x_pard_cpy, &size);
+	zlacpy("All", &size, &ione, x_pard, &size, x_pard_cpy, &size);
 
-	norm = rel_error(dlange, size, 1, x_pard_cpy, x_orig, size, thresh);
+	norm = rel_error(zlange, size, 1, x_pard_cpy, x_orig, size, thresh);
 
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
@@ -346,7 +346,7 @@ int main()
 	{
 		//status = DftiComputeForward(my_desc1_handle, &f[n1 * k], &f_FFT[n1 * k]);
 		//MyFFT1D_ForwardComplexSin(n1, &f[n1 * k], &f_FFT[n1 * k]);
-		MyFT1D_ForwardReal(n1, x.h, &f[n1 * k], &f_FFT[n1 * k]);
+		MyFT1D_ForwardComplex(n1, x.h, &f[n1 * k], &f_FFT[n1 * k]);
 	}
 
 #undef REAL
@@ -404,7 +404,7 @@ int main()
 		GenSol1DBackward(k, x, y, z, x_sol_prd, u1D);
 	//	status = DftiComputeBackward(my_desc1_handle, u1D, &x_sol[k * n1]);
 	//	MyFFT1D_BackwardComplexSin(n1, u1D, &x_sol[k * n1]);
-		MyFT1D_BackwardReal(n1, x.h, u1D, &x_sol[k * n1]);
+		MyFT1D_BackwardComplex(n1, x.h, u1D, &x_sol[k * n1]);
 		free(u1D);
 	}
 
@@ -415,20 +415,20 @@ int main()
 	status = DftiFreeDescriptor(&my_desc1_handle);
 	printf("-----------------------------------\n");
 
-	printf("Computing error ||x_{exact}-x_{comp}||/||x_{exact}||\n");
+	printf("Computing error ||x_{exact}-x_{comp_fft}||/||x_{exact}||\n");
 
 	//for (int i = 0; i < size; i++)
 	//	printf("%lf ,  %lf \n", x_sol[i], x_pard[i]);
 
-	dlacpy("All", &size, &ione, x_sol, &size, x_pard_cpy, &size);
+	zlacpy("All", &size, &ione, x_sol, &size, x_pard_cpy, &size);
 
-	norm = rel_error(dlange, n, 1, x_sol, x_orig, size, thresh);
+	norm = rel_error(zlange, n, 1, x_sol, x_orig, size, thresh);
 
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
 
 	printf("Computing error ||x_{comp_prd}-x_{comp_fft}||/||x_{comp_prd}||\n");
-	norm = rel_error(dlange, n, 1, x_pard_cpy, x_pard, size, thresh);
+	norm = rel_error(zlange, n, 1, x_pard_cpy, x_pard, size, thresh);
 
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);

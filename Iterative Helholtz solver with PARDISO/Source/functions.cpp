@@ -171,7 +171,7 @@ void GenSol1DBackward(int w, size_m x, size_m y, size_m z, dtype* x_sol_prd, dty
 #endif
 }
 
-void GenerateDiagonal2DBlock(int part_of_field, size_m x, size_m y, size_m z, double *DD, int lddd)
+void GenerateDiagonal2DBlock(int part_of_field, size_m x, size_m y, size_m z, dtype *DD, int lddd)
 {
 	int n = x.n * y.n;
 	int size = n * z.n;
@@ -181,6 +181,7 @@ void GenerateDiagonal2DBlock(int part_of_field, size_m x, size_m y, size_m z, do
 	for (int i = 0; i < n; i++)
 	{
 		DD[i + lddd * i] = -2.0 * (1.0 / (x.h * x.h) + 1.0 / (y.h * y.h) + 1.0 / (z.h * z.h));
+
 		if (i > 0) DD[i + lddd * (i - 1)] = 1.0 / (x.h * x.h);
 		if (i < n - 1) DD[i + lddd * (i + 1)] = 1.0 / (x.h * x.h);
 		if (i >= x.n) DD[i + lddd * (i - x.n)] = 1.0 / (y.h * y.h);
@@ -211,7 +212,7 @@ void DenseDiagMult(int n, dtype *diag, dtype *v, dtype *f)
 		f[i] = diag[i] * v[i];
 }
 
-void GenRHSandSolution(size_m x, size_m y, size_m z, /* output */ double* B, double *u, double *f)
+void GenRHSandSolution(size_m x, size_m y, size_m z, /* output */ dtype* B, dtype *u, dtype *f)
 {
 	int n = x.n * y.n;
 	int size = n * z.n;
@@ -273,15 +274,15 @@ void GenRHSandSolution(size_m x, size_m y, size_m z, /* output */ double* B, dou
 }
 
 
-void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, dcsr* Acsr)
+void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr)
 {
 	int n = x.n * y.n;
 	int size = n * z.n;
 	int non_zeros_on_prev_level = 0;
-	map<vector<int>, double> CSR;
+	map<vector<int>, dtype> CSR;
 
-	Diag(n, BL, ldbl, 1.0 / (z.h * z.h));
-	Diag(n, BR, ldbr, 1.0 / (z.h * z.h));
+	Diag(n, BL, ldbl, dtype{ 1.0 / (z.h * z.h), 0 });
+	Diag(n, BR, ldbr, dtype{ 1.0 / (z.h * z.h), 0 });
 
 
 	for (int blk = 0; blk < z.n; blk++)
@@ -295,30 +296,30 @@ void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, double *BL, int ldbl,
 
 }
 
-map<vector<int>, double> BlockRowMat_to_CSR(int blk, int n1, int n2, int n3, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, dcsr* Acsr, int& non_zeros_on_prev_level)
+map<vector<int>, dtype> BlockRowMat_to_CSR(int blk, int n1, int n2, int n3, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, int& non_zeros_on_prev_level)
 {
-	map<vector<int>, double> CSR_A;
+	map<vector<int>, dtype> CSR_A;
 	vector<int> v(2, 0);
 	int n = n1 * n2;
 	int k = 0;
-	double *Arow = alloc_arr<double>(n * 3 * n); int ldar = n;
+	dtype *Arow = alloc_arr<dtype>(n * 3 * n); int ldar = n;
 
 	if (blk == 0)
 	{
-		construct_block_row(dlacpy, n, n, (double*)NULL, ldbl, A, lda, BR, ldbr, Arow, ldar);
+		construct_block_row(zlacpy, n, n, (dtype*)NULL, ldbl, A, lda, BR, ldbr, Arow, ldar);
 		CSR_A = dense_to_CSR(n, 2 * n, Arow, ldar, &Acsr->ia[0], &Acsr->ja[0], &Acsr->values[0]);
 		non_zeros_on_prev_level = CSR_A.size();
 	}
 	else if (blk == n3 - 1)
 	{
-		construct_block_row(dlacpy, n, n, BL, ldbl, A, lda, (double*)NULL, ldbr, Arow, ldar);
+		construct_block_row(zlacpy, n, n, BL, ldbl, A, lda, (dtype*)NULL, ldbr, Arow, ldar);
 		CSR_A = dense_to_CSR(n, 2 * n, Arow, ldar, &Acsr->ia[ind(blk, n)], &Acsr->ja[non_zeros_on_prev_level], &Acsr->values[non_zeros_on_prev_level]);
 		shift_values(n, &Acsr->ia[ind(blk, n)], non_zeros_on_prev_level, CSR_A.size(), &Acsr->ja[non_zeros_on_prev_level], n * (blk - 1));
 		non_zeros_on_prev_level += CSR_A.size();
 	}
 	else
 	{
-		construct_block_row(dlacpy, n, n, BL, ldbl, A, lda, BR, ldbr, Arow, ldar);
+		construct_block_row(zlacpy, n, n, BL, ldbl, A, lda, BR, ldbr, Arow, ldar);
 		CSR_A = dense_to_CSR(n, 3 * n, Arow, ldar, &Acsr->ia[ind(blk, n)], &Acsr->ja[non_zeros_on_prev_level], &Acsr->values[non_zeros_on_prev_level]);
 
 		// shift values of arrays according to previous level
@@ -391,10 +392,10 @@ void GenSparseMatrixOnline2D(int w, size_m y, size_m z, dtype *BL, int ldbl, dty
 	printf("Non_zeros in 2D block: %d\n", non_zeros_on_prev_level);
 }
 
-void SolvePardiso3D(size_m x, size_m y, size_m z, dcsr* Dcsr, double* x_pard, double* f, double thresh)
+void SolvePardiso3D(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_pard, dtype* f, double thresh)
 {
 	int size = x.n * y.n * z.n;
-	int mtype = 11;
+	int mtype = 13;
 	int *iparm = alloc_arr<int>(64);
 	int *perm = alloc_arr<int>(size);
 	size_t *pt = alloc_arr<size_t>(64);
@@ -434,7 +435,7 @@ double F_ex(size_m xx, size_m yy, size_m zz, double x, double y, double z)
 
 //	return 2.0 * (x * (x - xx.l) * z * (z - zz.l) + y * (y - yy.l) * z * (z - zz.l) + x * (x - xx.l) * y * (y - yy.l));
 
-  return sin(2 * PI * x) * sin(2 * PI * y) * sin(2 * PI * z);
+	return sin(2 * PI * x) * sin(2 * PI * y) * sin(2 * PI * z);
 }
 
 double u_ex(size_m xx, size_m yy, size_m zz, double x, double y, double z)
@@ -476,15 +477,15 @@ double rel_error(int n, int k, double *Hrec, double *Hinit, int ldh, double eps)
 	//else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
 }
 
-void ResidCSR(int n1, int n2, int n3, dcsr* Dcsr, double* x_sol, double *f, double* g, double &RelRes)
+void ResidCSR(int n1, int n2, int n3, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, double &RelRes)
 {
 	int n = n1 * n2;
 	int size = n * n3;
-	double *f1 = alloc_arr<double>(size);
+	dtype *f1 = alloc_arr<dtype>(size);
 	int ione = 1;
 
 	// Multiply matrix A in CSR format by vector x_sol to obtain f1
-	mkl_dcsrgemv("No", &size, Dcsr->values, Dcsr->ia, Dcsr->ja, x_sol, f1);
+	mkl_zcsrgemv("No", &size, Dcsr->values, Dcsr->ia, Dcsr->ja, x_sol, f1);
 
 #pragma omp parallel for simd schedule(simd:static)
 	for (int i = 0; i < size; i++)
@@ -497,8 +498,8 @@ void ResidCSR(int n1, int n2, int n3, dcsr* Dcsr, double* x_sol, double *f, doub
 	print_vec(size, f, g, "f and g");
 #endif
 
-	RelRes = dlange("Frob", &size, &ione, g, &size, NULL);
-	RelRes = RelRes / dlange("Frob", &size, &ione, f, &size, NULL);
+	RelRes = zlange("Frob", &size, &ione, g, &size, NULL);
+	RelRes = RelRes / zlange("Frob", &size, &ione, f, &size, NULL);
 
 	free_arr(f1);
 }

@@ -58,6 +58,32 @@ void MyFT1D_ForwardReal(int N, double h, double* f, dtype *f_MYFFT)
 
 }
 
+dtype my_exp(double val)
+{
+	return dtype{ cos(val), sin(val) };
+}
+
+void MyFT1D_ForwardComplex(int N, double h, dtype* f, dtype *f_MYFFT)
+{
+	int n2 = N / 2;
+
+	for (int k = 0; k < N; k++)
+	{
+		f_MYFFT[k] = 0;
+		for (int j = 0; j < N - 1; j++)
+		{
+			f_MYFFT[k] += (f[j + 1] * my_exp(-2 * PI * (j + 1) * (k - n2) * h) + f[j] * my_exp(-2 * PI * j * (k - n2) * h));
+
+			//	if (k == 2) printf("f_MYFFT[k]: %lf %lf\n", f_MYFFT[k].real(), f_MYFFT[k].imag());
+		}
+
+		f_MYFFT[k] *= h / 2.0;
+
+		//	f_MYFFT[k] /= N;
+	}
+
+}
+
 void MyFT1D_BackwardReal(int N, double h, dtype* f_MYFFT, double *f)
 {
 	int n2 = N / 2;
@@ -67,6 +93,18 @@ void MyFT1D_BackwardReal(int N, double h, dtype* f_MYFFT, double *f)
 		f[i] = 0;
 		for (int k = 0; k < N; k++)
 			f[i] += (f_MYFFT[k].real() * cos(2 * PI * (k - n2) * i * h) - f_MYFFT[k].imag() * sin(2 * PI * (k - n2) * i * h));
+	}
+}
+
+void MyFT1D_BackwardComplex(int N, double h, dtype* f_MYFFT, dtype *f)
+{
+	int n2 = N / 2;
+
+	for (int i = 0; i < N; i++)
+	{
+		f[i] = 0;
+		for (int k = 0; k < N; k++)
+			f[i] += f_MYFFT[k] * my_exp(2 * PI * (k - n2) * i * h);
 	}
 }
 

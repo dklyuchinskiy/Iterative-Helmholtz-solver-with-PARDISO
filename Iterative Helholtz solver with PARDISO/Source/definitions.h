@@ -96,6 +96,20 @@ struct my_queue {
 
 typedef struct list qlist;
 
+#ifdef HELMHOLTZ
+#define omega 4
+#define ky 1.8
+#define pml 15 //max(15, c0(1, 1) / omega)
+#define beta_eq 2.3
+#define PML
+#else
+#define omega 0
+#define ky 0
+#define pml 0
+#define beta_eq 1
+#endif
+
+
 #define STRUCT_CSR
 
 #ifdef STRUCT_CSR
