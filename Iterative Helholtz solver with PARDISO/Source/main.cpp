@@ -195,13 +195,15 @@ int main()
 
 int main()
 {
-	TestAll();
-	system("pause");
+//	TestAll();
+//	system("pause");
 //	return 0;
 #if 1
-	int n1 = 49;		    // number of point across the directions
-	int n2 = 49;
-	int n3 = 49;
+	int pml_pts = 0;
+	int pml_size = 2 * pml_pts;
+	int n1 = 49 + pml_size;		    // number of point across the directions
+	int n2 = 49 + pml_size;
+	int n3 = 49 + pml_size;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 	int size = n * NB;		// size of vector x and f: n1 * n2 * n3
@@ -213,16 +215,36 @@ int main()
 	int non_zeros_in_3diag = n + (n - 1) * 2 + (n - n1) * 2 - (n1 - 1) * 2;
 	int ione = 1;
 
+	double timer1, timer2, all_time;
+
 	size_m x, y, z;
 
 	x.n = n1;
 	y.n = n2;
 	z.n = n3;
 
-	x.l = y.l = z.l = 1;
-	x.h = x.l / (double)(x.n + 1);  // x.n + 1 grid points of the whole domain
-	y.h = y.l / (double)(y.n + 1);  // x.n - 1 - inner points
-	z.h = z.l / (double)(z.n + 1);  // 2 points - for the boundaries
+	x.pml_pts = y.pml_pts = z.pml_pts = pml_pts;
+
+	printf("Size of domain: Nx = %d, Ny = %d, Nz = %d\n", x.n, y.n, z.n);
+
+	x.l = y.l = z.l = LENGTH + (double)(pml_size * LENGTH) / (n1 - pml_size + 1);
+
+	printf("Size of domain: Lx = %lf, Ly = %lf, Lz = %lf\n", x.l, y.l, z.l);
+
+	// При уменьшении шага в 2 ошибка должна уменьшаться в 4 раза!
+	// 3D график
+	// правильные - в безрамерныx
+	// h = 10, 1280 x 1280, N = 120 - 2 волны
+	// 40 точек h = 30, L = 600, omega = 4, 6, 10
+
+	x.h = x.l / (x.n + 1);  // x.n + 1 grid points of the whole domain
+	y.h = y.l / (y.n + 1);  // x.n - 1 - inner points
+	z.h = z.l / (z.n + 1);  // 2 points - for the boundaries
+
+	double ppw = (double)(c_z) / omega / x.h;
+
+	printf("ppw: %lf\n", ppw);
+
 
 
 	// Memory allocation for coefficient matrix A
@@ -244,30 +266,53 @@ int main()
 	double *G = alloc_arr(size * n);
 	int ldg = size;
 #else
-	cmnode **Gstr;
+	//cmnode **Gstr;
 #endif
 
 	// Solution, right hand side and block B
 	dtype *B = alloc_arr<dtype>(size - n); // vector of diagonal elementes
 	dtype *x_orig = alloc_arr<dtype>(size);
-	dtype *x_sol = alloc_arr<dtype>(size);
 	dtype *x_pard = alloc_arr<dtype>(size);
-	dtype *x_pard_cpy = alloc_arr<dtype>(size);
 	dtype *f = alloc_arr<dtype>(size);
 	dtype *f_FFT = alloc_arr<dtype>(size);
 	dtype *x_sol_prd = alloc_arr<dtype>(size);
 	dtype *u2Dsynt = alloc_arr<dtype>(size);
 
+	int n1_npml = x.n - pml_size;
+	int n2_npml = y.n - pml_size;
+	int n3_npml = z.n - pml_size;
+	int n_no_pml = n1_npml * n2_npml;
+	int size_no_pml = n_no_pml * n3_npml;
+
+	dtype *x_orig_no_pml = alloc_arr<dtype>(size_no_pml);
+	dtype *x_pard_no_pml = alloc_arr<dtype>(size_no_pml);
+
+	dtype *x_pard_no_pml_cpy = alloc_arr<dtype>(size_no_pml);
+
+	
+	ccsr *Dcsr_no_pml;
+	int non_zeros_no_pml = (n_no_pml + (n_no_pml - 1) * 2 + (n_no_pml - x.n + pml_size) * 2 - (x.n - pml_size - 1) * 2) * (z.n - pml_size) + 2 * (size_no_pml - n_no_pml);
+	Dcsr_no_pml = (ccsr*)malloc(sizeof(ccsr));
+	Dcsr_no_pml->values = alloc_arr<dtype>(non_zeros_no_pml);
+	Dcsr_no_pml->ia = alloc_arr<int>(size_no_pml + 1);
+	Dcsr_no_pml->ja = alloc_arr<int>(non_zeros_no_pml);
+	Dcsr_no_pml->ia[size_no_pml] = non_zeros_no_pml + 1;
+	Dcsr_no_pml->non_zeros = non_zeros_no_pml;
+
+
 #ifdef STRUCT_CSR
 	// Memory for 3D CSR matrix
 	ccsr *Dcsr;
 	int non_zeros_in_3Dblock3diag = (n + (n - 1) * 2 + (n - x.n) * 2 - (x.n - 1) * 2) * z.n + 2 * (size - n);
-	Dcsr = (ccsr*)malloc(sizeof(dcsr));
+	Dcsr = (ccsr*)malloc(sizeof(ccsr));
 	Dcsr->values = alloc_arr<dtype>(non_zeros_in_3Dblock3diag);
 	Dcsr->ia = alloc_arr<int>(size + 1);
 	Dcsr->ja = alloc_arr<int>(non_zeros_in_3Dblock3diag);
 	Dcsr->ia[size] = non_zeros_in_3Dblock3diag + 1;
+	Dcsr->non_zeros = non_zeros_in_3Dblock3diag;
 #endif
+
+//	printf("%d %d\n", non_zeros_no_pml, non_zeros_in_3Dblock3diag);
 
 	int success = 0;
 	int itcount = 0;
@@ -276,55 +321,134 @@ int main()
 
 #ifdef _OPENMP
 	int nthr = omp_get_max_threads();
+	printf("Max_threads: %d threads\n", nthr);
+	omp_set_dynamic(0);
+	nthr = 2;
+	omp_set_num_threads(nthr);
+	printf("Run in parallel on %d threads\n", nthr);
 #else
-	int nthr = 1;
+	printf("Run sequential version on 1 thread\n");
 #endif
 
-	omp_set_dynamic(0);
-	omp_set_num_threads(1);
 
-	printf("Run in parallel on %d threads\n", nthr);
 
 	printf("Grid steps: hx = %lf hy = %lf hz = %lf\n", x.h, y.h, z.h);
+
+	all_time = omp_get_wtime();
 
 #ifndef STRUCT_CSR
 	// Generation matrix of coefficients, vector of solution (to compare with obtained) and vector of RHS
 	GenMatrixandRHSandSolution(n1, n2, n3, D, ldd, B, x_orig, f);
 #else
 	// Generation of vector of solution (to compare with obtained) and vector of RHS
-	GenRHSandSolution(x, y, z, B, x_orig, f);
+	printf("Gen right-hand side and solution...\n");
+	GenRHSandSolution(x, y, z, x_orig, f);
 
 	// Generation of sparse coefficient matrix
 #ifndef ONLINE
 	GenSparseMatrix(x, y, z, B_mat, ldb, D, ldd, B_mat, ldb, Dcsr);
 #else
-	GenSparseMatrixOnline3D(x, y, z, B_mat, n, D, n, B_mat, n, Dcsr);
+	printf("--------------- Gen sparse 3D matrix in CSR format... ---------------\n");
+	//GenSparseMatrixOnline3D(x, y, z, B, B_mat, n, D, n, B_mat, n, Dcsr);
+
+	//for (int i = 0; i < size - n; i++)
+	//	printf("B[%d]: %lf %lf\n", i, B[i].real(), B[i].imag());
+	printf("-------------- Gen sparse 3D matrix in CSR format with PML... ------------\n");
+
+	timer1 = omp_get_wtime();
+	GenSparseMatrixOnline3DwithPML(x, y, z, B, B_mat, n, D, n, B_mat, n, Dcsr, thresh);
+	timer2 = omp_get_wtime() - timer1;
+
+	printf("Time of GenSparseMatrixOnline3DwithPML: %lf\n", timer2);
 
 #endif
 	free_arr(D);
 	free_arr(B_mat);
 
-	printf("Non_zeros in 3D block-tridiagonal matrix: %d\n", non_zeros_in_3Dblock3diag);
+	printf("Analytic non_zeros in first row and last two 2D blocks: %d\n", non_zeros_in_3diag + n);
+	printf("Analytic non_zeros in three 2D block-row: %d\n", non_zeros_in_3diag + 2 * n);
+	printf("Analytic non_zeros in 3D block-tridiagonal matrix: %d\n", non_zeros_in_3Dblock3diag);
 
 #if 1
+
+	// Test PML
+	printf("----------------- Running test PML... -----------\n");
+	timer1 = omp_get_wtime();
+	Test_PMLBlock3Diag_in_CSR(x, y, z, Dcsr, Dcsr_no_pml, thresh);
+	timer2 = omp_get_wtime() - timer1;
+	printf("Time of Test_PMLBlock3Diag_in_CSR: %lf\n", timer2);
+
 	//	Test_CompareColumnsOfMatrix(n1, n2, n3, D, ldd, B, Dcsr, thresh);
-	Test_TransferBlock3Diag_to_CSR(n1, n2, n3, Dcsr, x_orig, f, thresh);
+//	printf("--------------- Running test CSR... ----------------\n");
+	timer1 = omp_get_wtime();
+//	Test_TransferBlock3Diag_to_CSR(x, y, z, Dcsr, x_orig, f, thresh);
+	timer2 = omp_get_wtime() - timer1;
+//	printf("Time of Test_TransferBlock3Diag_to_CSR: %lf\n", timer2);
 
 	// Solve Pardiso
+	printf("-------------- Solving 3D system with Pardiso... -------------\n");
+	timer1 = omp_get_wtime();
 	SolvePardiso3D(x, y, z, Dcsr, x_pard, f, thresh);
+	timer2 = omp_get_wtime() - timer1;
+	printf("Time of  SolvePardiso3D: %lf\n", timer2);
 	printf("Computing error for 3D PARDISO ||x_{exact}-x_{comp}||/||x_{exact}||\n");
 
-	zlacpy("All", &size, &ione, x_pard, &size, x_pard_cpy, &size);
+	reducePML3D(x, y, z, size, x_pard, size_no_pml, x_pard_no_pml);
+	reducePML3D(x, y, z, size, x_orig, size_no_pml, x_orig_no_pml);
 
-	norm = rel_error(zlange, size, 1, x_pard_cpy, x_orig, size, thresh);
+	all_time = omp_get_wtime() - all_time;
+	printf("Elapsed time: %lf\n", all_time);
+
+	//norm = rel_error(zlange, size, 1, x_pard_cpy, x_orig, size, thresh);
+
+	bool pml_flag = true;
+
+#ifdef OUTPUT
+	output("ChartsN100PML/model", pml_flag, x, y, z, x_orig_no_pml, x_pard_no_pml);
+#endif
+
+#ifdef GNUPLOT
+	gnuplot("ChartsN100PML/model", "ChartsN100PML/helm_ex", pml_flag, 4, x, y, z);
+	gnuplot("ChartsN100PML/model", "ChartsN100PML/helm_pard", pml_flag, 6, x, y, z);
+#endif
+	//system("pause");
+
+	
+#ifdef OUTPUT
+	FILE* fout1 = fopen("solutions.dat", "w");
+
+	for (int i = 0; i < size_no_pml; i++)
+		fprintf(fout1, "%d %12.10lf %12.10lf %12.10lf %12.10lf\n", i, x_orig_no_pml[i].real(), x_orig_no_pml[i].imag(), x_pard_no_pml[i].real(), x_pard_no_pml[i].imag());
+
+	fclose(fout1);
+#endif
+
+	//for (int i = 0; i < size; i++)
+	//fprintf(fout1, "%d %12.10lf %12.10lf %12.10lf %12.10lf\n", i, x_orig[i].real(), x_orig[i].imag(), x_pard[i].real(), x_pard[i].imag());
+
+	zlacpy("All", &size_no_pml, &ione, x_pard_no_pml, &size_no_pml, x_pard_no_pml_cpy, &size_no_pml);
+
+	norm = rel_error(zlange, size_no_pml, 1, x_pard_no_pml_cpy, x_orig_no_pml, size_no_pml, thresh);
 
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
 
-#endif
+
+	//free_arr(x_pard);
+	//free_arr(x_pard_no_pml);
+	//free_arr(B);
+	//free_arr(f);
+	//free_arr(x_orig);
+	//free_arr(x_orig_no_pml);
+	
+
+
 	system("pause");
 #endif
+	//system("pause");
+#endif
 
+#if 1
 	printf("Solving %d x %d x %d Laplace equation using FFT's\n", n1, n2, n3);
 	printf("Reduce the problem to set of %d systems of size %d x %d\n", n1, n2*n3, n2*n3);
 
@@ -340,6 +464,9 @@ int main()
 	status = DftiSetValue(my_desc1_handle, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
 	status = DftiCommitDescriptor(my_desc1_handle);
 
+	//for (int i = 0; i < size_no_pml; i++)
+	//	printf("%lf %lf\n", f[i].real(), f[i].imag());
+
 	// We make n2 * n3 FFT's for one dimensional direction x with n1 grid points
 	printf("Applying 1D Fourier transformation for 3D RHS\n");
 	for (int k = 0; k < n2 * n3; k++)
@@ -349,23 +476,27 @@ int main()
 		MyFT1D_ForwardComplex(n1, x.h, &f[n1 * k], &f_FFT[n1 * k]);
 	}
 
+
 #undef REAL
 #define COMPLEX
 
 	// Calling the solver
 	int size2D = y.n * z.n;
+	int size2D_no_pml = n2_npml * n3_npml;
 	int mtype = 13;
 	int *iparm = alloc_arr<int>(64);
 	int *perm = alloc_arr<int>(size2D);
 	size_t *pt = alloc_arr<size_t>(64);
+	
+	printf("pardisoinit...\n");
+	pardisoinit(pt, &mtype, iparm);
 
 	int maxfct = 1;
 	int mnum = 1;
-	int phase = 0;
+	int phase = 13;
 	int rhs = 1;
 	int msglvl = 0;
 	int error = 0;
-	phase = 13;
 
 	// Memory for coefficient matrix
 	dtype *Dc = alloc_arr<dtype>(n1 * n1);
@@ -379,56 +510,83 @@ int main()
 	D2csr->ia = alloc_arr<int>(size2D + 1);
 	D2csr->ja = alloc_arr<int>(non_zeros_in_2Dblock3diag);
 	D2csr->ia[size2D] = non_zeros_in_2Dblock3diag + 1;
+	D2csr->non_zeros = non_zeros_in_2Dblock3diag;
 
 	printf("Non-zeros in 2D block-diagonal: %d\n", non_zeros_in_2Dblock3diag);
-	printf("Generating 2D matrix and rhs + solving by pardiso\n");
+	printf("----------Generating 2D matrix and rhs + solving by pardiso-------\n");
+	printf("Size of system: %d x %d with PML %d on each direction\n", y.n, z.n, 2 * z.pml_pts);
 	for (int i = 0; i < n1; i++)
 	{
 		printf("Iter: %d\n", i);
 		dtype *f2D = alloc_arr<dtype>(n2 * n3);
-		GenSparseMatrixOnline2D(i, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
+
+		// источник в каждой задаче в середине 
+		GenSparseMatrixOnline2D("FT", i, x, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
+		//GenSparseMatrixOnline2DwithPML(i, y, z, D2csr);
+
 		GenRhs2D(i, x, y, z, f_FFT, f2D);
+
 	//	GenRHSandSolution2D_Syntetic(y, z, D2csr, &u2Dsynt[i * size2D], f2D);
 		pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f2D, &x_sol_prd[i * size2D], &error);
 //		norm = rel_error(zlange, n2 * n3, 1, &u2Dsynt[i * size2D], &x_sol_prd[i * size2D], n2 * n3, thresh);
-	//	printf("ErrorNorm = %12.10e\n", norm);
+
 		free(f2D);
 	}
 
+	printf("Reducing PML after taking a solution\n");
+
+	dtype *x_sol = alloc_arr<dtype>(size_no_pml);
+	dtype *x_sol_fft_no_pml = alloc_arr<dtype>(size_no_pml);
 
 
-	printf("Backward 1D FFT's of %d x %d times to each point of 2D solution\n", n2, n3);
-	for (int k = 0; k < n2 * n3; k++)
+	for (int i = 0; i < n1; i++)
 	{
-		dtype* u1D = alloc_arr<dtype>(n1);
-		GenSol1DBackward(k, x, y, z, x_sol_prd, u1D);
-	//	status = DftiComputeBackward(my_desc1_handle, u1D, &x_sol[k * n1]);
-	//	MyFFT1D_BackwardComplexSin(n1, u1D, &x_sol[k * n1]);
-		MyFT1D_BackwardComplex(n1, x.h, u1D, &x_sol[k * n1]);
-		free(u1D);
+		reducePML2D(y, z, size2D, &x_sol_prd[i * size2D], size2D_no_pml, &x_sol_fft_no_pml[i * size2D_no_pml]);
 	}
 
 
-	//for (int i = 0; i < size; i++)
+
+	printf("Backward 1D FFT's of %d x %d times to each point of 2D solution\n", n2_npml, n3_npml);
+	for (int k = 0; k < n2_npml * n3_npml; k++)
+	{
+		dtype* u1D = alloc_arr<dtype>(n1_npml);
+		GenSol1DBackward(k, x, y, z, x_sol_fft_no_pml, u1D);
+	//	status = DftiComputeBackward(my_desc1_handle, u1D, &x_sol[k * n1]);
+	//	MyFFT1D_BackwardComplexSin(n1, u1D, &x_sol[k * n1]);
+		MyFT1D_BackwardComplex(n1_npml, x.h, u1D, &x_sol[k * n1_npml]);
+		free(u1D);
+	}
+
+//	for (int i = 0; i < size_no_pml; i++)
 	//	x_sol[i] /= n1;
 
 	status = DftiFreeDescriptor(&my_desc1_handle);
-	printf("-----------------------------------\n");
+	printf("------------- The end of algorithm ----------------------\n");
 
-	printf("Computing error ||x_{exact}-x_{comp_fft}||/||x_{exact}||\n");
 
 	//for (int i = 0; i < size; i++)
 	//	printf("%lf ,  %lf \n", x_sol[i], x_pard[i]);
 
-	zlacpy("All", &size, &ione, x_sol, &size, x_pard_cpy, &size);
 
-	norm = rel_error(zlange, n, 1, x_sol, x_orig, size, thresh);
+	zlacpy("All", &size_no_pml, &ione, x_sol, &size_no_pml, x_pard_no_pml_cpy, &size_no_pml);
+
+	pml_flag = true;
+	output("Charts100/model_ft", pml_flag, x, y, z, x_orig_no_pml, x_sol);
+	gnuplot("Charts100/model_ft", "Charts100/helm_ft", pml_flag, 6, x, y, z);
+
+//	for (int i = 0; i < size_no_pml; i++)
+	//	printf("%lf %lf\n", x_sol->real(), x_orig_no_pml->real());
+
+	printf("Computing error ||x_{exact}-x_{comp_fft}||/||x_{exact}||\n");
+	norm = rel_error(zlange, n, 1, x_sol, x_orig_no_pml, size_no_pml, thresh);
+
+
 
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
 
 	printf("Computing error ||x_{comp_prd}-x_{comp_fft}||/||x_{comp_prd}||\n");
-	norm = rel_error(zlange, n, 1, x_pard_cpy, x_pard, size, thresh);
+	norm = rel_error(zlange, size_no_pml, 1, x_pard_no_pml_cpy, x_pard_no_pml, size_no_pml, thresh);
 
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
@@ -446,6 +604,7 @@ int main()
 	system("pause");
 
 	return 0;
+#endif
 #endif
 }
 #endif

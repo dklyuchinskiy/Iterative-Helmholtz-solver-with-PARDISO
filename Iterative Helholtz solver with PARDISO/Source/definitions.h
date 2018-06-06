@@ -27,8 +27,8 @@ typedef double rtype;
 typedef std::complex<double> dtype;
 #define MKL_Complex16 dtype
 
-#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.1.156\windows\mkl\include\mkl.h"
-#include "mkl_dfti.h"
+#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl.h"
+#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl_dfti.h"
 
 //#define DEBUG
 
@@ -50,15 +50,23 @@ struct MatrixCSRComplex {
 	int *ia = NULL;
 	int *ja = NULL;
 	dtype *values = NULL;
+	int non_zeros = 0;
 };
 
 typedef struct MatrixCSRComplex ccsr;
 
 
 struct size_m {
-	int l;
+	double l;
 	int n;
 	double h;
+	int pml_pts;
+};
+
+struct point {
+	double x;
+	double y;
+	double z;
 };
 
 struct BinaryMatrixTreeNode {
@@ -96,17 +104,34 @@ struct my_queue {
 
 typedef struct list qlist;
 
+#define PI 3.141592653589793238462643
+
+//#define HELMHOLTZ
+
 #ifdef HELMHOLTZ
-#define omega 4
-#define ky 1.8
-#define pml 15 //max(15, c0(1, 1) / omega)
-#define beta_eq 2.3
-#define PML
+#define LENGTH 900
 #else
-#define omega 0
+#define LENGTH 1
+#endif
+
+#define OUTPUT
+#define GNUPLOT
+
+#ifdef HELMHOLTZ
+#define omega 4.0
+#define c_z 1280
+/*--------------*/
+#define ky 1.8
+#define beta_eq 2.3
+#define kk (2.0 * (PI) * (omega) / (c_z))
+
+//#define kk ((omega) / (c_z))
+#else
+#define omega 4.0
 #define ky 0
-#define pml 0
 #define beta_eq 1
+#define c_z 0
+#define kk 0
 #endif
 
 
@@ -121,9 +146,6 @@ typedef struct list qlist;
 //#define COL_UPDATE
 //#define COL_ADD
 
-
-#define PI 3.141592653589793238462643
-
 // Функция выделения памяти под массив
 
 template<typename T>
@@ -131,7 +153,7 @@ T* alloc_arr(int n)
 {
 	T *f = (T*)malloc(n * sizeof(T));
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for schedule(static)
 	for (int i = 0; i < n; i++)
 		f[i] = 0.0;
 

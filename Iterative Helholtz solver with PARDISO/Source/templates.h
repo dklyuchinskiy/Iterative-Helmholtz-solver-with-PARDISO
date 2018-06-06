@@ -49,6 +49,8 @@ void print_map(const map<vector<int>, dtype>& SD);
 void print_csr(int n, dcsr* A);
 int compare_str(int n, char *s1, char *s2);
 int ind(int j, int n);
+void take_coord3D(int n1, int n2, int n3, int l, int& i, int& j, int& k);
+void take_coord2D(int n1, int n2, int l, int& i, int& j);
 
 map<vector<int>, double> dense_to_sparse(int m, int n, double *DD, int ldd, int *i_ind, int *j_ind, double *d);
 map<vector<int>, double> block3diag_to_CSR(int n1, int n2, int blocks, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, dcsr* Acsr);
@@ -85,23 +87,32 @@ void Block3DSPDSolveFastStruct(size_m x, size_m y, size_m z, dtype *D, int ldd, 
 void DirFactFastDiagStructOnline(size_m x, size_m y, size_m z, cmnode** &Gstr, dtype *B, double thresh, int smallsize, char *bench);
 void DirSolveFastDiagStruct(int n1, int n2, int n3, cmnode* *Gstr, dtype *B, dtype *f, dtype *x, double eps, int smallsize);
 
-void GenerateDiagonal2DBlock(int part_of_field, size_m x, size_m y, size_m z, dtype *DD, int lddd);
-void GenerateDiagonal1DBlock(double w, int part_of_field, size_m y, size_m z, dtype *DD, int lddd);
+void GenerateDiagonal2DBlock(char *str, int part_of_field, size_m x, size_m y, size_m z, dtype *DD, int lddd, dtype *alpX, dtype* alpY, dtype *alpZ);
+void GenerateDiagonal1DBlock(double w, int part_of_field, size_m x, size_m y, size_m z, dtype *DD, int lddd, dtype *alpX, dtype* alpY, dtype *alpZ);
+
+void SetPml3D(int blk3D, size_m x, size_m y, size_m z, int n, dtype* alpX, dtype* alpY, dtype* alpZ);
+void SetPml2D(int blk3D, int blk2D, size_m x, size_m y, size_m z, int n, dtype* alpX, dtype* alpY, dtype *alpZ);
+
+void DiagVec(int n, dtype *H, int ldh, dtype *value);
 
 void DirFactFastDiagStruct(int n1, int n2, int n3, double *D, int ldd, double *B, mnode** &Gstr, 
 	double eps, int smallsize, char *bench);
 
 
-void ResidCSR(int n1, int n2, int n3, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, double &RelRes);
+void ResidCSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, double &RelRes);
 void GenSparseMatrix(size_m x, size_m y, size_m z, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, dcsr* Acsr);
 
-void GenRHSandSolution(size_m x, size_m y, size_m z, dtype* B, dtype *u, dtype *f);
-void GenSparseMatrixOnline2D(int w, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
-void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
+void GenRHSandSolution(size_m x, size_m y, size_m z, dtype *u, dtype *f);
+void GenSparseMatrixOnline2D(char *str, int w, size_m x, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
+void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
+void GenSparseMatrixOnline2DwithPML(int i, size_m y, size_m z, ccsr* Acsr);
+void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, double eps);
 map<vector<int>, dtype> Block1DRowMat_to_CSR(int blk, int n1, int n2, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, int& non_zeros_on_prev_level);
 void GenRhs2D(int w, size_m x, size_m y, size_m z, dtype* f, dtype* f2D);
 void Clear(int m, int n, dtype* A, int lda);
 void GenSol1DBackward(int w, size_m x, size_m y, size_m z, dtype* x_sol_prd, dtype *u1D);
+void reducePML3D(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2, dtype *vect_red);
+void reducePML2D(size_m x, size_m y, int size1, dtype *vect, int size2, dtype *vect_red);
 
 //map<vector<int>, dtype> dense_to_CSR(int m, int n, dtype *A, int lda, int *ia, int *ja, dtype *values);
 map<vector<int>, dtype> BlockRowMat_to_CSR(int blk, int n1, int n2, int n3, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, int& non_zeros_on_prev_level);
@@ -111,6 +122,12 @@ void shift_values(int rows, int *ia, int shift_non_zeros, int non_zeros, int *ja
 void count_dense_elements(int m, int n, double *A, int lda, int& non_zeros);
 void SolvePardiso3D(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_pard, dtype* f, double thresh);
 dtype my_exp(double val);
+dtype u_ex_complex(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
+dtype F_ex_complex(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
+void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_orig, dtype* x_pard);
+void gnuplot(char *str1, char *str2, bool pml_flag, int col, size_m x, size_m y, size_m z);
+dtype alpha(size_m xyz, int i);
+dtype beta(size_m, size_m y, size_m z, int diag_case, int i, int j, int k);
 
 // Queue
 void init(struct my_queue* &q);

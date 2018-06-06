@@ -17,6 +17,7 @@ map<vector<int>, MatrixType> dense_to_CSR(int m, int n, MatrixType *A, int lda, 
 	int k = 0;
 	int ik = 0;
 	int first_elem_in_row = 0;
+	//print(m, n, A, lda, "Arow[0]");
 	for (int i = 0; i < m; i++)
 	{
 		first_elem_in_row = 0;
@@ -25,6 +26,7 @@ map<vector<int>, MatrixType> dense_to_CSR(int m, int n, MatrixType *A, int lda, 
 			if (abs(A[i + lda * j]) != 0)
 			{
 				values[k] = A[i + lda * j];
+			//	printf("%lf %lf\n", A[i + lda * j].real(), A[i + lda * j].imag());
 				if (first_elem_in_row == 0)
 				{
 					ia[ik] = k + 1;
@@ -54,7 +56,7 @@ double rel_error(double (*LANGE)(const char *, const int*, const int*, const Mat
 	// Norm of residual
 #pragma omp parallel for schedule(static)
 	for (int j = 0; j < k; j++)
-#pragma omp simd
+//#pragma omp simd
 		for (int i = 0; i < n; i++)
 			Hrec[i + ldh * j] = Hrec[i + ldh * j] - Hinit[i + ldh * j];
 
@@ -86,6 +88,19 @@ void construct_block_row(void (*LACPY)(const char *, const int*, const int*, con
 		LACPY("All", &m, &n, BL, &ldbl, &Arow[0 + ldar * 0], &ldar);
 		LACPY("All", &m, &n, A, &lda, &Arow[0 + ldar * n], &ldar);
 		LACPY("All", &m, &n, BR, &ldbr, &Arow[0 + ldar * 2 * n], &ldar);
+	}
+}
+
+template<class t1, class t2>
+void TestEqual(const t1& v1, const t2& v2, const string& hint = {})
+{
+	if (v1 != v2)
+	{
+		ostringstream os;
+		os << "Assertion failed: " << v1 << " != " << v2 << ".";
+		if (!hint.empty()) {
+			os << " Hint: " << hint;
+		}
 	}
 }
 
