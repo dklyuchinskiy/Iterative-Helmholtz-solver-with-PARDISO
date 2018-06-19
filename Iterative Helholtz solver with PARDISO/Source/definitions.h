@@ -106,13 +106,22 @@ typedef struct list qlist;
 
 #define PI 3.141592653589793238462643
 
-//#define HELMHOLTZ
+#define HELMHOLTZ
+
+#define PML
 
 #ifdef HELMHOLTZ
+#ifdef PML
 #define LENGTH 900
+#else
+#define LENGTH 1500
+#endif
 #else
 #define LENGTH 1
 #endif
+
+//#define GEN_BLOCK_CSR
+//#define SOLVE_3D_PROBLEM
 
 #define OUTPUT
 #define GNUPLOT

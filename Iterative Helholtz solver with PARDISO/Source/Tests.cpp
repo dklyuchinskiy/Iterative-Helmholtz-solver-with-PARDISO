@@ -443,6 +443,145 @@ failed:
 	return;
 }
 
+void Test_Poisson_FT1D_Complex(int n /* grid points in 1 dim */, double eps)
+{
+	DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
+	DFTI_DESCRIPTOR_HANDLE my_desc2_handle;
+	DFTI_DESCRIPTOR_HANDLE hand = 0;
+	MKL_LONG status;
+
+	n = 79;
+
+	size_m xx;
+
+	double L = 10.0;
+	double h = L / (n - 1);
+	double norm;
+	double sum = 0;
+
+	xx.h = h;
+	xx.l = L;
+
+	dtype *f = alloc_arr<dtype>(n);
+	dtype *u = alloc_arr <dtype>(n);
+	dtype *u_obt = alloc_arr<dtype>(n);
+	dtype *f_FFT = alloc_arr<dtype>(n);
+	dtype *f_MYFFT = alloc_arr<dtype>(n);
+
+	dtype *u_FFT = alloc_arr<dtype>(n);
+	dtype *u_MYFFT = alloc_arr<dtype>(n);
+
+	double* x = alloc_arr<double>(n);
+	double *lambda_my = alloc_arr<double>(n);
+	double *lambda_mkl = alloc_arr<double>(n);
+
+	for (int i = 0; i < n; i++)
+	{
+		x[i] = i * h; // all points from 0 to 1
+		printf("%lf ", x[i]);
+	}
+
+
+	// u_xx = f
+	// u = sin(2 * PI * x) , f = - 4 * PI * PI * sin(2 * PI * x)
+
+	double pi2l = 2.0 * PI / xx.l;
+
+	for (int i = 0; i < n; i++)
+	{
+		u[i] = -sin(pi2l * x[i]) / (pi2l * pi2l + 1.0);
+		f[i] = sin(pi2l * x[i]);
+
+		//	u[i] = x[i] * (x[i] - L) * (x[i] - L);
+		//	f[i] = 6 * x[i] - 4 * L - x[i] * (x[i] - L) * (x[i] - L);
+	}
+
+	//Test_ExactSolution_1D(n, h, u, f, eps);
+
+
+	status = DftiCreateDescriptor(&hand, DFTI_DOUBLE, DFTI_COMPLEX, 1, (MKL_LONG)(n));
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	printf("Set configuration: out-of-place\n");
+	status = DftiSetValue(hand, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	printf("Set configuration: CCE storage\n");
+	status = DftiSetValue(hand, DFTI_CONJUGATE_EVEN_STORAGE,
+		DFTI_COMPLEX_COMPLEX);
+
+	//	status = DftiSetValue(hand, DFTI_FORWARD_SCALE, 1.0 / n);
+
+	status = DftiCommitDescriptor(hand);
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	status = DftiComputeForward(hand, f, f_FFT);
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	MyFT1D_ForwardComplex(n, xx, f, f_MYFFT);
+	printf("h = %lf\n", h);
+	for (int i = 0; i < n; i++)
+		printf("f_MYFFT[%d]: %14.12lf + I * %14.12lf, exact: %14.12lf\n",
+			i, f_MYFFT[i].real(), f_MYFFT[i].imag(), -2.0 / (PI * (4 * (i - n / 2) * (i - n / 2) - 1)));
+
+	//	norm = rel_error_complex(n / 2, 1, f_MYFFT, f_FFT, n, eps);
+	//	if (norm < eps) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
+	//	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+	//	system("pause");
+
+	/*	for (int i = 0; i < n; i++)
+	if (i < n / 2 - 1) lambda[i] = -(2.0 * PI * i / L) * (2.0 * PI * i / L) - 1.0;
+	else lambda[i] = -(2.0 * PI * (n - i) / L) * (2.0 * PI * (n - i) / L) - 1.0;*/
+
+	for (int i = 0; i < n; i++)
+	{
+		lambda_my[i] = -(pi2l * (i - n / 2) * pi2l * (i - n / 2) + 1);
+		lambda_mkl[i] = -(pi2l * i * pi2l * i  + 1);
+
+	}
+
+	for (int i = 0; i < n; i++)
+	{
+		f_FFT[i] /= lambda_mkl[i];
+		f_MYFFT[i] /= lambda_my[i];
+		//	printf("lambda[%d] = %lf\n", i, lambda[i]);
+	}
+
+	MyFT1D_BackwardComplex(n, xx, f_MYFFT, u_MYFFT);
+
+	status = DftiComputeBackward(hand, f_FFT, u_FFT);
+	if (status != DFTI_NO_ERROR) goto failed;
+
+	for (int i = 0; i < n; i++)
+	{
+		u_MYFFT[i] /= L;
+		u_FFT[i] /= n;
+	}
+
+	for (int i = 0; i < n; i++)
+		printf("u_backward[%d]: %14.12lf  u_MKL[%d]: %14.12lf, u_ex[%d]:  %14.12lf\n", i, u_MYFFT[i].real(),
+			i, u_FFT[i].real(), i, u[i].real());
+
+
+	norm = rel_error(zlange, n, 1, u_FFT, u, n, eps);
+	if (norm < eps) printf("MKL: Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
+	else printf("MKL: Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+
+	norm = rel_error(zlange, n, 1, u_MYFFT, u, n, eps);
+	if (norm < eps) printf("MyFFT: Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
+	else printf("MyFFT: Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+	system("pause");
+
+	printf("Free DFTI descriptor\n");
+	DftiFreeDescriptor(&hand);
+
+	return;
+failed:
+	printf("ERROR\n");
+	return;
+}
+
+
 
 void Shell_FFT1D_Complex(ptr_test_fft func, const string& test_name, int& numb, int& fail_count)
 {
@@ -487,7 +626,8 @@ void TestAll()
 	printf("*******FFT*******\n");
 //	runner.RunTest(Shell_FFT1D_Real, Test_FFT1D_Real, "Test_FFT1D");
 //	runner.RunTest(Shell_FFT1D_Complex, Test_FFT1D_Complex, "Test_FFT1D_Complex");
-	runner.RunTest(Shell_FFT1D_Complex, Test_Poisson_FT1D_Real, "Test_Poisson_FFT1D_Real");
+//	runner.RunTest(Shell_FFT1D_Complex, Test_Poisson_FT1D_Real, "Test_Poisson_FT1D_Real");
+	runner.RunTest(Shell_FFT1D_Complex, Test_Poisson_FT1D_Complex, "Test_Poisson_FT1D_Complex");
 
 
 	printf("********************\n");

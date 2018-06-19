@@ -47,6 +47,7 @@ void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr
 void Test_FFT1D_Real(int n /* grid points in 1 dim */, double eps);
 void Test_FFT1D_Complex(int n /* grid points in 1 dim */, double eps);
 void Test_Poisson_FFT1D_Real(int n /* grid points in 1 dim */, double eps);
+void Test_Poisson_FT1D_Complex(int n /* grid points in 1 dim */, double eps);
 
 // FT
 void Test_Poisson_FT1D_Real(int n /* grid points in 1 dim */, double eps);
