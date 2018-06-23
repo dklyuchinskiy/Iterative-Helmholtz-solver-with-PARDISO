@@ -352,7 +352,7 @@ double d(double x)
 {
 	//printf("x = %lf\n", x);
 
-	const double C = 10;
+	const double C = 100;
 	return C * pow(x, 2);
 
 	// 10 * x ^ 2, проверить , что значения 0 и С на границах
@@ -371,6 +371,38 @@ dtype alph(size_m size, int xl, int xr, int i)
 	}
 	else
 		return 1.0;
+}
+
+dtype alpha(size_m xyz, double i)
+{
+	double x = 0;
+	double h = 1.0 / xyz.pml_pts;
+
+	if (i < 0 || i > xyz.n - 1)
+	{
+		// bound case
+		x = 1.0 - h / 2.0;
+		return dtype{ 0, -omega } / dtype{ d(x), -omega };
+	}
+	else if (i < xyz.pml_pts || i >= (xyz.n - xyz.pml_pts))
+	{
+		if (i < xyz.pml_pts)
+		{
+			x = (double)(xyz.pml_pts - i) * h;
+
+		//	if ((abs(x - 0) < EPS_ZERO) || (abs(x - 1) < EPS_ZERO)) printf("left: i = %d x = %lf\n", i, x);
+		}
+		else if (i >= (xyz.n - xyz.pml_pts))
+		{
+			//x = (double)(i - xyz.n + xyz.pml_pts + 1) / (xyz.pml_pts);
+			x = (double)(i - xyz.n + xyz.pml_pts + 1) * h;
+			
+			//if ((abs(x - 0) < EPS_ZERO) || (abs(x - 1) < EPS_ZERO)) printf("right: i = %d x = %lf\n", i, x);
+		}
+
+		return dtype{ 0, -omega } / dtype{ d(x), -omega };
+	}
+	else return 1.0;
 }
 
 void SetPml3D(int blk3D, size_m x, size_m y, size_m z, int n, dtype* alpX, dtype* alpY, dtype* alpZ)
@@ -466,6 +498,10 @@ void check_exact_sol_Hankel(double k2, size_m y, size_m z, dtype* x_sol_prd, dou
 	int Nz = z.n - 2 * z.pml_pts;
 
 	double l_no_pml = (double)LENGTH;
+	double eps1p = 0.01;
+	bool pml_flag = true;
+
+	sprintf(str1, "Charts2D/model_ft_kwave2_%lf", k2);
 
 	if (k2 > 0)
 	{
@@ -505,7 +541,7 @@ void check_exact_sol_Hankel(double k2, size_m y, size_m z, dtype* x_sol_prd, dou
 			}
 		}
 
-		double norm = rel_error(zlange, size, 1, x_sol_cpy, x_sol_ex, size, eps);
+		double norm = rel_error(zlange, size, 1, x_sol_cpy, x_sol_ex, size, eps1p);
 
 		for (int i = 0; i < size; i++)
 		{
@@ -515,26 +551,21 @@ void check_exact_sol_Hankel(double k2, size_m y, size_m z, dtype* x_sol_prd, dou
 			x_sol_prd_im[i] = x_sol_prd[i].imag();
 		}
 
-		double norm_re = rel_error(dlange, size, 1, x_sol_prd_re, x_sol_ex_re, size, eps);
-		double norm_im = rel_error(dlange, size, 1, x_sol_prd_im, x_sol_ex_im, size, eps);
+		double norm_re = rel_error(dlange, size, 1, x_sol_prd_re, x_sol_ex_re, size, eps1p);
+		double norm_im = rel_error(dlange, size, 1, x_sol_prd_im, x_sol_ex_im, size, eps1p);
 
 
 		printf("k2 = %lf > 0, CHECK H0(kr): \n", k2);
-		if (norm < eps) printf("Norm %12.10e < eps %12.10lf: PASSED  ", norm, eps);
-		else printf("Norm %12.10lf > eps %12.10lf : FAILED  ", norm, eps);
+		if (norm < eps1p) printf("Norm %12.10e < eps %12.10lf: PASSED  ", norm, eps1p);
+		else printf("Norm %12.10lf > eps %12.10lf : FAILED  ", norm, eps1p);
 		printf("norm_re: %12.10lf, norm_im: %12.10lf\n", norm_re, norm_im);
 
-		sprintf(str1, "Charts2D/model_ft_kwave2_%lf", k2);
 		sprintf(str2, "Charts2D/model_ex_2D_kwave2_%lf", k2);
-
-		bool pml_flag = true;
 		output2D(str1, pml_flag, y, z, x_sol_ex, x_sol_prd);
 		gnuplot2D(str1, str2, pml_flag, 3, y, z);
 
-
 		sprintf(str2, "Charts2D/model_prd_2D_kwave2_%lf", k2);
 		gnuplot2D(str1, str2, pml_flag, 5, y, z);
-
 
 		free_arr(x_sol_ex);
 		free_arr(x_sol_cpy);
@@ -547,6 +578,8 @@ void check_exact_sol_Hankel(double k2, size_m y, size_m z, dtype* x_sol_prd, dou
 	{
 		printf("NO CHECK: k2 < 0\n");
 	}
+
+
 
 }
 
@@ -661,31 +694,6 @@ void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, dtype* B, dtype *BL, 
 
 }
 
-dtype alpha(size_m xyz, int i)
-{
-	double x = 0;
-	if (i == -1 || i == xyz.n)
-	{
-		// bound case
-		return 1.0;
-	}
-	else if (i < xyz.pml_pts || i >= (xyz.n - xyz.pml_pts))
-	{
-		if (i < xyz.pml_pts)
-		{
-			x = (double)(xyz.pml_pts - i) / (xyz.pml_pts);
-		}
-		else if (i >= (xyz.n - xyz.pml_pts))
-		{
-			//x = (double)(i - xyz.n + xyz.pml_pts + 1) / (xyz.pml_pts);
-			x = (double)(i - xyz.n + xyz.pml_pts + 1) / (xyz.pml_pts);
-		}
-
-		return dtype{ 0, -omega } / dtype{ d(x), -omega };
-	}
-	else return 1.0;
-}
-
 dtype beta3D(size_m x, size_m y, size_m z, int diag_case, int i, int j, int k)
 {
 	if (diag_case == 0)
@@ -740,8 +748,11 @@ dtype beta2D(size_m x, size_m y, int diag_case, int i, int j)
 		dtype value;
 
 #ifdef PML
-		value = -alpha(x, i) * (alpha(x, i + 1) + 2.0 * alpha(x, i) + alpha(x, i - 1)) / (2.0 * x.h * x.h)
-			    -alpha(y, j) * (alpha(y, j + 1) + 2.0 * alpha(y, j) + alpha(y, j - 1)) / (2.0 * y.h * y.h);
+	//	value = -alpha(x, i) * (alpha(x, i + 1) + 2.0 * alpha(x, i) + alpha(x, i - 1)) / (2.0 * x.h * x.h)
+	//		    -alpha(y, j) * (alpha(y, j + 1) + 2.0 * alpha(y, j) + alpha(y, j - 1)) / (2.0 * y.h * y.h);
+
+		value = -alpha(x, i) * (alpha(x, i + 0.5) + alpha(x, i - 0.5)) / (x.h * x.h)
+				-alpha(y, j) * (alpha(y, j + 0.5) + alpha(y, j - 0.5)) / (y.h * y.h);
 #else
 		dtype c1 = -2.0 / (x.h * x.h);
 		dtype c2 = -2.0 / (y.h * y.h);
@@ -757,13 +768,23 @@ dtype beta2D(size_m x, size_m y, int diag_case, int i, int j)
 
 		return value;
 	}
-	else if (diag_case == -1 || diag_case == 1)
+	else if (diag_case == 1)
 	{
-		return alpha(x, i) * (alpha(x, i + 1) + alpha(x, i)) / (2.0 * x.h * x.h);
+		//return alpha(x, i) * (alpha(x, i + 1) + alpha(x, i)) / (2.0 * x.h * x.h);
+		return alpha(x, i) * alpha(x, i + 0.5) / (x.h * x.h);
 	}
-	else if (diag_case == -2 || diag_case == 2)
+	else if (diag_case == -1)
 	{
-		return alpha(y, j) * (alpha(y, j + 1) + alpha(y, j)) / (2.0 * y.h * y.h);
+		return alpha(x, i) * alpha(x, i - 0.5) / (x.h * x.h);
+	}
+	else if (diag_case == 2)
+	{
+		//return alpha(y, j) * (alpha(y, j + 1) + alpha(y, j)) / (2.0 * y.h * y.h);
+		return alpha(y, j) * alpha(y, j + 0.5) / (y.h * y.h);
+	}
+	else if (diag_case == -2)
+	{
+		return alpha(y, j) * alpha(y, j - 0.5) / (y.h * y.h);
 	}
 
 	return 0;
@@ -975,8 +996,8 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m y, size_m z, ccsr* Acsr, doubl
 	int size3 = size - y.n;
 	int non_zeros_in_2Dblock3diag = size + size2 * 2 + size3 * 2;
 	double RelRes = 0;
-	double k = (double)kk;
-	double kww = 4 * PI * PI * (w - n2) * (w - n2) / (y.l * y.l);
+	//double k = (double)kk;
+	//double kww = 4.0 * PI * PI * (w - n2) * (w - n2) / (y.l * y.l);
 	//double kww = 4 * PI * PI * (w - n2) * (w - n2);
 
 	//printf("Number k = %lf\n", k);
@@ -1013,9 +1034,9 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m y, size_m z, ccsr* Acsr, doubl
 			{
 				Acsr->ja[count] = l2 + 1;
 #ifdef HELMHOLTZ
-				//Acsr->values[count] = dtype{ kwave2, 0 };
-				Acsr->values[count] = dtype{ k * k, 0 };
-				Acsr->values[count] -= dtype{ kww, 0 };
+				Acsr->values[count] = dtype{ kwave2, 0 };
+				//Acsr->values[count] = dtype{ k * k, 0 };
+				//Acsr->values[count] -= dtype{ kww, 0 };
 				Acsr->values[count++] += beta2D(y, z, 0, j1, k1);
 #else
 				Acsr->values[count++] = beta2D(y, z, 0, j1, k1);
@@ -1607,7 +1628,7 @@ void gnuplot2D(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m
 	//fprintf(file1, "reset\nclear\n");
 	fprintf(file1, "set term png font \"Times-Roman, 16\"\n");
 	//fprintf(file, "set view map\n");
-	fprintf(file1, "set xrange[0:%d]\nset yrange[0:%d]\n", (int)LENGTH, (int)LENGTH);
+	fprintf(file1, "set xrange[0:%lf]\nset yrange[0:%lf]\n", x.l, y.l);
 	fprintf(file1, "set pm3d\n");
 	fprintf(file1, "set palette\n");
 

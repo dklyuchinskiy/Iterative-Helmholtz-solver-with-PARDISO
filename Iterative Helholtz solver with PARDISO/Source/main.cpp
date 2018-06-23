@@ -201,14 +201,14 @@ int main()
 #if 1
 
 #ifdef PML
-	int pml_pts = 30;
+	int pml_pts = 15;
 #else
 	int pml_pts = 0;
 #endif
 	int pml_size = 2 * pml_pts;
-	int n1 = 39 + pml_size;		    // number of point across the directions
-	int n2 = 39 + pml_size;
-	int n3 = 39 + pml_size;
+	int n1 = 99 + pml_size;		    // number of point across the directions
+	int n2 = 99 + pml_size;
+	int n3 = 99 + pml_size;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 	int size = n * NB;		// size of vector x and f: n1 * n2 * n3
@@ -265,10 +265,14 @@ int main()
 	int n3_npml = z.n - pml_size;
 	int n_no_pml = n1_npml * n2_npml;
 	int size_no_pml = n_no_pml * n3_npml;
+	int size2D_no_pml = n2_npml * n3_npml;
 
 	dtype *x_orig_no_pml = alloc_arr<dtype>(size_no_pml);
 	dtype *x_pard_no_pml = alloc_arr<dtype>(size_no_pml);
 	dtype *x_pard_no_pml_cpy = alloc_arr<dtype>(size_no_pml);
+
+	dtype *x_sol = alloc_arr<dtype>(size_no_pml);
+	dtype *x_sol_fft_no_pml = alloc_arr<dtype>(size2D_no_pml * x.n);
 
 	
 	ccsr *Dcsr_no_pml;
@@ -487,7 +491,6 @@ int main()
 
 	// Calling the solver
 	int size2D = y.n * z.n;
-	int size2D_no_pml = n2_npml * n3_npml;
 	int mtype = 13;
 	int *iparm = alloc_arr<int>(64);
 	int *perm = alloc_arr<int>(size2D);
@@ -525,19 +528,22 @@ int main()
 
 	printf("SOURCE in 2D WITH PML AT: (%lf, %lf)\n", sourcePML.x, sourcePML.y);
 	double k = (double)kk;
+	int nhalf = n1 / 2;
 
 	system("pause");
+
 	for (int i = 0; i < n1; i++)
 	{
 		int count = 0;
-		int nhalf = n1 / 2;
 		printf("-------------Iter: %d------------------\n", i);
 
-		double kww = 4 * PI * PI * (i - nhalf) * (i - nhalf) / (y.l * y.l);
+		double kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (y.l * y.l);
 		double kwave2 = k * k - kww;
 
 		dtype *f2D = alloc_arr<dtype>(n2 * n3);
 		dtype *x_sol_ex = alloc_arr<dtype>(n2 * n3);
+
+	//	kwave2 = 0.005;
 
 		// источник в каждой задаче в середине 
 		//GenSparseMatrixOnline2D("FT", i, x, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
@@ -553,7 +559,7 @@ int main()
 			f2D[j] = 1.0 / (z.h * y.h);
 			count++;
 		}
-
+		
 		/*
 		for (int j = 0; j < n2 * n3; j++)
 			if (f2D[j].real() < 0)
@@ -561,60 +567,67 @@ int main()
 				//printf("i = %d, f2d[%d] = %lf %lf\n", i, j, f2D[j].real(), f2D[j].imag());
 				f2D[j] *= -1;
 				count++;
-			}
-*/
+			}*/
+
 	//	GenRHSandSolution2D_Syntetic(y, z, D2csr, &u2Dsynt[i * size2D], f2D);
 		pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f2D, &x_sol_prd[i * size2D], &error);
 //		norm = rel_error(zlange, n2 * n3, 1, &u2Dsynt[i * size2D], &x_sol_prd[i * size2D], n2 * n3, thresh);
 
-		get_exact_2D_Hankel(y.n, z.n, y, z, x_sol_ex, sqrt(abs(kwave2)), sourcePML);
-		//get_exact_2D_Hankel(y.n, z.n, y, z, x_sol_ex, k, sourcePML);
-
-		norm = resid_2D_Hankel(y, z, D2csr, x_sol_ex, f2D, sourcePML);
-
 		double eps = 0.01; // 1 percent
-		
+
 		if (norm < eps) printf("Resid 2D Hankel norm %12.10e < eps %12.10lf: PASSED\n\n", norm, eps);
 		else printf("Resid 2D Hankel norm %12.10lf > eps %12.10lf : FAILED\n\n", norm, eps);
 
-		char *str1, *str2;
+		char *str1, *str2, *str3;
 		str1 = alloc_arr<char>(255);
 		str2 = alloc_arr<char>(255);
+		str3 = alloc_arr<char>(255);
 		bool pml_flag = false;
+
+		sprintf(str1, "ChartsPML/model_pml_%lf", kwave2);
+		sprintf(str2, "ChartsPML/model_pml_ex_%lf", kwave2);
+		sprintf(str3, "ChartsPML/model_pml_pard_%lf", kwave2);
 
 		if (kwave2 > 0)
 		{
-			sprintf(str1, "ChartsPML/model_pml_%lf", kwave2);
-			output2D(str1, pml_flag, y, z, x_sol_ex, &x_sol_prd[i * size2D]);
+			get_exact_2D_Hankel(y.n, z.n, y, z, x_sol_ex, sqrt(kwave2), sourcePML);
 
-			sprintf(str2, "ChartsPML/model_pml_ex_%lf", kwave2);
+			norm = resid_2D_Hankel(y, z, D2csr, x_sol_ex, f2D, sourcePML);
+		
+			output2D(str1, pml_flag, y, z, x_sol_ex, &x_sol_prd[i * size2D]);
 			gnuplot2D(str1, str2, pml_flag, 3, y, z);
 
-			sprintf(str2, "ChartsPML/model_pml_pard_%lf", kwave2);
-			gnuplot2D(str1, str2, pml_flag, 5, y, z);
+			gnuplot2D(str1, str3, pml_flag, 5, y, z);
 		}
+		else
+		{
+			output2D(str1, pml_flag, y, z, x_sol_ex, &x_sol_prd[i * size2D]);
+		}
+
+
+
+
+		reducePML2D(y, z, size2D, &x_sol_prd[i * size2D], size2D_no_pml, &x_sol_fft_no_pml[i * size2D_no_pml]);
+		check_exact_sol_Hankel(kwave2, y, z, &x_sol_fft_no_pml[i * size2D_no_pml], thresh);
 
 		free(f2D);
 		free_arr(x_sol_ex);
 	}
 
-	printf("Reducing PML after taking a solution\n");
-
-	dtype *x_sol = alloc_arr<dtype>(size_no_pml);
-	dtype *x_sol_fft_no_pml = alloc_arr<dtype>(size2D_no_pml * x.n);
+	//("Reducing PML after taking a solution\n");
 
 
 #if 1
+	/*
 	for (int i = 0; i < n1; i++)
 	{
-		reducePML2D(y, z, size2D, &x_sol_prd[i * size2D], size2D_no_pml, &x_sol_fft_no_pml[i * size2D_no_pml]);
+		
 
-		int nhalf = n1 / 2;
-		double kww = 4 * PI * PI * (i - nhalf) * (i - nhalf) / (y.l * y.l);
-		double k2 = k * k - kww;
+		double kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (y.l * y.l);
+		double kwave2 = k * k - kww;
 	
-		check_exact_sol_Hankel(k2, y, z, &x_sol_fft_no_pml[i * size2D_no_pml], thresh);
-	}
+
+	}*/
 #else
 	reducePML3D(x, y, z, size, x_sol_prd, size_no_pml, x_sol_fft_no_pml);
 #endif

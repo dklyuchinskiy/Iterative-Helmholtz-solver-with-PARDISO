@@ -112,7 +112,8 @@ typedef struct list qlist;
 
 #ifdef HELMHOLTZ
 #ifdef PML
-#define LENGTH 900
+#define LENGTH 1000
+//#define LENGTH 200
 #else
 #define LENGTH 1500
 #endif
@@ -143,6 +144,8 @@ typedef struct list qlist;
 #define kk 0
 #endif
 
+
+#define EPS_ZERO 0.00000001
 
 #define STRUCT_CSR
 

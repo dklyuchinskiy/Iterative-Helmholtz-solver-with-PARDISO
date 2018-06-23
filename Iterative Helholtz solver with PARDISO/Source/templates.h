@@ -128,7 +128,7 @@ void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_ori
 void gnuplot(char *str1, char *str2, bool pml_flag, int col, size_m x, size_m y, size_m z);
 void output2D(char *str, bool pml_flag, size_m x, size_m y, dtype* x_orig, dtype* x_pard);
 void gnuplot2D(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m y);
-dtype alpha(size_m xyz, int i);
+dtype alpha(size_m xyz, double i);
 dtype beta(size_m, size_m y, size_m z, int diag_case, int i, int j, int k);
 void check_exact_sol_Hankel(double k2, size_m y, size_m z, dtype* x_sol_prd, double eps);
 dtype Hankel(double x);
