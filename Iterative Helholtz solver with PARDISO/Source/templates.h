@@ -130,11 +130,13 @@ void output2D(char *str, bool pml_flag, size_m x, size_m y, dtype* x_orig, dtype
 void gnuplot2D(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m y);
 dtype alpha(size_m xyz, double i);
 dtype beta(size_m, size_m y, size_m z, int diag_case, int i, int j, int k);
-void check_exact_sol_Hankel(double k2, size_m y, size_m z, dtype* x_sol_prd, double eps);
+void check_exact_sol_Hankel(dtype alpha_k, double k2, size_m y, size_m z, dtype* x_sol_prd, double eps);
 dtype Hankel(double x);
 void get_exact_2D_Hankel(int Ny, int Nz, size_m y, size_m z, dtype* x_sol_ex, double k, point source);
 double resid_2D_Hankel(size_m y, size_m z, ccsr* D2csr, dtype* x_sol_ex, dtype* f2D, point source);
 void ResidCSR2D(size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, point source, double &RelRes);
+void normalization_of_exact_sol(int n1, int n2, size_m x, size_m y, dtype *x_sol_ex, dtype alpha_k);
+void check_norm_result(int n1, int n2, int n3, dtype* x_orig_no_pml, dtype* x_sol);
 
 // Queue
 void init(struct my_queue* &q);

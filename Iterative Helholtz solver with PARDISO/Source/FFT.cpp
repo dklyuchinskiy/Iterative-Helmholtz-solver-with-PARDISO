@@ -95,7 +95,10 @@ void MyFT1D_BackwardComplex(int N, size_m x, dtype* f_MYFFT, dtype *f)
 		f[i] = 0;
 		for (int k = 0; k < N; k++)
 			f[i] += f_MYFFT[k] * my_exp(2 * PI * (k - n2) * i * x.h / x.l);
+
+		f[i] /= x.l;
 	}
+
 }
 
 void MyFT1D_BackwardReal(int N, double h, dtype* f_MYFFT, double *f)

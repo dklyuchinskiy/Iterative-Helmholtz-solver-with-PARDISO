@@ -156,8 +156,8 @@ void GenRhs2D(int w, size_m x, size_m y, size_m z, dtype* f, dtype* f2D)
 				}
 			}
 #else
-		for (int k = 0; k < y.n * z.n; k++)
-			f2D[k] = f[x.n * k + w];
+		for (int k = 0; k < x.n * y.n; k++)
+			f2D[k] = f[z.n * k + w];
 #endif
 }
 
@@ -183,8 +183,8 @@ void GenSol1DBackward(int w, size_m x, size_m y, size_m z, dtype* x_sol_prd, dty
 				}
 		}
 #else
-	for (int k = 0; k < Nx; k++)
-			u1D[k] = x_sol_prd[w + k * Ny * Nz];
+	for (int k = 0; k < Nz; k++)
+			u1D[k] = x_sol_prd[w + k * Nx * Ny];
 #endif
 }
 
@@ -274,16 +274,58 @@ void reducePML2D(size_m x, size_m y, int size1, dtype *vect, int size2, dtype *v
 	else printf("PML 2D is reduced successfully!\n");
 }
 
+void check_norm_result(int n1, int n2, int n3, dtype* x_orig_no_pml, dtype* x_sol)
+{
+	dtype *x_orig_new = alloc_arr<dtype>(n1 * n2 * n3);
+	dtype *x_sol_new = alloc_arr<dtype>(n1 * n2 * n3);
+
+	printf("------------ACCURACY CHECK---------\n");
+
+	int size = n1 * n2;
+
+	double *x_orig_re = alloc_arr<double>(size);
+	double *x_orig_im = alloc_arr<double>(size);
+
+	double *x_sol_re = alloc_arr<double>(size);
+	double *x_sol_im = alloc_arr<double>(size);
+
+	double eps1p = 0.01;
+
+#pragma omp parallel for simd schedule(simd:static)
+	for (int i = 0; i < n1 * n2 * n3; i++)
+	{
+		x_orig_new[i] = x_orig_no_pml[i];
+		x_sol_new[i] = x_sol[i];
+	}
+
+
+	for (int k = 0; k < n3; k++)
+	{
+#pragma omp parallel for simd schedule(simd:static)
+		for (int i = 0; i < size; i++)
+		{
+			x_orig_re[i] = x_orig_new[i + k * size].real();
+			x_orig_im[i] = x_orig_new[i + k * size].imag();
+			x_sol_re[i] = x_sol_new[i + k * size].real();
+			x_sol_im[i] = x_sol_new[i + k * size].imag();
+		}
+
+		double norm = rel_error(zlange, size, 1, &x_sol_new[k * size], &x_orig_new[k * size], size, 0.001);
+		double norm_re = rel_error(dlange, size, 1, x_sol_re, x_orig_re, size, eps1p);
+		double norm_im = rel_error(dlange, size, 1, x_sol_im, x_orig_im, size, eps1p);
+		printf("i = %d norm = %lf norm_re = %lf norm_im = %lf\n", k, norm, norm_re, norm_im);
+	}
+
+}
+
 
 void GenRHSandSolution(size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f)
 {
 	int n = x.n * y.n;
 	int size = n * z.n;
 
-	double center = (double)(x.l / 2.0);
-	//double center = 0;
 
-	point source = { center, center, center };
+	point source = { x.l / 2.0, y.l / 2.0, z.l / 2.0 };
 
 	//printf("SOURCE AT x = %lf, y = %lf, z = %lf\n", source.x, source.y, source.z);
 
@@ -479,23 +521,31 @@ dtype set_exact_2D_Hankel(double x, double y, double k, point source)
 	return Hankel(k * r);
 }
 
-void get_exact_2D_Hankel(int Ny, int Nz, size_m y, size_m z, dtype* x_sol_ex, double k, point source)
+void get_exact_2D_Hankel(int Nx, int Ny, size_m x, size_m y, dtype* x_sol_ex, double k, point source)
 {
 	for (int j = 0; j < Ny; j++)
-		for (int i = 0; i < Nz; i++)
+		for (int i = 0; i < Nx; i++)
 		{
-			x_sol_ex[j * Ny + i] = set_exact_2D_Hankel((i + 1) * y.h, (j + 1) * z.h, k, source);
+			x_sol_ex[j * Nx + i] = set_exact_2D_Hankel((i + 1) * x.h, (j + 1) * y.h, k, source);
 
-			x_sol_ex[j * Ny + i] *= -0.25;
-			x_sol_ex[j * Ny + i] = dtype{ -x_sol_ex[j * Ny + i].imag(), x_sol_ex[j * Ny + i].real() };
+			x_sol_ex[j * Nx + i] *= -0.25;
+			x_sol_ex[j * Nx + i] = dtype{ -x_sol_ex[j * Nx + i].imag(), x_sol_ex[j * Nx + i].real() };
 		}
 }
 
-void check_exact_sol_Hankel(double k2, size_m y, size_m z, dtype* x_sol_prd, double eps)
+void normalization_of_exact_sol(int n1, int n2, size_m x, size_m y, dtype *x_sol_ex, dtype alpha_k)
+{
+	for (int i = 0; i < n1 * n2; i++)
+		x_sol_ex[i] *= alpha_k;
+}
+
+void check_exact_sol_Hankel(dtype alpha_k, double k2, size_m x, size_m y, dtype* x_sol_prd, double eps)
 {
 	char str1[255], str2[255];
+
+	int Nx = x.n - 2 * x.pml_pts;
 	int Ny = y.n - 2 * y.pml_pts;
-	int Nz = z.n - 2 * z.pml_pts;
+
 
 	double l_no_pml = (double)LENGTH;
 	double eps1p = 0.01;
@@ -505,7 +555,7 @@ void check_exact_sol_Hankel(double k2, size_m y, size_m z, dtype* x_sol_prd, dou
 
 	if (k2 > 0)
 	{
-		int size = Ny * Nz;
+		int size = Nx * Ny;
 		dtype* x_sol_ex = alloc_arr<dtype>(size);
 		dtype* x_sol_cpy = alloc_arr<dtype>(size);
 
@@ -520,21 +570,20 @@ void check_exact_sol_Hankel(double k2, size_m y, size_m z, dtype* x_sol_prd, dou
 
 		double k = sqrt(k2);
 
-		double ppw = 1.0 / (k * y.h);
-		printf("ppw: %lf\n", ppw);
-
 		point source = { l_no_pml / 2.0, l_no_pml / 2.0 };
 
 		printf("SOURCE AT 2D PROBLEM AT x = %lf y = %lf\n", source.x, source.y);
 
-		get_exact_2D_Hankel(Ny, Nz, y, z, x_sol_ex, k, source);
+		get_exact_2D_Hankel(Nx, Ny, x, y, x_sol_ex, k, source);
+
+		normalization_of_exact_sol(Nx, Ny, x, y, x_sol_ex, alpha_k);
 
 		zlacpy("All", &size, &ione, x_sol_prd, &size, x_sol_cpy, &size);
 
 		for (int l = 0; l < size; l++)
 		{
-			take_coord2D(Ny, Nz, l, i1, j1);
-			if (i1 == j1 && ((i1 + 1) * y.h == source.x))
+			take_coord2D(Nx, Ny, l, i1, j1);
+			if (i1 == j1 && ((i1 + 1) * y.h == source.y))
 			{
 				printf("i = j = %d val = %lf %lf\n", i1, j1, x_sol_ex[l].real(), x_sol_ex[l].imag());
 				x_sol_cpy[l] = x_sol_prd[l] = x_sol_ex[l] = 0;
@@ -561,11 +610,11 @@ void check_exact_sol_Hankel(double k2, size_m y, size_m z, dtype* x_sol_prd, dou
 		printf("norm_re: %12.10lf, norm_im: %12.10lf\n", norm_re, norm_im);
 
 		sprintf(str2, "Charts2D/model_ex_2D_kwave2_%lf", k2);
-		output2D(str1, pml_flag, y, z, x_sol_ex, x_sol_prd);
-		gnuplot2D(str1, str2, pml_flag, 3, y, z);
+		output2D(str1, pml_flag, x, y, x_sol_ex, x_sol_prd);
+		gnuplot2D(str1, str2, pml_flag, 3, x, y);
 
 		sprintf(str2, "Charts2D/model_prd_2D_kwave2_%lf", k2);
-		gnuplot2D(str1, str2, pml_flag, 5, y, z);
+		gnuplot2D(str1, str2, pml_flag, 5, x, y);
 
 		free_arr(x_sol_ex);
 		free_arr(x_sol_cpy);
@@ -583,14 +632,14 @@ void check_exact_sol_Hankel(double k2, size_m y, size_m z, dtype* x_sol_prd, dou
 
 }
 
-double resid_2D_Hankel(size_m y, size_m z, ccsr* D2csr, dtype* x_sol_ex, dtype* f2D, point source)
+double resid_2D_Hankel(size_m x, size_m y, ccsr* D2csr, dtype* x_sol_ex, dtype* f2D, point source)
 {
-	int n = y.n;
-	int size = n * z.n;
+	int n = x.n;
+	int size = n * y.n;
 	double RelRes = 0;
 	dtype *g = alloc_arr<dtype>(size);
 
-	ResidCSR2D(y, z, D2csr, x_sol_ex, f2D, g, source, RelRes);
+	ResidCSR2D(x, y, D2csr, x_sol_ex, f2D, g, source, RelRes);
 
 	return RelRes;
 }
@@ -1371,8 +1420,8 @@ double rel_error(int n, int k, double *Hrec, double *Hinit, int ldh, double eps)
 
 void ResidCSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, double &RelRes)
 {
-	int n = x.n * y.n;
-	int size = n * z.n;
+	int n = y.n * z.n;
+	int size = n * x.n;
 	int size_no_pml = (x.n - 2 * x.pml_pts) * (y.n - 2 * y.pml_pts) * (z.n - 2 * z.pml_pts);
 	dtype *f1 = alloc_arr<dtype>(size);
 	int ione = 1;
@@ -1407,11 +1456,11 @@ void ResidCSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, 
 	free_arr(f1);
 }
 
-void ResidCSR2D(size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, point source, double &RelRes)
+void ResidCSR2D(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, point source, double &RelRes)
 {
-	int n = y.n;
-	int size = n * z.n;
-	int size_no_pml = (y.n - 2 * y.pml_pts) * (z.n - 2 * z.pml_pts);
+	int n = x.n;
+	int size = n * y.n;
+	int size_no_pml = (x.n - 2 * x.pml_pts) * (y.n - 2 * y.pml_pts);
 	dtype *f1 = alloc_arr<dtype>(size);
 	int ione = 1;
 
@@ -1450,8 +1499,8 @@ void ResidCSR2D(size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g
 
 	dtype *g_no_pml = alloc_arr<dtype>(size_no_pml);
 	dtype *f_no_pml = alloc_arr<dtype>(size_no_pml);
-	reducePML2D(y, z, size, g, size_no_pml, g_no_pml);
-	reducePML2D(y, z, size, f, size_no_pml, f_no_pml);
+	reducePML2D(x, y, size, g, size_no_pml, g_no_pml);
+	reducePML2D(x, y, size, f, size_no_pml, f_no_pml);
 
 	RelRes = zlange("Frob", &size_no_pml, &ione, g_no_pml, &size_no_pml, NULL);
 
@@ -1520,9 +1569,9 @@ void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_ori
 		for (int j = 0; j < Ny; j++)
 			for (int i = 0; i < Nx; i++)
 				fprintf(file, "%lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf\n", i * x.h, j * y.h, k * z.h,
-					x_orig[i + j * Nx + k * Ny * Nx].real(), x_orig[i + j * Nx + k * Ny * Nx].imag(),
-					x_pard[i + j * Nx + k * Ny * Nx].real(), x_pard[i + j * Nx + k * Ny * Nx].imag(),
-					x_orig[i + j * Nx + k * Ny * Nx].real() / x_pard[i + j * Nx + k * Ny * Nx].real());
+					x_orig[i + j * Nx + k * Nx * Ny].real(), x_orig[i + j * Nx + k * Nx * Ny].imag(),
+					x_pard[i + j * Nx + k * Nx * Ny].real(), x_pard[i + j * Nx + k * Nx * Ny].imag(),
+					x_orig[i + j * Nx + k * Nx * Ny].real() / x_pard[i + j * Nx + k * Nx * Ny].real());
 		fclose(file);
 	}
 }

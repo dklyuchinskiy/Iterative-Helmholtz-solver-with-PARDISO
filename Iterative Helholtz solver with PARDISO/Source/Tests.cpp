@@ -554,7 +554,6 @@ void Test_Poisson_FT1D_Complex(int n /* grid points in 1 dim */, double eps)
 
 	for (int i = 0; i < n; i++)
 	{
-		u_MYFFT[i] /= L;
 		u_FFT[i] /= n;
 	}
 
