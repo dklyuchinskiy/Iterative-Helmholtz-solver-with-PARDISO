@@ -508,7 +508,53 @@ dtype Hankel(double x)
 	return { j0(x), y0(x) };
 }
 
-dtype set_exact_2D_Hankel(double x, double y, double k, point source)
+dtype Hankel(dtype z)
+{
+	void *vmblock = NULL;
+
+	int n = 1; // number of functions
+	int nz;
+
+	//memory allocation for cyr, cyi, cwr, cwi
+	vmblock = vminit();
+	REAL *res_real = (REAL *)vmalloc(vmblock, VEKTOR, n + 1, 0); //index 0 not used
+	REAL *res_imag = (REAL *)vmalloc(vmblock, VEKTOR, n + 1, 0);
+	REAL *CWRKR = (REAL *)vmalloc(vmblock, VEKTOR, n + 1, 0);
+	REAL *CWRKI = (REAL *)vmalloc(vmblock, VEKTOR, n + 1, 0);
+
+	if (!vmcomplete(vmblock)) {
+		LogError("No Memory", 0, __FILE__, __LINE__);
+		return 0;
+	}
+
+	int fnu = 0; // first function
+	int kode = 1; // no scaling
+	int ierr = 0;
+	int m = 1; // kind of hankel function
+
+#if 0
+
+	ZBESJ(z.real(), z.imag(), fnu, kode, n, res_real, res_imag, &nz, &IERR);
+	printf("ZBESJ IERROR: %d\n", IERR);
+	dtype res1 = { res_real[1], res_imag[1] };
+
+	ZBESY(z.real(), z.imag(), fnu, kode, n, res_real, res_imag, &nz, CWRKR, CWRKI, &IERR);
+	printf("ZBESY IERROR: %d\n", IERR);
+	dtype res2 = { res_real[1], res_imag[1] };
+	res2 = { -res2.imag(), res2.real() };
+
+	return res1 + res2;
+#else
+
+	// Hankel function of the 1 kind
+	ZBESH(z.real(), z.imag(), fnu, kode, m, n, res_real, res_imag, &nz, &ierr);
+
+	return { res_real[1], res_imag[1] };
+
+#endif
+}
+
+dtype set_exact_2D_Hankel(double x, double y, dtype k, point source)
 {
 	x -= source.x;
 	y -= source.y;
@@ -521,7 +567,7 @@ dtype set_exact_2D_Hankel(double x, double y, double k, point source)
 	return Hankel(k * r);
 }
 
-void get_exact_2D_Hankel(int Nx, int Ny, size_m x, size_m y, dtype* x_sol_ex, double k, point source)
+void get_exact_2D_Hankel(int Nx, int Ny, size_m x, size_m y, dtype* x_sol_ex, dtype k, point source)
 {
 	for (int j = 0; j < Ny; j++)
 		for (int i = 0; i < Nx; i++)
@@ -553,8 +599,7 @@ void check_exact_sol_Hankel(dtype alpha_k, double k2, size_m x, size_m y, dtype*
 
 	sprintf(str1, "Charts2D/model_ft_kwave2_%lf", k2);
 
-	if (k2 > 0)
-	{
+	
 		int size = Nx * Ny;
 		dtype* x_sol_ex = alloc_arr<dtype>(size);
 		dtype* x_sol_cpy = alloc_arr<dtype>(size);
@@ -567,8 +612,11 @@ void check_exact_sol_Hankel(dtype alpha_k, double k2, size_m x, size_m y, dtype*
 		int ione = 1;
 
 		int i1, j1;
+		
+		dtype k = 0;
 
-		double k = sqrt(k2);
+		if (k2 > 0) k = sqrt(k2);
+		else k = { 0 , sqrt(abs(k2)) };
 
 		point source = { l_no_pml / 2.0, l_no_pml / 2.0 };
 
@@ -603,18 +651,29 @@ void check_exact_sol_Hankel(dtype alpha_k, double k2, size_m x, size_m y, dtype*
 		double norm_re = rel_error(dlange, size, 1, x_sol_prd_re, x_sol_ex_re, size, eps1p);
 		double norm_im = rel_error(dlange, size, 1, x_sol_prd_im, x_sol_ex_im, size, eps1p);
 
+		if (k2 > 0)
+		{
+			printf("k2 = %lf > 0, CHECK H0(kr): \n", k2);
+			if (norm < eps1p) printf("Norm %12.10e < eps %12.10lf: PASSED  ", norm, eps1p);
+			else printf("Norm %12.10lf > eps %12.10lf : FAILED  ", norm, eps1p);
+			printf("norm_re: %12.10lf, norm_im: %12.10lf\n", norm_re, norm_im);
 
-		printf("k2 = %lf > 0, CHECK H0(kr): \n", k2);
-		if (norm < eps1p) printf("Norm %12.10e < eps %12.10lf: PASSED  ", norm, eps1p);
-		else printf("Norm %12.10lf > eps %12.10lf : FAILED  ", norm, eps1p);
-		printf("norm_re: %12.10lf, norm_im: %12.10lf\n", norm_re, norm_im);
+			sprintf(str2, "Charts2D/model_ex_2D_kwave2_%lf", k2);
+			output2D(str1, pml_flag, x, y, x_sol_ex, x_sol_prd);
+			gnuplot2D(str1, str2, pml_flag, 3, x, y);
 
-		sprintf(str2, "Charts2D/model_ex_2D_kwave2_%lf", k2);
-		output2D(str1, pml_flag, x, y, x_sol_ex, x_sol_prd);
-		gnuplot2D(str1, str2, pml_flag, 3, x, y);
+			sprintf(str2, "Charts2D/model_prd_2D_kwave2_%lf", k2);
+			gnuplot2D(str1, str2, pml_flag, 5, x, y);
+		}
+		else
+		{
+			printf("k2 = %lf < 0, CHECK H0(i * kr): \n", k2);
+			if (norm < eps1p) printf("Norm %12.10e < eps %12.10lf: PASSED  ", norm, eps1p);
+			else printf("Norm %12.10lf > eps %12.10lf : FAILED  ", norm, eps1p);
+			printf("norm_re: %12.10lf, norm_im: %12.10lf\n", norm_re, norm_im);
+			//printf("NO CHECK: k2 < 0\n");
+		}
 
-		sprintf(str2, "Charts2D/model_prd_2D_kwave2_%lf", k2);
-		gnuplot2D(str1, str2, pml_flag, 5, x, y);
 
 		free_arr(x_sol_ex);
 		free_arr(x_sol_cpy);
@@ -622,14 +681,6 @@ void check_exact_sol_Hankel(dtype alpha_k, double k2, size_m x, size_m y, dtype*
 		free_arr(x_sol_ex_im);
 		free_arr(x_sol_prd_re);
 		free_arr(x_sol_prd_im);
-	}
-	else
-	{
-		printf("NO CHECK: k2 < 0\n");
-	}
-
-
-
 }
 
 double resid_2D_Hankel(size_m x, size_m y, ccsr* D2csr, dtype* x_sol_ex, dtype* f2D, point source)
@@ -1036,16 +1087,14 @@ void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtyp
 
 }
 
-void GenSparseMatrixOnline2DwithPML(int w, size_m y, size_m z, ccsr* Acsr, double kwave2)
+void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, size_m z, ccsr* Acsr, double kwave2)
 {
-	int n = y.n;
-	int n2 = n / 2;
-	int size = y.n * z.n;
-	int size2 = size - z.n;
+	int size = x.n * y.n;
+	int size2 = size - y.n;
 	int size3 = size - y.n;
 	int non_zeros_in_2Dblock3diag = size + size2 * 2 + size3 * 2;
 	double RelRes = 0;
-	//double k = (double)kk;
+	double k = (double)kk;
 	//double kww = 4.0 * PI * PI * (w - n2) * (w - n2) / (y.l * y.l);
 	//double kww = 4 * PI * PI * (w - n2) * (w - n2);
 
@@ -1056,7 +1105,7 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m y, size_m z, ccsr* Acsr, doubl
 
 	if (non_zeros_in_2Dblock3diag != Acsr->non_zeros) printf("ERROR! Uncorrect value of non_zeros inside 2D: %d != %d\n", non_zeros_in_2Dblock3diag, Acsr->non_zeros);
 
-	printf("Gen 2D matrix for frequency w = %d, k^2 - ky^2 = %lf\n", w - n2, kwave2);
+	printf("Gen 2D matrix for frequency w = %d, k^2 - ky^2 = %lf\n", w - z.n / 2, kwave2);
 
 	// All elements
 
@@ -1076,41 +1125,42 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m y, size_m z, ccsr* Acsr, doubl
 		Acsr->ia[l1] = count + 1;
 		for (int l2 = 0; l2 < size; l2++)
 		{
-			take_coord2D(y.n, z.n, l1, j1, k1);
-			take_coord2D(y.n, z.n, l2, j2, k2);
+			take_coord2D(x.n, y.n, l1, j1, k1);
+			take_coord2D(x.n, y.n, l2, j2, k2);
 
 			if (l1 == l2)
 			{
 				Acsr->ja[count] = l2 + 1;
 #ifdef HELMHOLTZ
 				Acsr->values[count] = dtype{ kwave2, 0 };
+				//Acsr->values[count] += dtype{ 0, k * k * beta_eq };
 				//Acsr->values[count] = dtype{ k * k, 0 };
 				//Acsr->values[count] -= dtype{ kww, 0 };
-				Acsr->values[count++] += beta2D(y, z, 0, j1, k1);
+				Acsr->values[count++] += beta2D(x, y, 0, j1, k1);
 #else
-				Acsr->values[count++] = beta2D(y, z, 0, j1, k1);
+				Acsr->values[count++] = beta2D(x, y, 0, j1, k1);
 #endif
 				
 			}
-			else if (l1 == l2 - 1 && (l1 + 1) % y.n != 0)
+			else if (l1 == l2 - 1 && (l1 + 1) % x.n != 0)
 			{
 				Acsr->ja[count] = l2 + 1;
-				Acsr->values[count++] = beta2D(y, z, 1, j1, k1); // right
+				Acsr->values[count++] = beta2D(x, y, 1, j1, k1); // right
 			}
-			else if (l1 == l2 + 1 && l1 % y.n != 0)
+			else if (l1 == l2 + 1 && l1 % x.n != 0)
 			{
 				Acsr->ja[count] = l2 + 1;
-				Acsr->values[count++] = beta2D(y, z, -1, j1, k1); // left
+				Acsr->values[count++] = beta2D(x, y, -1, j1, k1); // left
 			}
-			else if (l1 == l2 - y.n)
+			else if (l1 == l2 - x.n)
 			{
 				Acsr->ja[count] = l2 + 1;
-				Acsr->values[count++] = beta2D(y, z, 2, j1, k1); // right
+				Acsr->values[count++] = beta2D(x, y, 2, j1, k1); // right
 			}
-			else if (l1 == l2 + y.n)
+			else if (l1 == l2 + x.n)
 			{
 				Acsr->ja[count] = l2 + 1;
-				Acsr->values[count++] = beta2D(y, z, -2, j1, k1); // left
+				Acsr->values[count++] = beta2D(x, y, -2, j1, k1); // left
 			}
 
 		}
@@ -1348,7 +1398,7 @@ dtype u_ex_complex(size_m xx, size_m yy, size_m zz, double x, double y, double z
 
 	if (r == 0) r = 0.005;
 	
-	double arg = -(double)(kk) * r;
+	double arg = (double)(kk) * r;
 
 	return my_exp(arg) / (4.0 * PI * r);
 
@@ -1626,12 +1676,12 @@ void gnuplot(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m y
 
 	FILE* file1;
 	//sprintf(str, "run.plt", numb++);
-	if (col == 4) str = "run_ex.plt";
+	if (col == 4 || col == 5) str = "run_ex.plt";
 	else str = "run_pard.plt";
 
 	file1 = fopen(str, "w");
 
-	fprintf(file1, "reset\nclear\nset term png font \"Times-Roman, 16\"\n");
+	fprintf(file1, "set term png font \"Times-Roman, 16\"\n");
 	//fprintf(file, "set view map\n");
 	fprintf(file1, "set xrange[0:%d]\nset yrange[0:%d]\n", (int)LENGTH, (int)LENGTH);
 	fprintf(file1, "set pm3d\n");
@@ -1646,6 +1696,8 @@ void gnuplot(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m y
 		fprintf(file1, "set output '%s_z_%4.2lf.png'\n", sout, k * z.h);
 		fprintf(file1, "splot '%s_%02d.dat' u 2:1:%d w linespoints pt 7 palette pointsize 1 notitle\n\n", splot, k, col);
 	}
+
+	fprintf(file1, "exit\n");
 
 	fclose(file1);
 	system(str);

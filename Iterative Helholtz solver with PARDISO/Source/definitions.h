@@ -30,11 +30,12 @@ typedef std::complex<double> dtype;
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl.h"
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl_dfti.h"
 
+#include "source_bessel\basis.h"
+#include "source_bessel\vmblock.h""
+
 //#define DEBUG
 
-#define EPS 0.00000001
-
-#define min(a,b) ((a) <= (b)) ? (a) : (b)
+#define EPS 0.00001
 
 struct MatrixCSRReal {
 
@@ -133,7 +134,7 @@ typedef struct list qlist;
 #define c_z 1280
 /*--------------*/
 #define ky 1.8
-#define beta_eq 2.3
+#define beta_eq 0.5
 #define kk (2.0 * (PI) * (omega) / (c_z))
 
 //#define kk ((omega) / (c_z))

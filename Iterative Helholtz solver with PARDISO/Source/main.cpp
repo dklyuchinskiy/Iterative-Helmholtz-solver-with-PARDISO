@@ -193,6 +193,7 @@ int main()
 
 #else
 
+#if 1
 int main()
 {
 	TestAll();
@@ -256,6 +257,8 @@ int main()
 	// h = 10, 1280 x 1280, N = 120 - 2 волны
 	// 40 точек h = 30, L = 600, omega = 4, 6, 10
 
+	TestHankel();
+	system("pause");
 
 	double ppw = (double)(c_z) / omega / z.h;
 
@@ -577,7 +580,7 @@ int main()
 
 		// источник в каждой задаче в середине 
 		//GenSparseMatrixOnline2D("FT", i, x, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
-		GenSparseMatrixOnline2DwithPML(i, x, y, D2csr, kwave2);
+		GenSparseMatrixOnline2DwithPML(i, x, y, z, D2csr, kwave2);
 
 		GenRhs2D(i, x, y, z, f_FFT, f2D);
 
@@ -632,9 +635,15 @@ int main()
 
 			gnuplot2D(str1, str3, pml_flag, 5, x, y);
 		}
-		else
+		else // kwave2 < 0
 		{
+			get_exact_2D_Hankel(x.n, y.n, x, y, x_sol_ex, { 0, sqrt(abs(kwave2)) }, sourcePML);
+
+			normalization_of_exact_sol(x.n, y.n, x, y, x_sol_ex, alpha_k);
+
+			norm = resid_2D_Hankel(x, y, D2csr, x_sol_ex, f2D, sourcePML);
 			output2D(str1, pml_flag, x, y, x_sol_ex, &x_sol_prd[i * size2D]);
+
 			//gnuplot2D(str1, str3, pml_flag, 5, y, z);
 		}
 
@@ -674,9 +683,9 @@ int main()
 	}
 
 	pml_flag = true;
+
+	// Output
 	output("Charts100/model_ft", pml_flag, x, y, z, x_orig_no_pml, x_sol);
-	gnuplot("Charts100/model_ft", "Charts100/ex_pard", pml_flag, 4, x, y, z);
-	gnuplot("Charts100/model_ft", "Charts100/helm_ft", pml_flag, 6, x, y, z);
 
 	check_norm_result(n1_npml, n2_npml, n3_npml, x_orig_no_pml, x_sol);
 
@@ -685,8 +694,6 @@ int main()
 
 	printf("Computing error ||x_{exact}-x_{comp_fft}||/||x_{exact}||\n");
 	norm = rel_error(zlange, size_no_pml, 1, x_sol, x_orig_no_pml, size_no_pml, thresh);
-
-
 
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
@@ -697,7 +704,12 @@ int main()
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
 
-
+	printf("----------------------------------------------\n");
+	printf("Printing results...\n");
+	gnuplot("Charts100/model_ft", "Charts100/real/ex_pard", pml_flag, 4, x, y, z);
+	gnuplot("Charts100/model_ft", "Charts100/imag/ex_pard", pml_flag, 5, x, y, z);
+	gnuplot("Charts100/model_ft", "Charts100/real/helm_ft", pml_flag, 6, x, y, z);
+	gnuplot("Charts100/model_ft", "Charts100/imag/helm_ft", pml_flag, 7, x, y, z);
 
 #ifndef ONLINE
 	free_arr(D);
@@ -713,4 +725,5 @@ int main()
 #endif
 #endif
 }
+#endif
 #endif

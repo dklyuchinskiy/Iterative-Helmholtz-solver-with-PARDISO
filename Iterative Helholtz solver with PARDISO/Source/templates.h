@@ -105,7 +105,7 @@ void GenSparseMatrix(size_m x, size_m y, size_m z, double *BL, int ldbl, double 
 void GenRHSandSolution(size_m x, size_m y, size_m z, dtype *u, dtype *f);
 void GenSparseMatrixOnline2D(char *str, int w, size_m x, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
 void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
-void GenSparseMatrixOnline2DwithPML(int i, size_m y, size_m z, ccsr* Acsr, double kwave2);
+void GenSparseMatrixOnline2DwithPML(int i, size_m x, size_m y, size_m z, ccsr* Acsr, double kwave2);
 void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, double eps);
 map<vector<int>, dtype> Block1DRowMat_to_CSR(int blk, int n1, int n2, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, int& non_zeros_on_prev_level);
 void GenRhs2D(int w, size_m x, size_m y, size_m z, dtype* f, dtype* f2D);
@@ -132,11 +132,13 @@ dtype alpha(size_m xyz, double i);
 dtype beta(size_m, size_m y, size_m z, int diag_case, int i, int j, int k);
 void check_exact_sol_Hankel(dtype alpha_k, double k2, size_m y, size_m z, dtype* x_sol_prd, double eps);
 dtype Hankel(double x);
-void get_exact_2D_Hankel(int Ny, int Nz, size_m y, size_m z, dtype* x_sol_ex, double k, point source);
+dtype Hankel(dtype z);
+void get_exact_2D_Hankel(int Nx, int Ny, size_m x, size_m y, dtype* x_sol_ex, dtype k, point source);
 double resid_2D_Hankel(size_m y, size_m z, ccsr* D2csr, dtype* x_sol_ex, dtype* f2D, point source);
 void ResidCSR2D(size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, point source, double &RelRes);
 void normalization_of_exact_sol(int n1, int n2, size_m x, size_m y, dtype *x_sol_ex, dtype alpha_k);
 void check_norm_result(int n1, int n2, int n3, dtype* x_orig_no_pml, dtype* x_sol);
+dtype set_exact_2D_Hankel(double x, double y, dtype k, point source);
 
 // Queue
 void init(struct my_queue* &q);
@@ -166,6 +168,44 @@ void MyFT1D_ForwardComplex(int N, size_m x, dtype* f, dtype *f_MYFFT);
 //
 void GenSolVector(int size, dtype *vector);
 void GenRHSandSolution2D_Syntetic(size_m x, size_m y, ccsr *Dcsr, dtype *u, dtype *f);
+
+
+
+
+// Bessel and Hankel functions
+void ZBESI(REAL ZR, REAL ZI, REAL FNU, int KODE, int N, REAL *CYR, REAL *CYI, int *NZ, int *IERR);
+void ZBESJ(REAL ZR, REAL ZI, REAL FNU, int KODE, int N, REAL *CYR, REAL *CYI, int *NZ, int *IERR);
+void ZBESK(REAL ZR, REAL ZI, REAL FNU, int KODE, int N, REAL *CYR, REAL *CYI, int *NZ, int *IERR);
+void ZBESY(REAL ZR, REAL ZI, REAL FNU, int KODE, int N, REAL *CYR, REAL *CYI, int *NZ, REAL *CWRKR, REAL *CWRKI, int *IERR);
+void ZBESH(REAL ZR, REAL ZI, REAL FNU, int KODE, int M, int N, REAL *CYR, REAL *CYI, int *NZ, int *IERR);
+
+void ZUOIK(REAL, REAL, REAL, int, int, int, REAL *, REAL *, int *, REAL, REAL, REAL);
+void ZBUNK(REAL, REAL, REAL, int, int, int, REAL *, REAL *, int *, REAL, REAL, REAL);
+void ZBKNU(REAL, REAL, REAL, int, int, REAL *, REAL *, int *, REAL, REAL, REAL);
+void ZBUNI(REAL ZR, REAL ZI, REAL FNU, int KODE, int N, REAL *YR, REAL *YI, int *NZ, int NUI, int *NLAST, REAL FNUL, REAL TOL, REAL ELIM, REAL ALIM);
+void ZBINU(REAL ZR, REAL ZI, REAL FNU, int KODE, int N, REAL *CYR, REAL *CYI, int *NZ, REAL RL, REAL FNUL, REAL TOL, REAL ELIM, REAL ALIM);
+void ZACAI(REAL, REAL, REAL, int, int, int, REAL *, REAL *, int *, REAL, REAL, REAL, REAL);
+void ZACON(REAL, REAL, REAL, int, int, int, REAL *, REAL *, int *, REAL, REAL, REAL, REAL, REAL);
+void ZKSCL(REAL, REAL, REAL, int, REAL *, REAL *, int *, REAL *, REAL *, REAL, REAL, REAL);
+void ZRATI(REAL, REAL, REAL, int, REAL *, REAL *, REAL);
+void ZWRSK(REAL ZRR, REAL ZRI, REAL FNU, int KODE, int N, REAL *YR, REAL *YI, int *NZ, REAL *CWR, REAL *CWI, REAL TOL, REAL ELIM, REAL ALIM);
+void ZUNI1(REAL ZR, REAL ZI, REAL FNU, int KODE, int N, REAL *YR, REAL *YI, int *NZ, int *NLAST, REAL FNUL, REAL TOL, REAL ELIM, REAL ALIM);
+void ZUNI2(REAL ZR, REAL ZI, REAL FNU, int KODE, int N, REAL *YR, REAL *YI, int *NZ, int *NLAST, REAL FNUL, REAL TOL, REAL ELIM, REAL ALIM);
+void ZUNHJ(REAL, REAL, REAL, int, REAL, REAL *, REAL *, REAL *, REAL *, REAL *, REAL *, REAL *, REAL *, REAL *, REAL *, REAL *, REAL *);
+void ZUNIK(REAL, REAL, REAL, int, int, REAL, int, REAL *, REAL *, REAL *, REAL *, REAL *, REAL *, REAL *, REAL *, REAL *, REAL *);
+void ZUNK1(REAL ZR, REAL ZI, REAL FNU, int KODE, int MR, int N, REAL *YR, REAL *YI, int *NZ, REAL TOL, REAL ELIM, REAL ALIM);
+void ZUNK2(REAL ZR, REAL ZI, REAL FNU, int KODE, int MR, int N, REAL *YR, REAL *YI, int *NZ, REAL TOL, REAL ELIM, REAL ALIM);
+
+//Functions defined in CBess0.cpp.
+void ZSERI(REAL, REAL, REAL, int, int, REAL *, REAL *, int *, REAL, REAL, REAL);
+void ZASYI(REAL, REAL, REAL, int, int, REAL *, REAL *, int *, REAL, REAL, REAL, REAL);
+void ZAIRY(REAL ZR, REAL ZI, int ID, int KODE, REAL *AIR, REAL *AII, int *NZ, int *IERR);
+void ZMLRI(REAL, REAL, REAL, int, int, REAL *, REAL *, int *, REAL);
+void ZS1S2(REAL *, REAL *, REAL *, REAL *, REAL *, REAL *, int *, REAL, REAL, int *);
+void ZSHCH(REAL, REAL, REAL *, REAL *, REAL *, REAL *);
+void ZUCHK(REAL, REAL, int *, REAL, REAL);
+REAL DGAMLN(REAL, int *);
+
 
 
 

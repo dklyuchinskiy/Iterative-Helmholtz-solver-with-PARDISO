@@ -52,6 +52,7 @@ void Test_Poisson_FT1D_Complex(int n /* grid points in 1 dim */, double eps);
 // FT
 void Test_Poisson_FT1D_Real(int n /* grid points in 1 dim */, double eps);
 void Test_ExactSolution_1D(int n, double h, double* u, double *f, double eps);
+void TestHankel();
 
 #if 0
 

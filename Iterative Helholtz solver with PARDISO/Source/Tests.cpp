@@ -580,7 +580,47 @@ failed:
 	return;
 }
 
+void TestHankel()
+{
+	printf("-----TEST HANKEL-------\n");
+	double x1 = PI;
+	double x2 = PI / 4;
+	dtype z1 = { x1, 0 };
+	dtype z2 = { x2, 0 };
 
+	if (fabs(Hankel(x1).real() - Hankel(z1).real()) < EPS && (Hankel(x1).imag() - Hankel(z1).imag()) < EPS)
+	printf("PASSED Hankel %lf vs Hankel (%lf, %lf): (%lf %lf) - (%lf, %lf)\n", x1, z1.real(), z1.imag(),
+		Hankel(x1).real(), Hankel(x1).imag(), Hankel(z1).real(), Hankel(z1).imag());
+
+	if ((Hankel(x2).real() - Hankel(z2).real()) < EPS && (Hankel(x2).imag() - Hankel(z2).imag()) < EPS)
+	printf("PASSED Hankel %lf vs Hankel (%lf, %lf): (%lf %lf) - (%lf, %lf)\n", x2, z2.real(), z2.imag(),
+		Hankel(x2).real(), Hankel(x2).imag(), Hankel(z2).real(), Hankel(z2).imag());
+
+	int N = 1; // number of functions
+	int nz;
+	int ierr = 0;
+
+	void *vmblock;
+
+	//memory allocation for cyr, cyi, cwr, cwi
+	vmblock = vminit();
+	REAL *res_real = (REAL *)vmalloc(vmblock, VEKTOR, N + 1, 0); //index 0 not used
+	REAL *res_imag = (REAL *)vmalloc(vmblock, VEKTOR, N + 1, 0);
+
+
+	ZBESH(z1.real(), z1.imag(), 0, 1, 1, 1, res_real, res_imag, &nz, &ierr);
+	//printf("ZBESH IERROR: %d\n", ierr);
+
+	if ((Hankel(z1).real() - res_real[1]) < EPS && (Hankel(z1).imag() - res_imag[1]) < EPS)
+	printf("PASSED Hankel (%lf, %lf): (%lf, %lf)\n", z1.real(), z1.imag(), res_real[1], res_imag[1]);
+
+	ZBESH(z2.real(), z2.imag(), 0, 1, 1, 1, res_real, res_imag, &nz, &ierr);
+
+//	printf("ZBESH IERROR: %d\n", ierr);
+	if ((Hankel(z2).real() - res_real[1]) < EPS && (Hankel(z2).imag() - res_imag[1]) < EPS)
+	printf("PASSED Hankel (%lf, %lf): (%lf, %lf)\n", z2.real(), z2.imag(), res_real[1], res_imag[1]);
+
+}
 
 void Shell_FFT1D_Complex(ptr_test_fft func, const string& test_name, int& numb, int& fail_count)
 {
