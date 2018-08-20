@@ -139,6 +139,7 @@ void ResidCSR2D(size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g
 void normalization_of_exact_sol(int n1, int n2, size_m x, size_m y, dtype *x_sol_ex, dtype alpha_k);
 void check_norm_result(int n1, int n2, int n3, dtype* x_orig_no_pml, dtype* x_sol);
 dtype set_exact_2D_Hankel(double x, double y, dtype k, point source);
+void extendPML3D(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2, dtype *vect_ext);
 
 // Queue
 void init(struct my_queue* &q);
@@ -168,6 +169,9 @@ void MyFT1D_ForwardComplex(int N, size_m x, dtype* f, dtype *f_MYFFT);
 //
 void GenSolVector(int size, dtype *vector);
 void GenRHSandSolution2D_Syntetic(size_m x, size_m y, ccsr *Dcsr, dtype *u, dtype *f);
+
+//
+void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* f_FFT, dtype* x_sol_prd, dtype* x_pard_nopml, dtype* x_pard_nopml_cpy, dtype* x_sol_fft_nopml, dtype* x_sol, dtype* x_orig, dtype* x_orig_nopml, double thresh);
 
 
 

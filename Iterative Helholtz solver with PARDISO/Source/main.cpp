@@ -209,13 +209,16 @@ int main()
 	int pml_size = 2 * pml_pts;
 
 	size_m x, y, z;
+	size_m x_nopml, y_nopml, z_nopml;
 
 	x.pml_pts = y.pml_pts = pml_pts;
 	z.pml_pts = 0;
 
-	int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
-	int n2 = 99 + 2 * y.pml_pts;
-	int n3 = 99 + 2 * z.pml_pts;
+	x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
+
+	int n1 = 29 + 2 * x.pml_pts;		    // number of point across the directions
+	int n2 = 29 + 2 * y.pml_pts;
+	int n3 = 29 + 2 * z.pml_pts;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 
@@ -235,18 +238,25 @@ int main()
 
 	double timer1, timer2, all_time;
 
-	x.l = LENGTH + (double)(2 * x.pml_pts * LENGTH) / (n1 - 2 * x.pml_pts + 1);
-	y.l = LENGTH + (double)(2 * y.pml_pts * LENGTH) / (n2 - 2 * y.pml_pts + 1);
-	z.l = LENGTH + (double)(2 * z.pml_pts * LENGTH) / (n3 - 2 * z.pml_pts + 1);
+	x.n_nopml = n1 - 2 * x.pml_pts;
+	y.n_nopml = n2 - 2 * y.pml_pts;
+	z.n_nopml = n3 - 2 * z.pml_pts;
+
+	x_nopml.n = y_nopml.n = z_nopml.n = x.n_nopml;
+
+	x_nopml.n_nopml = y_nopml.n_nopml = z_nopml.n_nopml = x_nopml.n;
+
+	x.l = LENGTH + (double)(2 * x.pml_pts * LENGTH) / (x.n_nopml + 1);
+	y.l = LENGTH + (double)(2 * y.pml_pts * LENGTH) / (y.n_nopml + 1);
+	z.l = LENGTH + (double)(2 * z.pml_pts * LENGTH) / (z.n_nopml + 1);
 
 	x.h = x.l / (x.n + 1);  // x.n + 1 grid points of the whole domain
 	y.h = y.l / (y.n + 1);  // x.n - 1 - inner points
 	z.h = z.l / (z.n + 1);  // 2 points - for the boundaries
 
-
 	printf("Size of domain: Lx = %lf, Ly = %lf, Lz = %lf\n", x.l, y.l, z.l);
-	printf("with points: Nx = %d, Ny = %d, Nz = %d\n", n1, n2, n3);
-	printf("Size of physical domain: Nx = %d, Ny = %d, Nz = %d\n", x.n - 2 * x.pml_pts, y.n - 2 * y.pml_pts, z.n - 2 * z.pml_pts);
+	printf("with points: Nx = %d, Ny = %d, Nz = %d\n", x.n, y.n, z.n);
+	printf("Size of physical domain: Nx = %d, Ny = %d, Nz = %d\n", x.n_nopml, y.n_nopml, z.n_nopml);
 	printf("Size of PML domain: Nx = %d, Ny = %d, Nz = %d\n", 2 * x.pml_pts, 2 * y.pml_pts, 2 * z.pml_pts);
 	printf("Steps for physical domain: Hx = %lf, hy = %lf, hz = %lf\n", x.h, y.h, z.h);
 
@@ -265,42 +275,68 @@ int main()
 	printf("ppw: %lf\n", ppw);
 
 	// Solution, right hand side and block B
-	dtype *B = alloc_arr<dtype>(size - n); // vector of diagonal elementes
 	dtype *x_orig = alloc_arr<dtype>(size);
 	dtype *f = alloc_arr<dtype>(size);
 	dtype *f_FFT = alloc_arr<dtype>(size);
 	dtype *x_sol_prd = alloc_arr<dtype>(size);
 	//dtype *u2Dsynt = alloc_arr<dtype>(size);
 
-	int n1_npml = x.n - 2 * x.pml_pts;
-	int n2_npml = y.n - 2 * y.pml_pts;
-	int n3_npml = z.n - 2 * z.pml_pts;
-	int n_no_pml = n1_npml * n2_npml;
-	int size_no_pml = n_no_pml * n3_npml;
-	int size2D_no_pml = n1_npml * n2_npml;
 
-	dtype *x_orig_no_pml = alloc_arr<dtype>(size_no_pml);
-	dtype *x_pard_no_pml = alloc_arr<dtype>(size_no_pml);
-	dtype *x_pard_no_pml_cpy = alloc_arr<dtype>(size_no_pml);
+	int n_nopml = x.n_nopml * y.n_nopml;
+	int size_nopml = n_nopml * z.n_nopml;
+	int size2D_nopml = n_nopml;
 
-	dtype *x_sol = alloc_arr<dtype>(size_no_pml);
-	dtype *x_sol_fft_no_pml = alloc_arr<dtype>(size2D_no_pml * n3);
+	int success = 0;
+	int itcount = 0;
+	double RelRes = 0;
+	double norm = 0;
+
+	dtype *x_orig_nopml = alloc_arr<dtype>(size_nopml);
+	dtype *x_pard_nopml = alloc_arr<dtype>(size_nopml);
+	dtype *x_pard_nopml_cpy = alloc_arr<dtype>(size_nopml);
+
+	dtype *x_sol = alloc_arr<dtype>(size_nopml);
+	dtype *x_sol_fft_nopml = alloc_arr<dtype>(size2D_nopml * n3);
 
 	
-	ccsr *Dcsr_no_pml;
-	int non_zeros_no_pml = (n_no_pml + (n_no_pml - 1) * 2 + (n_no_pml - x.n + 2 * x.pml_pts) * 2 - (x.n - 2 * x.pml_pts - 1) * 2) * (z.n - 2 * z.pml_pts) + 2 * (size_no_pml - n_no_pml);
-	Dcsr_no_pml = (ccsr*)malloc(sizeof(ccsr));
-	Dcsr_no_pml->values = alloc_arr<dtype>(non_zeros_no_pml);
-	Dcsr_no_pml->ia = alloc_arr<int>(size_no_pml + 1);
-	Dcsr_no_pml->ja = alloc_arr<int>(non_zeros_no_pml);
-	Dcsr_no_pml->ia[size_no_pml] = non_zeros_no_pml + 1;
-	Dcsr_no_pml->non_zeros = non_zeros_no_pml;
+	ccsr *Dcsr_nopml;
+	int non_zeros_nopml = (n_nopml + (n_nopml - 1) * 2 + (n_nopml - x.n_nopml) * 2 - (y.n_nopml - 1) * 2) * z.n_nopml + 2 * (size_nopml - n_nopml);
+	Dcsr_nopml = (ccsr*)malloc(sizeof(ccsr));
+	Dcsr_nopml->values = alloc_arr<dtype>(non_zeros_nopml);
+	Dcsr_nopml->ia = alloc_arr<int>(size_nopml + 1);
+	Dcsr_nopml->ja = alloc_arr<int>(non_zeros_nopml);
+	Dcsr_nopml->ia[size_nopml] = non_zeros_nopml + 1;
+	Dcsr_nopml->non_zeros = non_zeros_nopml;
 
-	int non_zeros_in_3Dblock3diag = (n + (n - 1) * 2 + (n - x.n) * 2 - (y.n - 1) * 2) * z.n + 2 * (size - n);
+	ccsr *Dcsr_reduced;
+	Dcsr_reduced = (ccsr*)malloc(sizeof(ccsr));
+	Dcsr_reduced->values = alloc_arr<dtype>(non_zeros_nopml);
+	Dcsr_reduced->ia = alloc_arr<int>(size_nopml + 1);
+	Dcsr_reduced->ja = alloc_arr<int>(non_zeros_nopml);
+	Dcsr_reduced->ia[size_nopml] = non_zeros_nopml + 1;
+	Dcsr_reduced->non_zeros = non_zeros_nopml;
+
+
+	x_nopml.l = y_nopml.l = z_nopml.l = (double)(LENGTH);
+	x_nopml.h = x_nopml.l / (double)(x_nopml.n + 1);  // x.n + 1 grid points of the whole domain
+	y_nopml.h = y_nopml.l / (double)(y_nopml.n + 1);  // x.n - 1 - inner points
+	z_nopml.h = z_nopml.l / (double)(z_nopml.n + 1);  // 2 points - for the boundaries
+
 
 	system("pause");
 
-#ifdef SOLVE_3D_PROBLEM
+
+#define GEN_3D_MATRIX
+
+#ifdef GEN_3D_MATRIX
+
+	int non_zeros_in_3Dblock3diag = (n + (n - 1) * 2 + (n - x.n) * 2 - (y.n - 1) * 2) * z.n + 2 * (size - n);
+
+	dtype *D, *D_nopml;
+	dtype *B_mat, *B_mat_nopml;
+
+	dtype *B = alloc_arr<dtype>(size - n); // vector of diagonal elementes
+	dtype *B_nopml = alloc_arr<dtype>(size_nopml - n_nopml); // vector of diagonal elementes
 
 	dtype *x_pard = alloc_arr<dtype>(size);
 
@@ -316,24 +352,16 @@ int main()
 
 	// Memory allocation for coefficient matrix A
 	// the size of matrix A: n^3 * n^3 = n^6
-	dtype *D;
-	dtype *B_mat;
-#ifdef GEN_BLOCK_CSR
 
 	D = alloc_arr<dtype>(n * n); // it's a matrix with size n^3 * n^2 = size * n
 	B_mat = alloc_arr<dtype>(n * n);
 
+	D_nopml = alloc_arr<dtype>(n_nopml * n_nopml);
+	B_mat_nopml = alloc_arr<dtype>(n_nopml * n_nopml);
+
 	int ldd = n;
 	int ldb = n;
 #endif
-#endif
-
-//	printf("%d %d\n", non_zeros_no_pml, non_zeros_in_3Dblock3diag);
-
-	int success = 0;
-	int itcount = 0;
-	double RelRes = 0;
-	double norm = 0;
 
 #ifdef _OPENMP
 	int nthr = omp_get_max_threads();
@@ -346,8 +374,6 @@ int main()
 	printf("Run sequential version on 1 thread\n");
 #endif
 
-
-
 	printf("Grid steps: hx = %lf hy = %lf hz = %lf\n", x.h, y.h, z.h);
 
 	all_time = omp_get_wtime();
@@ -356,16 +382,19 @@ int main()
 	// Generation matrix of coefficients, vector of solution (to compare with obtained) and vector of RHS
 	GenMatrixandRHSandSolution(n1, n2, n3, D, ldd, B, x_orig, f);
 #else
+
 	// Generation of vector of solution (to compare with obtained) and vector of RHS
 	printf("Gen right-hand side and solution...\n");
 	GenRHSandSolution(x, y, z, x_orig, f);
 
+
 	// Generation of sparse coefficient matrix
-#ifdef SOLVE_3D_PROBLEM
+#ifdef GEN_3D_MATRIX
 	//printf("--------------- Gen sparse 3D matrix in CSR format... ---------------\n");
 	//GenSparseMatrixOnline3D(x, y, z, B, B_mat, n, D, n, B_mat, n, Dcsr);
 
 
+#if 1
 	printf("-------------- Gen sparse 3D matrix in CSR format with PML... ------------\n");
 	timer1 = omp_get_wtime();
 	GenSparseMatrixOnline3DwithPML(x, y, z, B, B_mat, n, D, n, B_mat, n, Dcsr, thresh);
@@ -373,9 +402,14 @@ int main()
 
 	printf("Time of GenSparseMatrixOnline3DwithPML: %lf\n", timer2);
 
+	printf("-------------- Gen sparse 3D matrix in CSR format with no PML... ------------\n");
+	timer1 = omp_get_wtime();
+	GenSparseMatrixOnline3DwithPML(x_nopml, y_nopml, z_nopml, B_nopml, B_mat_nopml, n_nopml, D_nopml, n_nopml, B_mat_nopml, n_nopml, Dcsr_nopml, thresh);
+	timer2 = omp_get_wtime() - timer1;
+
+	printf("Time of GenSparseMatrixOnline3DnoPML: %lf\n", timer2);
 #endif
 
-#ifdef GEN_BLOCK_CSR
 	free_arr(D);
 	free_arr(B_mat);
 #endif
@@ -384,14 +418,18 @@ int main()
 	printf("Analytic non_zeros in three 2D block-row: %d\n", non_zeros_in_3diag + 2 * n);
 	printf("Analytic non_zeros in 3D block-tridiagonal matrix: %d\n", non_zeros_in_3Dblock3diag);
 
-#ifdef SOLVE_3D_PROBLEM
-
 	// Test PML
 	printf("----------------- Running test PML... -----------\n");
 	timer1 = omp_get_wtime();
-	Test_PMLBlock3Diag_in_CSR(x, y, z, Dcsr, Dcsr_no_pml, thresh);
+	Test_PMLBlock3Diag_in_CSR(x, y, z, Dcsr, Dcsr_nopml, Dcsr_reduced, thresh);
 	timer2 = omp_get_wtime() - timer1;
 	printf("Time of Test_PMLBlock3Diag_in_CSR: %lf\n", timer2);
+
+	system("pause");
+
+#ifdef SOLVE_3D_PROBLEM
+
+
 
 	//	Test_CompareColumnsOfMatrix(n1, n2, n3, D, ldd, B, Dcsr, thresh);
 //	printf("--------------- Running test CSR... ----------------\n");
@@ -408,7 +446,7 @@ int main()
 	printf("Time of  SolvePardiso3D: %lf\n", timer2);
 	printf("Computing error for 3D PARDISO ||x_{exact}-x_{comp}||/||x_{exact}||\n");
 
-	reducePML3D(x, y, z, size, x_pard, size_no_pml, x_pard_no_pml);
+	reducePML3D(x, y, z, size, x_pard, size_nopml, x_pard_nopml);
 
 	all_time = omp_get_wtime() - all_time;
 	printf("Elapsed time: %lf\n", all_time);
@@ -418,7 +456,7 @@ int main()
 	pml_flag = true;
 
 #ifdef OUTPUT
-	//output("ChartsN100PML/model", pml_flag, x, y, z, x_orig_no_pml, x_pard_no_pml);
+	//output("ChartsN100PML/model", pml_flag, x, y, z, x_orig_nopml, x_pard_nopml);
 #endif
 
 
@@ -434,8 +472,8 @@ int main()
 #ifdef OUTPUT
 	FILE* fout1 = fopen("solutions.dat", "w");
 
-	for (int i = 0; i < size_no_pml; i++)
-		fprintf(fout1, "%d %12.10lf %12.10lf %12.10lf %12.10lf\n", i, x_orig_no_pml[i].real(), x_orig_no_pml[i].imag(), x_pard_no_pml[i].real(), x_pard_no_pml[i].imag());
+	for (int i = 0; i < size_nopml; i++)
+		fprintf(fout1, "%d %12.10lf %12.10lf %12.10lf %12.10lf\n", i, x_orig_nopml[i].real(), x_orig_nopml[i].imag(), x_pard_nopml[i].real(), x_pard_nopml[i].imag());
 
 	fclose(fout1);
 #endif
@@ -443,20 +481,20 @@ int main()
 	//for (int i = 0; i < size; i++)
 	//fprintf(fout1, "%d %12.10lf %12.10lf %12.10lf %12.10lf\n", i, x_orig[i].real(), x_orig[i].imag(), x_pard[i].real(), x_pard[i].imag());
 
-	zlacpy("All", &size_no_pml, &ione, x_pard_no_pml, &size_no_pml, x_pard_no_pml_cpy, &size_no_pml);
+	zlacpy("All", &size_nopml, &ione, x_pard_nopml, &size_nopml, x_pard_nopml_cpy, &size_nopml);
 
-	norm = rel_error(zlange, size_no_pml, 1, x_pard_no_pml_cpy, x_orig_no_pml, size_no_pml, thresh);
+	norm = rel_error(zlange, size_nopml, 1, x_pard_nopml_cpy, x_orig_nopml, size_nopml, thresh);
 
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
 
 
 	//free_arr(x_pard);
-	//free_arr(x_pard_no_pml);
+	//free_arr(x_pard_nopml);
 	//free_arr(B);
 	//free_arr(f);
 	//free_arr(x_orig);
-	//free_arr(x_orig_no_pml);
+	//free_arr(x_orig_nopml);
 	
 
 
@@ -465,251 +503,87 @@ int main()
 
 #endif
 
-#if 1
-	printf("Solving %d x %d x %d Laplace equation using FFT's\n", n1, n2, n3);
-	printf("Reduce the problem to set of %d systems of size %d x %d\n", n3, n1 * n2, n1 * n2);
+	Solve3DSparseUsingFT(x, y, z, f, f_FFT, x_sol_prd, x_pard_nopml, x_pard_nopml_cpy, x_sol_fft_nopml, x_sol, x_orig, x_orig_nopml, thresh);
 
-	// f(x,y,z) -> fy(x,z) 
+	dtype *g_nopml = alloc_arr<dtype>(size_nopml);
+	dtype *g = alloc_arr<dtype>(size);
+	dtype *x1_nopml = alloc_arr<dtype>(size_nopml);
+	dtype *f_nopml = alloc_arr<dtype>(size_nopml);
+	RelRes = 0;
 
-	DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
-	DFTI_DESCRIPTOR_HANDLE my_desc2_handle;
-	MKL_LONG status;
+	printf("size = %d size_no_pml = %d\n", size, size_nopml);
 
-	// Create 1D FFT of COMPLEX DOUBLE case
-	status = DftiCreateDescriptor(&my_desc1_handle, DFTI_DOUBLE, DFTI_REAL, 1, n3);
-	status = DftiSetValue(my_desc1_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
-	status = DftiSetValue(my_desc1_handle, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
-	status = DftiCommitDescriptor(my_desc1_handle);
+	reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
-	//for (int i = 0; i < size_no_pml; i++)
-	//	printf("%lf %lf\n", f[i].real(), f[i].imag());
+	ResidCSR(x_nopml, y_nopml, z_nopml, Dcsr_nopml, x_sol, f_nopml, g_nopml, RelRes);
 
-	// We make n2 * n3 FFT's for one dimensional direction x with n1 grid points
-	printf("Applying 1D Fourier transformation for 3D RHS\n");
-	for (int k = 0; k < n1 * n2; k++)
-	{
-		//status = DftiComputeForward(my_desc1_handle, &f[n1 * k], &f_FFT[n1 * k]);
-		//MyFFT1D_ForwardComplexSin(n1, &f[n1 * k], &f_FFT[n1 * k]);
-		MyFT1D_ForwardComplex(n3, z, &f[n3 * k], &f_FFT[n3 * k]);
-	}
+	for (int i = 0; i < size_nopml; i++)
+		printf("g_nopml[%d] = %lf %lf\n", i, g_nopml[i].real(), g_nopml[i].imag());
 
-	printf("check right-hand-side f\n");
-	for (int i = 0; i < size; i++)
-		if (abs(f_FFT[i]) != 0) printf("f_FFT[%d] = %lf %lf\n", i, f_FFT[i].real(), f_FFT[i].imag());
-
-	
-#undef REAL
-#define COMPLEX
-
-	// Calling the solver
-	int size2D = x.n * y.n;
-	int mtype = 13;
-	int *iparm = alloc_arr<int>(64);
-	int *perm = alloc_arr<int>(size2D);
-	size_t *pt = alloc_arr<size_t>(64);
-	
-	printf("pardisoinit...\n");
-	pardisoinit(pt, &mtype, iparm);
-
-	int maxfct = 1;
-	int mnum = 1;
-	int phase = 13;
-	int rhs = 1;
-	int msglvl = 0;
-	int error = 0;
-
-	// Memory for coefficient matrix
-//	dtype *Dc = alloc_arr<dtype>(n1 * n1);
-//	dtype *Bc_mat = alloc_arr<dtype>(n1 * n1);
-
-	// Memory for 2D CSR matrix
-	ccsr *D2csr;
-	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
-	D2csr = (ccsr*)malloc(sizeof(ccsr));
-	D2csr->values = alloc_arr<dtype>(non_zeros_in_2Dblock3diag);
-	D2csr->ia = alloc_arr<int>(size2D + 1);
-	D2csr->ja = alloc_arr<int>(non_zeros_in_2Dblock3diag);
-	D2csr->ia[size2D] = non_zeros_in_2Dblock3diag + 1;
-	D2csr->non_zeros = non_zeros_in_2Dblock3diag;
-
-	printf("Non-zeros in 2D block-diagonal: %d\n", non_zeros_in_2Dblock3diag);
-	printf("----------Generating 2D matrix and rhs + solving by pardiso-------\n");
-	printf("Size of system: %d x %d with PML %d on each direction\n", x.n, y.n, 2 * x.pml_pts);
-
-	point sourcePML = { y.l / 2.0, y.l / 2 };
-
-	printf("SOURCE in 2D WITH PML AT: (%lf, %lf)\n", sourcePML.x, sourcePML.y);
-	double k = (double)kk;
-	int nhalf = n3 / 2;
-	int src;
+	printf("RelRes = %lf\n", RelRes);
 
 	system("pause");
+	ItRef = 100;
 
-	char *str1, *str2, *str3;
-	str1 = alloc_arr<char>(255);
-	str2 = alloc_arr<char>(255);
-	str3 = alloc_arr<char>(255);
-	pml_flag = false;
-
-	for (int i = 0; i < n3; i++)
+	if (RelRes < thresh)
 	{
-		int count = 0;
-		printf("-------------Iter: %d------------------\n", i);
-
-		double kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (z.l * z.l);
-		double kwave2 = k * k - kww;
-
-		dtype alpha_k;
-		dtype *f2D = alloc_arr<dtype>(n1 * n2);
-		dtype *x_sol_ex = alloc_arr<dtype>(n1 * n2);
-
-		double nu = 1;
-		double c = 300;
-		double omega_loc = 2.0 * PI * nu;
+		success = 1;
+		itcount = 0;
+	}
+	else {
 		
-		//kwave2 = 0.005;
-		//kwave2 = omega_loc * omega_loc / (c * c);
-
-		//double ppw = c / nu / x.h;
-
-		double ppw = 1.0 / (sqrt(abs(kwave2)) / (2.0 * PI)) / z.h;
-		printf("ppw: %lf\n", ppw);
-
-		printf("frequency: %lf\n", sqrt(abs(kwave2)) * c_z / (2.0 * PI));
-
-
-		// источник в каждой задаче в середине 
-		//GenSparseMatrixOnline2D("FT", i, x, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
-		GenSparseMatrixOnline2DwithPML(i, x, y, z, D2csr, kwave2);
-
-		GenRhs2D(i, x, y, z, f_FFT, f2D);
-
-		for (int j = 0; j < n1 * n2; j++) 
-		if (abs(f2D[j]) != 0)
-		//if (j == (n2 * n3 / 2))
+		while (RelRes > thresh && itcount < ItRef)
 		{
-			printf("i = %d, f2d[%d] = %lf %lf\n", i, j, f2D[j].real(), f2D[j].imag());
-			src = j;
-			//f2D[j] = 1.0 / (z.h * y.h);
-			//count++;
-		}
-		
-	/*
-		for (int j = 0; j < n2 * n3; j++)
-			if (f2D[j].real() < 0)
-			{
-				//printf("i = %d, f2d[%d] = %lf %lf\n", i, j, f2D[j].real(), f2D[j].imag());
-				f2D[j] *= -1;
-				count++;
-			}*/
+			extendPML3D(x, y, z, size_nopml, g_nopml, size, g);
+			Solve3DSparseUsingFT(x, y, z, g, f_FFT, x_sol_prd, x_pard_nopml, x_pard_nopml_cpy, x_sol_fft_nopml, x1_nopml, x_orig, x_orig_nopml, thresh);
 
-		// normalization of rhs
+#pragma omp parallel for simd schedule(simd:static)
+			for (int i = 0; i < size_nopml; i++)
+				x_sol[i] += x1_nopml[i];
 
-		alpha_k = f2D[src] / (1.0 / (x.h * y.h));
+			ResidCSR(x_nopml, y_nopml, z_nopml, Dcsr_nopml, x_sol, f_nopml, g_nopml, RelRes);
 
-	//	printf("alpha_k = %lf %lf\n", alpha_k.real(), alpha_k.imag());
-
-	//	GenRHSandSolution2D_Syntetic(y, z, D2csr, &u2Dsynt[i * size2D], f2D);
-		pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f2D, &x_sol_prd[i * size2D], &error);
-//		norm = rel_error(zlange, n2 * n3, 1, &u2Dsynt[i * size2D], &x_sol_prd[i * size2D], n2 * n3, thresh);
-
-		double eps = 0.01; // 1 percent
-
-		if (norm < eps) printf("Resid 2D Hankel norm %12.10e < eps %12.10lf: PASSED\n\n", norm, eps);
-		else printf("Resid 2D Hankel norm %12.10lf > eps %12.10lf : FAILED\n\n", norm, eps);
-
-		sprintf(str1, "ChartsPML/model_pml_%lf", kwave2);
-		sprintf(str2, "ChartsPML/model_pml_ex_%lf", kwave2);
-		sprintf(str3, "ChartsPML/model_pml_pard_%lf", kwave2);
-
-		if (kwave2 > 0)
-		{
-			get_exact_2D_Hankel(x.n, y.n, x, y, x_sol_ex, sqrt(kwave2), sourcePML);
-
-			normalization_of_exact_sol(x.n, y.n, x, y, x_sol_ex, alpha_k);
-
-			norm = resid_2D_Hankel(x, y, D2csr, x_sol_ex, f2D, sourcePML);
-		
-			output2D(str1, pml_flag, x, y, x_sol_ex, &x_sol_prd[i * size2D]);
-			gnuplot2D(str1, str2, pml_flag, 3, x, y);
-
-			gnuplot2D(str1, str3, pml_flag, 5, x, y);
-		}
-		else // kwave2 < 0
-		{
-			get_exact_2D_Hankel(x.n, y.n, x, y, x_sol_ex, { 0, sqrt(abs(kwave2)) }, sourcePML);
-
-			normalization_of_exact_sol(x.n, y.n, x, y, x_sol_ex, alpha_k);
-
-			norm = resid_2D_Hankel(x, y, D2csr, x_sol_ex, f2D, sourcePML);
-			output2D(str1, pml_flag, x, y, x_sol_ex, &x_sol_prd[i * size2D]);
-
-			//gnuplot2D(str1, str3, pml_flag, 5, y, z);
+			printf("---------------iteration: %d, RelRes = %lf---------------\n", itcount, RelRes);
+			itcount++;
+			system("pause");
 		}
 
-		reducePML2D(x, y, size2D, &x_sol_prd[i * size2D], size2D_no_pml, &x_sol_fft_no_pml[i * size2D_no_pml]);
-		check_exact_sol_Hankel(alpha_k, kwave2, x, y, &x_sol_fft_no_pml[i * size2D_no_pml], thresh);
-
-		free(f2D);
-		free_arr(x_sol_ex);
+		if (RelRes < thresh && ItRef < itcount) success = 1;
 	}
 
-	//("Reducing PML after taking a solution\n");
 
-
-	printf("Backward 1D FFT's of %d x %d times to each point of 2D solution\n", n1_npml, n2_npml);
-	for (int k = 0; k < n1_npml * n2_npml; k++)
-	{
-		dtype* u1D = alloc_arr<dtype>(n3_npml);
-		GenSol1DBackward(k, x, y, z, x_sol_fft_no_pml, u1D); // new u1D on each iteration
-	//	status = DftiComputeBackward(my_desc1_handle, u1D, &x_sol[k * n1]);
-	//	MyFFT1D_BackwardComplexSin(n1, u1D, &x_sol[k * n1]);
-		MyFT1D_BackwardComplex(n3_npml, z, u1D, &x_sol[k * n3_npml]);
-		free(u1D);
-	}
-
-	status = DftiFreeDescriptor(&my_desc1_handle);
-	printf("------------- The end of algorithm ----------------------\n");
-
-
-
-	zlacpy("All", &size_no_pml, &ione, x_sol, &size_no_pml, x_pard_no_pml_cpy, &size_no_pml);
-
-	reducePML3D(x, y, z, size, x_orig, size_no_pml, x_orig_no_pml);
-
-	for (int k = 0; k < n3_npml; k++)
-	{
-		x_orig_no_pml[k * size2D_no_pml + size2D_no_pml / 2] = x_sol[k * size2D_no_pml + size2D_no_pml / 2] = 0;
-	}
-
-	pml_flag = true;
-
+	if (success == 0) printf("No convergence\nResidual norm: %lf\n", RelRes);
+	
+	system("pause");
 	// Output
-	output("Charts100/model_ft", pml_flag, x, y, z, x_orig_no_pml, x_sol);
+	output("Charts100/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol);
 
-	check_norm_result(n1_npml, n2_npml, n3_npml, x_orig_no_pml, x_sol);
-
-//	for (int i = 0; i < size_no_pml; i++)
-	//	printf("%lf %lf\n", x_sol->real(), x_orig_no_pml->real());
+	check_norm_result(x.n_nopml, y.n_nopml, z.n_nopml, x_orig_nopml, x_sol);
 
 	printf("Computing error ||x_{exact}-x_{comp_fft}||/||x_{exact}||\n");
-	norm = rel_error(zlange, size_no_pml, 1, x_sol, x_orig_no_pml, size_no_pml, thresh);
+	norm = rel_error(zlange, size_nopml, 1, x_sol, x_orig_nopml, size_nopml, thresh);
+
 
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
 
 	printf("Computing error ||x_{comp_prd}-x_{comp_fft}||/||x_{comp_prd}||\n");
-	norm = rel_error(zlange, size_no_pml, 1, x_pard_no_pml_cpy, x_pard_no_pml, size_no_pml, thresh);
+	norm = rel_error(zlange, size_nopml, 1, x_pard_nopml_cpy, x_pard_nopml, size_nopml, thresh);
 
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
 
 	printf("----------------------------------------------\n");
+
+#ifdef GNUPLOT
 	printf("Printing results...\n");
 	gnuplot("Charts100/model_ft", "Charts100/real/ex_pard", pml_flag, 4, x, y, z);
 	gnuplot("Charts100/model_ft", "Charts100/imag/ex_pard", pml_flag, 5, x, y, z);
 	gnuplot("Charts100/model_ft", "Charts100/real/helm_ft", pml_flag, 6, x, y, z);
 	gnuplot("Charts100/model_ft", "Charts100/imag/helm_ft", pml_flag, 7, x, y, z);
+#else
+	printf("No printing results...\n");
+#endif
 
 #ifndef ONLINE
 	free_arr(D);
@@ -722,7 +596,6 @@ int main()
 	system("pause");
 
 	return 0;
-#endif
 #endif
 }
 #endif

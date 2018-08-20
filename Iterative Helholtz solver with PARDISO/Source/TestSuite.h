@@ -41,7 +41,7 @@ void Shell_FFT1D_Complex(ptr_test_fft func, const string& test_name, int& numb, 
 // Solver
 void Test_DirFactFastDiagStructOnline(size_m x, size_m y, size_m z, cmnode** Gstr, dtype *B, double thresh, int smallsize);
 void Test_TransferBlock3Diag_to_CSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_orig, dtype *f, double eps);
-void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr, /*out */ ccsr* Dcsr_new, double eps);
+void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr, ccsr *Dcsr_nopml, /*out */ ccsr* Dcsr_reduced, double eps);
 
 // FFT
 void Test_FFT1D_Real(int n /* grid points in 1 dim */, double eps);
