@@ -114,8 +114,8 @@ typedef struct list qlist;
 
 #ifdef HELMHOLTZ
 #ifdef PML
-#define LENGTH 900
-//#define LENGTH 1200
+//#define LENGTH 900
+#define LENGTH 1200
 //#define LENGTH 1000
 //#define LENGTH 200
 #else
@@ -130,9 +130,10 @@ typedef struct list qlist;
 
 #define OUTPUT
 #define GNUPLOT
+//#define GEN_3D_MATRIX
 
 #ifdef HELMHOLTZ
-#define omega 2.0
+#define omega 4.0
 #define c_z 1280
 /*--------------*/
 #define ky 1.8

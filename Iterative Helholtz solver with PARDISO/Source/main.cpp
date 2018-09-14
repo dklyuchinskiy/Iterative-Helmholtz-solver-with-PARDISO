@@ -216,9 +216,9 @@ int main()
 
 	x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-	int n1 = 29 + 2 * x.pml_pts;		    // number of point across the directions
-	int n2 = 29 + 2 * y.pml_pts;
-	int n3 = 29 + 2 * z.pml_pts;
+	int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
+	int n2 = 99 + 2 * y.pml_pts;
+	int n3 = 99 + 2 * z.pml_pts;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 
@@ -227,6 +227,7 @@ int main()
 	z.n = n3;
 
 	int size = n * NB;		// size of vector x and f: n1 * n2 * n3
+	int size2D = n;
 	int smallsize = 1600;
 	double thresh = 1e-6;	// stop level of algorithm by relative error
 	int ItRef = 200;		// Maximal number of iterations in refirement
@@ -242,9 +243,11 @@ int main()
 	y.n_nopml = n2 - 2 * y.pml_pts;
 	z.n_nopml = n3 - 2 * z.pml_pts;
 
-	x_nopml.n = y_nopml.n = z_nopml.n = x.n_nopml;
+	x_nopml.n = y_nopml.n = x.n_nopml;
+	z_nopml.n = z.n_nopml;
 
-	x_nopml.n_nopml = y_nopml.n_nopml = z_nopml.n_nopml = x_nopml.n;
+	x_nopml.n_nopml = y_nopml.n_nopml = x_nopml.n;
+	z_nopml.n_nopml = z_nopml.n;
 
 	x.l = LENGTH + (double)(2 * x.pml_pts * LENGTH) / (x.n_nopml + 1);
 	y.l = LENGTH + (double)(2 * y.pml_pts * LENGTH) / (y.n_nopml + 1);
@@ -279,7 +282,9 @@ int main()
 	dtype *f = alloc_arr<dtype>(size);
 	dtype *f_FFT = alloc_arr<dtype>(size);
 	dtype *x_sol_prd = alloc_arr<dtype>(size);
-	//dtype *u2Dsynt = alloc_arr<dtype>(size);
+	dtype *sound3D = alloc_arr<dtype>(size);
+	dtype *sound2D = alloc_arr<dtype>(size2D);
+	dtype *x_sol = alloc_arr<dtype>(size);
 
 
 	int n_nopml = x.n_nopml * y.n_nopml;
@@ -290,12 +295,13 @@ int main()
 	int itcount = 0;
 	double RelRes = 0;
 	double norm = 0;
+	pml_flag = 1;
 
 	dtype *x_orig_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *x_pard_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *x_pard_nopml_cpy = alloc_arr<dtype>(size_nopml);
 
-	dtype *x_sol = alloc_arr<dtype>(size_nopml);
+	dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *x_sol_fft_nopml = alloc_arr<dtype>(size2D_nopml * n3);
 
 	
@@ -324,9 +330,6 @@ int main()
 
 
 	system("pause");
-
-
-#define GEN_3D_MATRIX
 
 #ifdef GEN_3D_MATRIX
 
@@ -383,9 +386,17 @@ int main()
 	GenMatrixandRHSandSolution(n1, n2, n3, D, ldd, B, x_orig, f);
 #else
 
+	point source = { x.l / 2.0, y.l / 2.0, z.l / 2.0 };
+
+	// Gen velocity of sound in 3D domain
+	SetSoundSpeed3D(x, y, z, sound3D, source);
+
+	// Gen velocity of sound in 3D domain
+	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
+
 	// Generation of vector of solution (to compare with obtained) and vector of RHS
 	printf("Gen right-hand side and solution...\n");
-	GenRHSandSolution(x, y, z, x_orig, f);
+	GenRHSandSolution(x, y, z, x_orig, f, source);
 
 
 	// Generation of sparse coefficient matrix
@@ -412,7 +423,7 @@ int main()
 
 	free_arr(D);
 	free_arr(B_mat);
-#endif
+
 
 	printf("Analytic non_zeros in first row and last two 2D blocks: %d\n", non_zeros_in_3diag + n);
 	printf("Analytic non_zeros in three 2D block-row: %d\n", non_zeros_in_3diag + 2 * n);
@@ -426,6 +437,7 @@ int main()
 	printf("Time of Test_PMLBlock3Diag_in_CSR: %lf\n", timer2);
 
 	system("pause");
+#endif
 
 #ifdef SOLVE_3D_PROBLEM
 
@@ -503,26 +515,48 @@ int main()
 
 #endif
 
-	Solve3DSparseUsingFT(x, y, z, f, f_FFT, x_sol_prd, x_pard_nopml, x_pard_nopml_cpy, x_sol_fft_nopml, x_sol, x_orig, x_orig_nopml, thresh);
+	// We need to solve iteratively: (I - \delta L * L_0^{-1})w = g
+
+	dtype *w = alloc_arr<dtype>(size);
+	dtype *g = alloc_arr<dtype>(size);
+	dtype *deltaL = alloc_arr<dtype>(size);
+
+	SetSoundSpeed3D(x, y, z, sound3D, source);
+	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
+	GenerateDeltaL(x, y, z, sound3D, sound2D, deltaL);
+
+	for (int i = 0; i < size; i++)
+		w[i] = f[i];
+	
+	// GMRES algorithm
+	ApplyCoeffMatrixA(x, y, z, w, deltaL, f_FFT, x_sol_prd, x_pard_nopml, x_pard_nopml_cpy, x_sol_fft_nopml, x_sol, thresh);	// Apply preconditioner
 
 	dtype *g_nopml = alloc_arr<dtype>(size_nopml);
-	dtype *g = alloc_arr<dtype>(size);
 	dtype *x1_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *f_nopml = alloc_arr<dtype>(size_nopml);
 	RelRes = 0;
 
 	printf("size = %d size_no_pml = %d\n", size, size_nopml);
 
+	reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
+	reducePML3D_FT(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 	reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
-	ResidCSR(x_nopml, y_nopml, z_nopml, Dcsr_nopml, x_sol, f_nopml, g_nopml, RelRes);
+	for (int k = 0; k < z.n_nopml; k++)
+		x_orig_nopml[k * size2D_nopml + size2D_nopml / 2] = x_sol_nopml[k * size2D_nopml + size2D_nopml / 2] = 0;
 
-	for (int i = 0; i < size_nopml; i++)
-		printf("g_nopml[%d] = %lf %lf\n", i, g_nopml[i].real(), g_nopml[i].imag());
 
-	printf("RelRes = %lf\n", RelRes);
+	ResidCSR(x_nopml, y_nopml, z_nopml, Dcsr_nopml, x_sol_nopml, f_nopml, g_nopml, RelRes);
+
+//	for (int i = 0; i < size_nopml; i++)
+	//	printf("g_nopml[%d] = %lf %lf\n", i, g_nopml[i].real(), g_nopml[i].imag());
+	printf("--------------------\n");
+	printf("RelRes ||A * u_sol - f|| = %lf\n", RelRes);
+	printf("--------------------\n");
 
 	system("pause");
+
+#ifdef GEN_3D_MATRIX
 	ItRef = 100;
 
 	if (RelRes < thresh)
@@ -553,25 +587,27 @@ int main()
 
 
 	if (success == 0) printf("No convergence\nResidual norm: %lf\n", RelRes);
-	
+
+#endif
+
 	system("pause");
 	// Output
-	output("Charts100/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol);
+	output("Charts100/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
 
-	check_norm_result(x.n_nopml, y.n_nopml, z.n_nopml, x_orig_nopml, x_sol);
+	check_norm_result(x.n_nopml, y.n_nopml, z.n_nopml, x_orig_nopml, x_sol_nopml);
 
 	printf("Computing error ||x_{exact}-x_{comp_fft}||/||x_{exact}||\n");
-	norm = rel_error(zlange, size_nopml, 1, x_sol, x_orig_nopml, size_nopml, thresh);
+	norm = rel_error(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
 
 
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
 
-	printf("Computing error ||x_{comp_prd}-x_{comp_fft}||/||x_{comp_prd}||\n");
-	norm = rel_error(zlange, size_nopml, 1, x_pard_nopml_cpy, x_pard_nopml, size_nopml, thresh);
+//	printf("Computing error ||x_{comp_prd}-x_{comp_fft}||/||x_{comp_prd}||\n");
+//	norm = rel_error(zlange, size_nopml, 1, x_pard_nopml_cpy, x_pard_nopml, size_nopml, thresh);
 
-	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
-	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
+//	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
+//	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
 
 	printf("----------------------------------------------\n");
 

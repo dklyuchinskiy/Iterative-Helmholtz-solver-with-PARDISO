@@ -102,7 +102,7 @@ void DirFactFastDiagStruct(int n1, int n2, int n3, double *D, int ldd, double *B
 void ResidCSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, double &RelRes);
 void GenSparseMatrix(size_m x, size_m y, size_m z, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, dcsr* Acsr);
 
-void GenRHSandSolution(size_m x, size_m y, size_m z, dtype *u, dtype *f);
+void GenRHSandSolution(size_m x, size_m y, size_m z, dtype *u, dtype *f, point source);
 void GenSparseMatrixOnline2D(char *str, int w, size_m x, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
 void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
 void GenSparseMatrixOnline2DwithPML(int i, size_m x, size_m y, size_m z, ccsr* Acsr, double kwave2);
@@ -113,6 +113,7 @@ void Clear(int m, int n, dtype* A, int lda);
 void GenSol1DBackward(int w, size_m x, size_m y, size_m z, dtype* x_sol_prd, dtype *u1D);
 void reducePML3D(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2, dtype *vect_red);
 void reducePML2D(size_m x, size_m y, int size1, dtype *vect, int size2, dtype *vect_red);
+void reducePML3D_FT(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2, dtype *vect_red);
 
 //map<vector<int>, dtype> dense_to_CSR(int m, int n, dtype *A, int lda, int *ia, int *ja, dtype *values);
 map<vector<int>, dtype> BlockRowMat_to_CSR(int blk, int n1, int n2, int n3, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, int& non_zeros_on_prev_level);
@@ -140,6 +141,11 @@ void normalization_of_exact_sol(int n1, int n2, size_m x, size_m y, dtype *x_sol
 void check_norm_result(int n1, int n2, int n3, dtype* x_orig_no_pml, dtype* x_sol);
 dtype set_exact_2D_Hankel(double x, double y, dtype k, point source);
 void extendPML3D(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2, dtype *vect_ext);
+void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound, point source);
+void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D, point source);
+dtype MakeSound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
+void GenerateDeltaL(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D, dtype* deltaL);
+
 
 // Queue
 void init(struct my_queue* &q);
@@ -171,8 +177,9 @@ void GenSolVector(int size, dtype *vector);
 void GenRHSandSolution2D_Syntetic(size_m x, size_m y, ccsr *Dcsr, dtype *u, dtype *f);
 
 //
-void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* f_FFT, dtype* x_sol_prd, dtype* x_pard_nopml, dtype* x_pard_nopml_cpy, dtype* x_sol_fft_nopml, dtype* x_sol, dtype* x_orig, dtype* x_orig_nopml, double thresh);
-
+void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* f_FFT, dtype* x_sol_prd, dtype* x_pard_nopml, dtype* x_pard_nopml_cpy, dtype* x_sol_fft_nopml, dtype* x_sol, double thresh);
+void ApplyCoeffMatrixA(size_m x, size_m y, size_m z, dtype *w, dtype* deltaL, dtype* f_FFT, dtype* x_sol_prd, dtype* x_pard_nopml, dtype* x_pard_nopml_cpy, dtype* x_sol_fft_nopml, dtype* g, double thresh);
+void OpTwoMatrices(int m, int n, dtype *Y1, dtype *Y2, dtype *Yres, int ldy, char sign);
 
 
 
