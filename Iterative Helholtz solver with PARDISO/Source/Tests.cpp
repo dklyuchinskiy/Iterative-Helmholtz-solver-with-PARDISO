@@ -163,6 +163,29 @@ void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr
 	
 }
 
+void TestNormalizedVector(int n, dtype* vect, double eps)
+{
+	double norm;
+	int ione = 1;
+
+	norm = dznrm2(&n, vect, &ione);
+	if ((norm - 1.0) < eps) printf("Normalized vector: %12.10e = 1.0: PASSED\n", norm);
+	else printf("Normalized vector: %12.10lf != 1.0 : FAILED\n", norm);
+
+}
+
+void TestOrtogonalizedVectors(int n, dtype* vect1, dtype* vect2, double eps)
+{
+	dtype value;
+	int ione = 1;
+
+	value = zdot(n, vect1, vect2);
+
+	if (abs(value) < eps) printf("zdot: %12.10e = 0.0: PASSED\n", value);
+	else printf("zdot: %12.10lf != 0.0 : FAILED\n", value);
+
+}
+
 void Test_Poisson_FFT1D_Real(int n /* grid points in 1 dim */, double eps)
 {
 	DFTI_DESCRIPTOR_HANDLE my_desc1_handle;

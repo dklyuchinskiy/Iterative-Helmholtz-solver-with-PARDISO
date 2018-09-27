@@ -58,11 +58,6 @@ void MyFT1D_ForwardReal(int N, double h, double* f, dtype *f_MYFFT)
 
 }
 
-dtype my_exp(double val)
-{
-	return dtype{ cos(val), sin(val) };
-}
-
 void MyFT1D_ForwardComplex(int N, size_m x, dtype* f, dtype *f_MYFFT)
 {
 	int nd2 = N / 2;

@@ -53,6 +53,8 @@ void Test_Poisson_FT1D_Complex(int n /* grid points in 1 dim */, double eps);
 void Test_Poisson_FT1D_Real(int n /* grid points in 1 dim */, double eps);
 void Test_ExactSolution_1D(int n, double h, double* u, double *f, double eps);
 void TestHankel();
+void TestOrtogonalizedVectors(int n, dtype* vect1, dtype* vect2, double eps);
+void TestNormalizedVector(int n, dtype* vect, double eps);
 
 #if 0
 
