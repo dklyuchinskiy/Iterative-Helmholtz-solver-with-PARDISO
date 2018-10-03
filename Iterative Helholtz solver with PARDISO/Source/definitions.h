@@ -29,6 +29,7 @@ typedef std::complex<double> dtype;
 
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl.h"
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl_dfti.h"
+#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl_rci.h"
 
 #include "source_bessel\basis.h"
 #include "source_bessel\vmblock.h""
@@ -62,6 +63,8 @@ struct size_m {
 	int n;
 	double h;
 	int pml_pts;
+	int spg_pts;
+	int n_nopml;
 };
 
 struct point {
@@ -108,13 +111,14 @@ typedef struct list qlist;
 #define PI 3.141592653589793238462643
 
 #define HELMHOLTZ
-
 #define PML
+#define GMRES_SIZE 128
 
 #ifdef HELMHOLTZ
 #ifdef PML
+//#define LENGTH 900
 #define LENGTH 1200
-//#define LENGTH 1000
+//#define LENGTH 1200
 //#define LENGTH 200
 #else
 #define LENGTH 1500
@@ -128,13 +132,14 @@ typedef struct list qlist;
 
 #define OUTPUT
 #define GNUPLOT
+//#define GEN_3D_MATRIX
 
 #ifdef HELMHOLTZ
 #define omega 4.0
 #define c_z 1280
 /*--------------*/
 #define ky 1.8
-#define beta_eq 0.5
+#define beta_eq 0.1
 #define kk (2.0 * (PI) * (omega) / (c_z))
 
 //#define kk ((omega) / (c_z))

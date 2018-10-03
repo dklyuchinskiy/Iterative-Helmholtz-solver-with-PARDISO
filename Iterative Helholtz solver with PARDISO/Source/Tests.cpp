@@ -41,7 +41,7 @@ void Test_TransferBlock3Diag_to_CSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dt
 }
 
 
-void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr, /*out */ ccsr* Dcsr_new, double eps)
+void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr, ccsr* Dcsr_nopml, /*out */ ccsr* Dcsr_reduced, double eps)
 {
 	int n = x.n * y.n;
 	int size = x.n * y.n * z.n;
@@ -76,7 +76,22 @@ void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr
 
 	ERROR_RESULT = sparse_matrix_checker(my_check);
 
-	printf("ERROR_RESULT: %d\n", ERROR_RESULT);
+	printf("ERROR_RESULT1: %d\n", ERROR_RESULT);
+
+	my_check->n = x.n_nopml * y.n_nopml * z.n_nopml;
+	my_check->csr_ia = Dcsr_nopml->ia;
+	my_check->csr_ja = Dcsr_nopml->ja;
+	my_check->indexing = MKL_ONE_BASED;
+	my_check->matrix_structure = MKL_GENERAL_STRUCTURE;
+	my_check->matrix_format = MKL_CSR;
+	my_check->message_level = MKL_PRINT;
+	my_check->print_style = MKL_C_STYLE;
+
+	sparse_matrix_checker_init(my_check);
+
+	ERROR_RESULT = sparse_matrix_checker(my_check);
+
+	printf("ERROR_RESULT2: %d\n", ERROR_RESULT);
 
 #ifdef OUTPUT
 //	FILE* fout3;
@@ -100,48 +115,18 @@ void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr
 			take_coord3D(x.n, y.n, z.n, l1, i1, j1, k1);
 			take_coord3D(x.n, y.n, z.n, l2, i2, j2, k2);
 			if ((i1 >= x.pml_pts && j1 >= y.pml_pts && k1 >= z.pml_pts && i1 < (x.n - x.pml_pts) && j1 < (y.n - y.pml_pts) && k1 < (z.n - z.pml_pts))
-			  &&(i2 >= x.pml_pts && j2 >= y.pml_pts && k2 >= z.pml_pts && i2 < (x.n - x.pml_pts) && j2 < (y.n - y.pml_pts) && k2 < (z.n - z.pml_pts))) Dcsr_new->values[numb++] = Dcsr->values[cur_elem];
+			  &&(i2 >= x.pml_pts && j2 >= y.pml_pts && k2 >= z.pml_pts && i2 < (x.n - x.pml_pts) && j2 < (y.n - y.pml_pts) && k2 < (z.n - z.pml_pts))) Dcsr_reduced->values[numb++] = Dcsr->values[cur_elem];
 
 			cur_elem++;
 		}
 	}
 
 
-	if (numb != Dcsr_new->non_zeros || cur_elem != Dcsr->non_zeros) printf("matrix PML reduction failed: %d != %d OR %d != %d\n", numb, Dcsr_new->non_zeros, cur_elem, Dcsr->non_zeros);
+	if (numb != Dcsr_reduced->non_zeros || cur_elem != Dcsr->non_zeros) printf("matrix PML reduction failed: %d != %d OR %d != %d\n", numb, Dcsr_reduced->non_zeros, cur_elem, Dcsr->non_zeros);
 	else printf("matrix PML reduction succeed: %d elements!\n", numb);
 
 	//system("pause");
 
-	// Construct matrix with no pml
-	int pml_size = 2 * x.pml_pts;
-	int n_no_pml = (x.n - 2 * x.pml_pts) * (y.n - 2 * y.pml_pts);
-	int size_no_pml = n_no_pml * (z.n - 2 * z.pml_pts);
-	dtype *D = alloc_arr<dtype>(n_no_pml  * n_no_pml); // it's a matrix with size n^3 * n^2 = size * n
-	dtype *B_mat = alloc_arr<dtype>(n_no_pml  * n_no_pml);
-
-	// Solution, right hand side and block B
-	dtype *B = alloc_arr<dtype>(size_no_pml - n_no_pml); // vector of diagonal elementes
-
-
-	ccsr *Dcsr_no_pml;
-	int non_zeros_no_pml = (n_no_pml + (n_no_pml - 1) * 2 + (n_no_pml - x.n + pml_size) * 2 - (x.n - pml_size - 1) * 2) * (z.n - pml_size) + 2 * (size_no_pml - n_no_pml);
-	Dcsr_no_pml = (ccsr*)malloc(sizeof(ccsr));
-	Dcsr_no_pml->values = alloc_arr<dtype>(non_zeros_no_pml);
-	Dcsr_no_pml->ia = alloc_arr<int>(size_no_pml + 1);
-	Dcsr_no_pml->ja = alloc_arr<int>(non_zeros_no_pml);
-	Dcsr_no_pml->ia[size_no_pml] = non_zeros_no_pml + 1;
-	Dcsr_no_pml->non_zeros = non_zeros_no_pml;
-
-	size_m x_no_pml, y_no_pml, z_no_pml;
-	x_no_pml.pml_pts = y_no_pml.pml_pts = z_no_pml.pml_pts = 0;
-	x_no_pml.n = z_no_pml.n = y_no_pml.n = x.n - 2 * x.pml_pts;
-
-	x_no_pml.l = y_no_pml.l = z_no_pml.l = (double)(LENGTH);
-	x_no_pml.h = x_no_pml.l / (double)(x_no_pml.n + 1);  // x.n + 1 grid points of the whole domain
-	y_no_pml.h = y_no_pml.l / (double)(y_no_pml.n + 1);  // x.n - 1 - inner points
-	z_no_pml.h = z_no_pml.l / (double)(z_no_pml.n + 1);  // 2 points - for the boundaries
-
-	GenSparseMatrixOnline3DwithPML(x_no_pml, y_no_pml, z_no_pml, B, B_mat, n_no_pml, D, n_no_pml, B_mat, n_no_pml, Dcsr_no_pml, eps);
 
 #ifdef OUTPUT
 	FILE* fout1;
@@ -149,14 +134,14 @@ void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr
 
 	for (int i = 0; i < numb; i++)
 	{
-		fprintf(fout1, "i = %d %d %12.10lf %12.10lf %12.10lf %12.10lf\n", i, Dcsr_no_pml->ja[i] - 1, Dcsr_new->values[i].real(), Dcsr_new->values[i].imag(), Dcsr_no_pml->values[i].real(), Dcsr_no_pml->values[i].imag());
+		fprintf(fout1, "i = %d %d %12.10lf %12.10lf %12.10lf %12.10lf\n", i, Dcsr_nopml->ja[i] - 1, Dcsr_reduced->values[i].real(), Dcsr_reduced->values[i].imag(), Dcsr_nopml->values[i].real(), Dcsr_nopml->values[i].imag());
 	}
 
 	fclose(fout1);
 #endif
 
 
-	RelRes = rel_error(zlange, numb, 1, Dcsr_new->values, Dcsr_no_pml->values, numb, eps);
+	RelRes = rel_error(zlange, numb, 1, Dcsr_reduced->values, Dcsr_nopml->values, numb, eps);
 
 #ifdef OUTPUT
 	FILE* fout2;
@@ -164,8 +149,8 @@ void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr
 
 	for (int i = 0; i < numb; i++)
 	{
-		if (abs(Dcsr_new->values[i]) > 0.1) fprintf(fout2, "%d %12.10lf %12.10lf  false\n", i, Dcsr_new->values[i].real(), Dcsr_new->values[i].imag());
-		else fprintf(fout2, "%d %12.10lf %12.10lf\n", i, Dcsr_new->values[i].real(), Dcsr_new->values[i].imag());
+		if (abs(Dcsr_reduced->values[i]) > 0.1) fprintf(fout2, "%d %12.10lf %12.10lf  false\n", i, Dcsr_reduced->values[i].real(), Dcsr_reduced->values[i].imag());
+		else fprintf(fout2, "%d %12.10lf %12.10lf\n", i, Dcsr_reduced->values[i].real(), Dcsr_reduced->values[i].imag());
 	}
 
 	fclose(fout2);
@@ -176,6 +161,29 @@ void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr
 	else printf("values[:] - values_no_pml[:]. Norm %10.8lf > eps %10.8e : FAILED\n", RelRes, eps);
 
 	
+}
+
+void TestNormalizedVector(int n, dtype* vect, double eps)
+{
+	double norm;
+	int ione = 1;
+
+	norm = dznrm2(&n, vect, &ione);
+	if ((norm - 1.0) < eps) printf("Normalized vector: %12.10e = 1.0: PASSED\n", norm);
+	else printf("Normalized vector: %12.10lf != 1.0 : FAILED\n", norm);
+
+}
+
+void TestOrtogonalizedVectors(int n, dtype* vect1, dtype* vect2, double eps)
+{
+	dtype value;
+	int ione = 1;
+
+	value = zdot(n, vect1, vect2);
+
+	if (abs(value) < eps) printf("zdot: %12.10e = 0.0: PASSED\n", value);
+	else printf("zdot: %12.10lf != 0.0 : FAILED\n", value);
+
 }
 
 void Test_Poisson_FFT1D_Real(int n /* grid points in 1 dim */, double eps)

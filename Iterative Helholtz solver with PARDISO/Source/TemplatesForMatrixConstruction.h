@@ -70,6 +70,31 @@ double rel_error(double (*LANGE)(const char *, const int*, const int*, const Mat
 }
 
 template <typename MatrixType>
+double RelError(double(*LANGE)(const char *, const int*, const int*, const MatrixType*, const int*, double *),
+	int m, int n, MatrixType *Hrec, MatrixType *Hinit, int ldh, double eps)
+{
+	double norm = 0;
+	dtype *Hdiff = alloc_arr<dtype>(m * n);
+
+	// Norm of residual
+#pragma omp parallel for schedule(static)
+	for (int j = 0; j < n; j++)
+		//#pragma omp simd
+		for (int i = 0; i < m; i++)
+			Hdiff[i + ldh * j] = Hrec[i + ldh * j] - Hinit[i + ldh * j];
+
+	norm = LANGE("Frob", &m, &n, Hdiff, &ldh, NULL);
+	norm = norm / LANGE("Frob", &m, &n, Hinit, &ldh, NULL);
+
+	free_arr(Hdiff);
+
+	return norm;
+
+	//if (norm < eps) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
+	//else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+}
+
+template <typename MatrixType>
 void construct_block_row(void (*LACPY)(const char *, const int*, const int*, const MatrixType*, const int*, MatrixType*, const int*),
 	int m, int n, MatrixType* BL, int ldbl, MatrixType *A, int lda, MatrixType *BR, int ldbr, MatrixType* Arow, int ldar)
 {
