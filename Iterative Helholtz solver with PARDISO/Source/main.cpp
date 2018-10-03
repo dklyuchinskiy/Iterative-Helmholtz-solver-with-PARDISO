@@ -225,7 +225,7 @@ int main()
 
 	int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
 	int n2 = 99 + 2 * y.pml_pts;
-	int n3 = 59 + 2 * z.spg_pts;
+	int n3 = 99 + 2 * z.spg_pts;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 
@@ -248,7 +248,7 @@ int main()
 
 	x.n_nopml = n1 - 2 * x.pml_pts;
 	y.n_nopml = n2 - 2 * y.pml_pts;
-	z.n_nopml = n3 - 2 * z.pml_pts;
+	z.n_nopml = n3 - 2 * z.spg_pts;
 
 	x_nopml.n = y_nopml.n = x.n_nopml;
 	z_nopml.n = z.n_nopml;
@@ -258,7 +258,7 @@ int main()
 
 	x.l = LENGTH + (double)(2 * x.pml_pts * LENGTH) / (x.n_nopml + 1);
 	y.l = LENGTH + (double)(2 * y.pml_pts * LENGTH) / (y.n_nopml + 1);
-	z.l = LENGTH + (double)(2 * z.pml_pts * LENGTH) / (z.n_nopml + 1);
+	z.l = LENGTH + (double)(2 * z.spg_pts * LENGTH) / (z.n_nopml + 1);
 
 	x.h = x.l / (x.n + 1);  // x.n + 1 grid points of the whole domain
 	y.h = y.l / (y.n + 1);  // x.n - 1 - inner points
@@ -523,7 +523,7 @@ int main()
 
 	// We need to solve iteratively: (I - \delta L * L_0^{-1})w = g
 
-	int m = 10;
+	int m = 5;
 	int iterCount = m;
 	int iter = 0;
 	double norm_r0 = 0;
@@ -537,20 +537,21 @@ int main()
 	printf("-----Step 0. Set sound speed and deltaL-----\n");
 //	SetSoundSpeed3D(x, y, z, sound3D, source);
 //	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
-#if 0
+#if 1
 	// Gen velocity of sound in 3D domain
 	SetSoundSpeed3D(x, y, z, sound3D, source);
 
 	// Gen velocity of sound in 3D domain
 	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
+	
 	char str1[255] = "sound_speed2D";
-	output(str1, false, x, y, z, sound3D, deltaL);
-	output2D(str1, false, x, y, sound2D, sound2D);
+	//output(str1, false, x, y, z, sound3D, deltaL);
+	//output2D(str1, false, x, y, sound2D, sound2D);
 
 	// Gen DeltaL function
 	GenerateDeltaL(x, y, z, sound3D, sound2D, deltaL);
 	char str2[255] = "sound_speed_deltaL";
-	output(str2, false, x, y, z, sound3D, deltaL);
+	//output(str2, false, x, y, z, sound3D, deltaL);
 
 
 	printf("-----Step 0. Memory allocation-----\n");
@@ -573,6 +574,7 @@ int main()
 
 	// 1. First step. Compute r_0 and its norm
 	printf("-----Step 1-----\n");
+#pragma omp parallel for simd schedule(simd:static)
 	for (int i = 0; i < size; i++)
 		x0[i] = 0;
 	
@@ -665,7 +667,7 @@ int main()
 
 	zgemv("no", &size, &iterCount, &mone, V, &ldv, eBeta, &ione, &done, x0, &ione);
 
-	system("pause");
+	//system("pause");
 
 	norm = RelError(zlange, size, 1, x0, f, size, thresh);
 	printf("x_gmres = f, norm ||x_gmres - f|| = %lf\n", norm);
@@ -681,7 +683,7 @@ int main()
 	Solve3DSparseUsingFT(x, y, z, x0, x_sol, thresh);
 #endif
 
-#define TEST1D
+//#define TEST1D
 
 #ifdef TEST1D
 	dtype *f1D = alloc_arr<dtype>(x.n);
@@ -689,7 +691,7 @@ int main()
 	Solve1DSparseHelmholtz(x, y, z, f1D, x_sol1D, thresh);
 #endif
 
-#define TEST2D
+//#define TEST2D
 
 #ifdef TEST2D
 	dtype *f2D = alloc_arr<dtype>(x.n * y.n);
@@ -721,7 +723,7 @@ int main()
 //	printf("RelRes ||A * u_sol - f|| = %lf\n", RelRes);
 //	printf("--------------------\n");
 
-	system("pause");
+	//system("pause");
 
 #ifdef GEN_3D_MATRIX
 	ItRef = 100;
@@ -757,7 +759,7 @@ int main()
 	free_arr(work);
 #endif
 
-	system("pause");
+	//system("pause");
 	// Output
 	output("Charts100/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
 

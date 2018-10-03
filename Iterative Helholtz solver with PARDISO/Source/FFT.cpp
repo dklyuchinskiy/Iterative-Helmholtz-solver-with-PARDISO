@@ -62,17 +62,21 @@ void MyFT1D_ForwardComplex(int N, size_m x, dtype* f, dtype *f_MYFFT)
 {
 	int nd2 = N / 2;
 
+	double hl = 2.0 * PI * x.h / x.l;
+	double h2 = x.h / 2.0;
+
+#pragma omp parallel for schedule(static)
 	for (int k = 0; k < N; k++)
 	{
 		f_MYFFT[k] = 0;
 		for (int j = 0; j < N - 1; j++)
 		{
-			f_MYFFT[k] += (f[j + 1] * my_exp(-2.0 * PI * (j + 1) * (k - nd2) * x.h / x.l) + f[j] * my_exp(-2.0 * PI * j * (k - nd2) * x.h / x.l));
+			f_MYFFT[k] += (f[j + 1] * my_exp(-hl * (j + 1) * (k - nd2)) + f[j] * my_exp(-hl * j * (k - nd2)));
 
 			//	if (k == 2) printf("f_MYFFT[k]: %lf %lf\n", f_MYFFT[k].real(), f_MYFFT[k].imag());
 		}
 
-		f_MYFFT[k] *= x.h / 2.0;
+		f_MYFFT[k] *= h2;
 		//	f_MYFFT[k] /= N;
 	}
 }
@@ -81,15 +85,17 @@ void MyFT1D_BackwardComplex(int N, size_m x, dtype* f_MYFFT, dtype *f)
 {
 	int nd2 = N / 2;
 	double L;
+	double hl = 2.0 * PI * x.h / x.l;
 
 //	if (x.l == 1) L = 1.0;
 //	else L = (double)LENGTH;
 
+#pragma omp parallel for schedule(static)
 	for (int i = 0; i < N; i++)
 	{
 		f[i] = 0;
 		for (int k = 0; k < N; k++)
-			f[i] += f_MYFFT[k] * my_exp(2.0 * PI * (k - nd2) * i * x.h / x.l);
+			f[i] += f_MYFFT[k] * my_exp(hl * (k - nd2) * i);
 
 		f[i] /= x.l;
 	}

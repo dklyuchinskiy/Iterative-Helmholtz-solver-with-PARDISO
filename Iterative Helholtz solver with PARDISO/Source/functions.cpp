@@ -159,7 +159,7 @@ void GenSol1DBackward(int w, size_m x, size_m y, size_m z, dtype* x_sol_prd, dty
 
 	//Nx = x.n - 2 * x.pml_pts;
 	//Ny = y.n - 2 * y.pml_pts;
-	//Nz = z.n - 2 * z.pml_pts;
+	//Nz = z.n - 2 * z.spg_pts;
 
 	Nx = x.n;
 	Ny = y.n;
@@ -235,7 +235,7 @@ void reducePML3D(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2
 	for (int l = 0; l < size1; l++)
 	{
 		take_coord3D(x.n, y.n, z.n, l, i, j, k);
-		if(i >= x.pml_pts && j >= y.pml_pts && k >= z.pml_pts && i < (x.n - x.pml_pts) && j < (y.n - y.pml_pts) && k < (z.n - z.pml_pts)) vect_red[numb++] = vect[l];
+		if(i >= x.pml_pts && j >= y.pml_pts && k >= z.spg_pts && i < (x.n - x.pml_pts) && j < (y.n - y.pml_pts) && k < (z.n - z.spg_pts)) vect_red[numb++] = vect[l];
 	}
 
 	if (numb != size2) printf("ERROR of reducing PML 3D: %d != %d\n", numb, size2);
@@ -264,7 +264,7 @@ void reducePML3D_FT(size_m x, size_m y, size_m z, int size1, dtype *vect, int si
 		take_coord2D(x.n, y.n, l, i, j);
 		if (i >= x.pml_pts && j >= y.pml_pts && i < (x.n - x.pml_pts) && j < (y.n - y.pml_pts))
 		{
-			for (int k = 0; k < z.n; k++)
+			for (int k = z.spg_pts; k < (z.n - z.spg_pts); k++)
 				vect_red[numb++] = vect[l * z.n + k];
 		}
 	}
@@ -293,7 +293,7 @@ void extendPML3D(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2
 	for (int l = 0; l < size2; l++)
 	{
 		take_coord3D(x.n, y.n, z.n, l, i, j, k);
-		if (i >= x.pml_pts && j >= y.pml_pts && k >= z.pml_pts && i < (x.n - x.pml_pts) && j < (y.n - y.pml_pts) && k < (z.n - z.pml_pts)) vect_ext[l] = vect[numb++];
+		if (i >= x.pml_pts && j >= y.pml_pts && k >= z.spg_pts && i < (x.n - x.pml_pts) && j < (y.n - y.pml_pts) && k < (z.n - z.spg_pts)) vect_ext[l] = vect[numb++];
 		else vect_ext[l] = 0;
 	}
 
@@ -697,7 +697,7 @@ void SetPml2D(int blk3D, int blk2D, size_m x, size_m y, size_m z, int n, dtype* 
 			alpX[i] = alph(x, x.pml_pts, x.pml_pts, i);     // a(x) != 1 only in the pml section
 			alpY[i] = alph(y, y.n - 1, y.n - 1, i); // a(y) != 1 in the whole domain
 		}
-		if (blk3D < z.pml_pts || blk3D >= (z.n - z.pml_pts))
+		if (blk3D < z.spg_pts || blk3D >= (z.n - z.spg_pts))
 		{
 			for (int i = 0; i < y.n + 2; i++)
 				//alpZ[i] = alph(z, y.n - 1, y.n - 1, i);  // a(z) !=  1 in the whole domain
@@ -718,7 +718,7 @@ void SetPml2D(int blk3D, int blk2D, size_m x, size_m y, size_m z, int n, dtype* 
 			alpY[i] = alph(y, 0, 0, i);       // a(y) == 1 in the whole domain
 		}
 
-		if (blk3D < z.pml_pts || blk3D >= (z.n - z.pml_pts))
+		if (blk3D < z.spg_pts || blk3D >= (z.n - z.spg_pts))
 		{
 			for (int i = 0; i < y.n + 2; i++)
 				//alpZ[i] = alph(z, y.n - 1, y.n - 1, i);  // a(z) !=  1 in the whole domain
@@ -987,7 +987,7 @@ void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, dtype* B, dtype *BL, 
 
 	for (int blk3D = 0; blk3D < z.n; blk3D++)
 	{
-		if (blk3D < z.pml_pts || blk3D >= (z.n - z.pml_pts))
+		if (blk3D < z.spg_pts || blk3D >= (z.n - z.spg_pts))
 		{
 			for (int i = 0; i < z.n + 2; i++)
 				//alpZ[i] = alph(z, z.n - 1, z.n - 1, i);  // a(z) !=  1 in the whole domain
@@ -2151,7 +2151,7 @@ void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_ori
 	{
 		Nx = x.n - 2 * x.pml_pts;
 		Ny = y.n - 2 * y.pml_pts;
-		Nz = z.n - 2 * z.pml_pts;
+		Nz = z.n - 2 * z.spg_pts;
 	}
 	else
 	{
@@ -2237,7 +2237,7 @@ void gnuplot(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m y
 	{
 		Nx = x.n - 2 * x.pml_pts;
 		Ny = y.n - 2 * y.pml_pts;
-		Nz = z.n - 2 * z.pml_pts;
+		Nz = z.n - 2 * z.spg_pts;
 	}
 	else
 	{
@@ -2445,10 +2445,6 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 	int size_nopml = n_nopml * z.n_nopml;
 	int size2D_nopml = x.n_nopml * y.n_nopml;
 
-	// Memory for coefficient matrix
-	//	dtype *Dc = alloc_arr<dtype>(n1 * n1);
-	//	dtype *Bc_mat = alloc_arr<dtype>(n1 * n1);
-
 	// Memory for 2D CSR matrix
 	ccsr *D2csr;
 	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
@@ -2469,6 +2465,7 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 
 	printf("SOURCE in 2D WITH PML AT: (%lf, %lf)\n", sourcePML.x, sourcePML.y);
 	double k = (double)kk;
+	double k2 = k * k;
 	int nhalf = z.n / 2;
 	int src;
 
@@ -2484,9 +2481,12 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 //		printf("-------------Iter: %d------------------\n", i);
 
 		double kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (z.l * z.l);
-		double kwave2 = k * k - kww;
+		double kwave2 = k2 - kww;
 
-		dtype kwave_beta2 = k * k * dtype{ 1, beta_eq } - kww;
+		if (kww > 2.5 * k2) continue;
+
+
+		dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } - kww;
 
 		dtype alpha_k;
 		dtype *f2D = alloc_arr<dtype>(x.n * y.n);
@@ -2517,7 +2517,6 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 
 		for (int j = 0; j < x.n * y.n; j++)
 			if (abs(f2D[j]) != 0)
-				//if (j == (n2 * n3 / 2))
 			{
 	//			printf("i = %d, f2d[%d] = %lf %lf\n", i, j, f2D[j].real(), f2D[j].imag());
 				src = j;
@@ -2554,9 +2553,9 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 		//sprintf(str2, "ChartsPML/model_pml_ex_%lf", kwave2);
 		//sprintf(str3, "ChartsPML/model_pml_pard_%lf", kwave2);
 
-		sprintf(str1, "ChartsSPONGE/model_pml_%lf", kwave2);
-		sprintf(str2, "ChartsSPONGE/model_pml_ex_%lf", kwave2);
-		sprintf(str3, "ChartsSPONGE/model_pml_pard_%lf", kwave2);
+		//sprintf(str1, "ChartsSPONGE/model_pml_%lf", kwave2);
+		//sprintf(str2, "ChartsSPONGE/model_pml_ex_%lf", kwave2);
+		//sprintf(str3, "ChartsSPONGE/model_pml_pard_%lf", kwave2);
 
 //#define CHECK_ACCURACY
 
