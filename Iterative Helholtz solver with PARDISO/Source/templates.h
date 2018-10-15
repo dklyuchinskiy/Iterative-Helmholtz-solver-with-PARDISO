@@ -165,6 +165,7 @@ void Solve1DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f1D, dtype *x_s
 void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_sol2D, double thresh);
 dtype beta2D(size_m x, size_m y, int diag_case, int i, int j);
 dtype beta1D(size_m x, int diag_case, double k2, int i);
+void NullifySource2D(size_m x, size_m y, dtype *u, int src, int npoints);
 
 // Queue
 void init(struct my_queue* &q);

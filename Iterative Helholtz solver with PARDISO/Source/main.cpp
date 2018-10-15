@@ -208,6 +208,11 @@ int main()
 					   //          - 6 % and 3 % if beta = 0.1
 					   // 200 pts  - 4 % and 4 % if beta = 0.1
 	int spg_pts = 200;  // 250 pts  - 3 % and 3 % if beta = 0.1
+
+	// 3D
+	// 200 pt - 33 % if beta = 0.1
+	//		  - 20 % if beta = 0.05
+	//		  - 11 % if beta = 0.01
 #else
 	int pml_pts = 0;
 #endif
@@ -540,7 +545,53 @@ int main()
 #ifdef TEST3D
 	TestFGMRES();
 #endif
+
+	dtype *f_rsd = alloc_arr<dtype>(size);
+	dtype *f_rsd_nopml = alloc_arr<dtype>(size_nopml);
+
+	int i1, j1, k1;
+
+	printf("---Residual exact solution---\n");
+	ComputeResidual(x, y, z, (double)kk, x_orig, f, f_rsd, RelRes);
+	printf("-----------\n");
+	printf("Residual in 3D with PML |A * x_sol - f| = %e\n", RelRes);
+	printf("-----------\n");
+
+
+	for (int k = 0; k < z.n; k++)
+	{
+		f_rsd[k * size2D + size2D / 2] = 0;
+
+		int l = k * size2D + size2D / 2;
+		
+		take_coord3D(x.n, y.n, z.n, l, i1, j1, k1);
+		printf("i = %d j = %d k = %d\n", i1, j1, k1);
+	}
+
+	for (int k = 0; k < z.n; k++)
+	{
+		int src = size2D / 2;
+		NullifySource2D(x, y, &f_rsd[k * size2D], src, 2);
+	}
+
+#ifdef FOUT
+	FILE* out = fopen("ResidualVectorOrig.dat", "w");
+	for (int i = 0; i < size; i++)
+	{
+		take_coord3D(x.n, y.n, z.n, i, i1, j1, k1);
+		fprintf(out, "%d %d %d %lf %lf\n", i1, j1, k1, f_rsd[i].real(), f_rsd[i].imag());
+	}
+	fclose(out);
+#endif
+	
+	reducePML3D(x, y, z, size, f_rsd, size_nopml, f_rsd_nopml);
+
+	RelRes = dznrm2(&size_nopml, f_rsd_nopml, &ione);
+	printf("-----------\n");
+	printf("Residual in 3D psys dom  |A * x_sol - f| = %e\n", RelRes);
+	printf("-----------\n");
 	system("pause");
+
 	FGMRES(x, y, z, sound2D, sound3D, source, x_sol, f, thresh);
 
 

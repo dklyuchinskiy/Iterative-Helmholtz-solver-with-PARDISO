@@ -139,7 +139,7 @@ typedef struct list qlist;
 #define c_z 1280
 /*--------------*/
 #define ky 1.8
-#define beta_eq 0.1
+#define beta_eq 0.01
 #define kk (2.0 * (PI) * (omega) / (c_z))
 
 //#define kk ((omega) / (c_z))

@@ -233,7 +233,7 @@ void TestFGMRES()
 	int ione = 1;
 
 	int size = n;
-	int m = 500;
+	int m = 1000;
 	int iterCount = m;
 	int iter = 0;
 	double norm = 0;
@@ -262,7 +262,7 @@ void TestFGMRES()
 	dtype *deltaL = alloc_arr<dtype>(size);
 	dtype* work;
 
-	FILE *in = fopen("Matrix2.txt", "r");
+	FILE *in = fopen("Matrix4.txt", "r");
 
 	while (!feof(in))
 	{
@@ -319,6 +319,8 @@ void TestFGMRES()
 
 	// the vector of right-hand side for the system with Hessenberg matrix
 	dtype *eBeta = alloc_arr<dtype>(m + 1); int ldb = m + 1;
+	dtype calpha;
+	double dalpha;
 
 
 	// 1. First step. Compute r_0 and its norm
@@ -333,7 +335,10 @@ void TestFGMRES()
 	norm = dznrm2(&size, f, &ione);
 	printf("norm ||f|| = %lf\n", norm);
 
-	Add_dense(size, ione, 1.0, f, size, -1.0, Ax0, size, r0, size);
+	//Add_dense(size, ione, 1.0, f, size, -1.0, Ax0, size, r0, size); // r0 = f - Ax0
+
+	zcopy(&size, f, &ione, r0, &ione);
+	zaxpy(&size, &mone, Ax0, &ione, r0, &ione); // r0: = f - Ax0
 
 	norm = dznrm2(&size, r0, &ione);
 	printf("norm ||r0|| = %lf\n", norm);
@@ -361,7 +366,9 @@ void TestFGMRES()
 			zdotc(&H[i + ldh * j], &size, w, &ione, &V[ldv * i], &ione);
 
 			//w[j] = w[j] - H[i][j]*v[i]
-			AddDenseVectorsComplex(size, 1.0, w, -H[i + ldh * j], &V[ldv * i], w);
+			//AddDenseVectorsComplex(size, 1.0, w, -H[i + ldh * j], &V[ldv * i], w);
+			calpha = -H[i + ldh * j];
+			zaxpy(&size, &calpha, &V[ldv * i], &ione, w, &ione);
 		}
 
 		H[j + 1 + ldh * j] = dznrm2(&size, w, &ione);
@@ -377,7 +384,11 @@ void TestFGMRES()
 		}
 
 		// If not, construct the new vector of basis
-		MultVectorConst(size, w, 1.0 / H[j + 1 + ldh * j], &V[ldv * (j + 1)]);
+		zcopy(&size, w, &ione, &V[ldv * (j + 1)], &ione);
+		dalpha = 1.0 / H[j + 1 + ldh * j].real();
+		zdscal(&size, &dalpha, &V[ldv * (j + 1)], &ione);
+
+		//MultVectorConst(size, w, 1.0 / H[j + 1 + ldh * j], &V[ldv * (j + 1)]);
 		TestNormalizedVector(size, &V[ldv * (j + 1)], thresh);
 		for (int i = 0; i <= j; i++)
 		{

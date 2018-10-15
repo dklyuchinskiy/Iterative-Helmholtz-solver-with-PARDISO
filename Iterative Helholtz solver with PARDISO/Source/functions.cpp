@@ -1291,6 +1291,10 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 	// the vector of right-hand side for the system with Hessenberg matrix
 	dtype *eBeta = alloc_arr<dtype>(m + 1); int ldb = m + 1;
 
+	// vars
+	dtype calpha;
+	double dalpha;
+
 
 	// 1. First step. Compute r_0 and its norm
 	printf("-----Step 1-----\n");
@@ -1304,7 +1308,9 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 	norm = dznrm2(&size, f, &ione);
 	printf("norm ||f|| = %lf\n", norm);
 
-	Add_dense(size, ione, 1.0, f, size, -1.0, Ax0, size, r0, size);
+	//Add_dense(size, ione, 1.0, f, size, -1.0, Ax0, size, r0, size);
+	zcopy(&size, f, &ione, r0, &ione);
+	zaxpy(&size, &mone, Ax0, &ione, r0, &ione); // r0: = f - Ax0
 
 	norm = dznrm2(&size, r0, &ione);
 	printf("norm ||r0|| = %lf\n", norm);
@@ -1329,7 +1335,9 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 			zdotc(&H[i + ldh * j], &size, w, &ione, &V[ldv * i], &ione);
 
 			//w[j] = w[j] - H[i][j]*v[i]
-			AddDenseVectorsComplex(size, 1.0, w, -H[i + ldh * j], &V[ldv * i], w);
+			//AddDenseVectorsComplex(size, 1.0, w, -H[i + ldh * j], &V[ldv * i], w);
+			calpha = -H[i + ldh * j];
+			zaxpy(&size, &calpha, &V[ldv * i], &ione, w, &ione);
 		}
 
 		H[j + 1 + ldh * j] = dznrm2(&size, w, &ione);
@@ -1345,7 +1353,11 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 		}
 
 		// If not, construct the new vector of basis
-		MultVectorConst(size, w, 1.0 / H[j + 1 + ldh * j], &V[ldv * (j + 1)]);
+		//MultVectorConst(size, w, 1.0 / H[j + 1 + ldh * j], &V[ldv * (j + 1)]);
+		zcopy(&size, w, &ione, &V[ldv * (j + 1)], &ione);
+		dalpha = 1.0 / H[j + 1 + ldh * j].real();
+		zdscal(&size, &dalpha, &V[ldv * (j + 1)], &ione);
+
 		TestNormalizedVector(size, &V[ldv * (j + 1)], thresh);
 		for (int i = 0; i <= j; i++)
 		{
@@ -1402,10 +1414,8 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 		dtype *f_rsd = alloc_arr<dtype>(size);
 		dtype *f_rsd_nopml = alloc_arr<dtype>(size_nopml);
 
-		for (int k = 0; k < z.n; k++)
-			x_sol[k * size2D + size2D / 2] = 0;
-
 		ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);
+
 		printf("-----------\n");
 		printf("Residual in 3D with PML |A * x_sol - f| = %lf\n", RelRes);
 		printf("-----------\n");
@@ -2990,6 +3000,12 @@ void ComputeResidual(size_m x, size_m y, size_m z, double kw, dtype* u, dtype* f
 	for (int i = 0; i < size; i++)
 		f_res[i] = f_res[i] - f[i];
 
+	for (int k = 0; k < z.n; k++)
+	{
+		int src = size2D / 2;
+		NullifySource2D(x, y, &f_res[k * size2D], src, 2);
+	}
+
 	RelRes = dznrm2(&size, f_res, &ione);
 
 }
@@ -3115,7 +3131,7 @@ void GenExact1DHelmholtz(int n, size_m x, dtype *x_sol_ex, double k, point sourc
 }
 
 
-void NullifySource(size_m x, size_m y, dtype *x_ex, dtype* x_sol, int src, int npoints)
+void NullifySource2D(size_m x, size_m y, dtype *u, int src, int npoints)
 {
 	int isrc, jsrc;
 	jsrc = src / x.n;
@@ -3123,11 +3139,11 @@ void NullifySource(size_m x, size_m y, dtype *x_ex, dtype* x_sol, int src, int n
 
 	for (int l = 0; l <= npoints; l++)
 	{
-		x_ex[isrc - l + x.n * jsrc] = x_sol[isrc - l + x.n * jsrc] = 0;
-		x_ex[isrc + l + x.n * jsrc] = x_sol[isrc + l + x.n * jsrc] = 0;
+		u[isrc - l + x.n * jsrc] = 0;
+		u[isrc + l + x.n * jsrc] = 0;
 
-		x_ex[isrc + x.n * (jsrc - l)] = x_sol[isrc + x.n * (jsrc - l)] = 0;
-		x_ex[isrc + x.n * (jsrc + l)] = x_sol[isrc + x.n * (jsrc + l)] = 0;
+		u[isrc + x.n * (jsrc - l)] = 0;
+		u[isrc + x.n * (jsrc + l)] = 0;
 	}
 }
 
@@ -3226,7 +3242,8 @@ void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_s
 				i, j, i + x.n * j, i * x.h, j * y.h);
 #endif
 
-	NullifySource(x, y, x_sol_ex, x_sol_prd, src, 1);
+	NullifySource2D(x, y, x_sol_ex, src, 1);
+	NullifySource2D(x, y, x_sol_prd, src, 1);
 	x_sol_ex[src] = x_sol_prd[src] = 0;
 
 	output2D(str1, pml_flag, x, y, x_sol_ex, x_sol_prd);
