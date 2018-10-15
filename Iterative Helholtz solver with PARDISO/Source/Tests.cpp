@@ -40,7 +40,7 @@ void Test_TransferBlock3Diag_to_CSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dt
 	free_arr(g);
 }
 
-
+#if 0
 void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr, ccsr* Dcsr_nopml, /*out */ ccsr* Dcsr_reduced, double eps)
 {
 	int n = x.n * y.n;
@@ -162,6 +162,7 @@ void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr
 
 	
 }
+#endif
 
 void TestNormalizedVector(int n, dtype* vect, double eps)
 {
@@ -169,7 +170,7 @@ void TestNormalizedVector(int n, dtype* vect, double eps)
 	int ione = 1;
 
 	norm = dznrm2(&n, vect, &ione);
-	if ((norm - 1.0) < eps) printf("Normalized vector: %12.10e = 1.0: PASSED\n", norm);
+	if (fabs(norm - 1.0) < eps) printf("Normalized vector: %12.10e = 1.0: PASSED\n", norm);
 	else printf("Normalized vector: %12.10lf != 1.0 : FAILED\n", norm);
 
 }
@@ -179,11 +180,280 @@ void TestOrtogonalizedVectors(int n, dtype* vect1, dtype* vect2, double eps)
 	dtype value;
 	int ione = 1;
 
-	value = zdot(n, vect1, vect2);
+	zdotc(&value, &n, vect1, &ione, vect2, &ione);
 
-	if (abs(value) < eps) printf("zdot: %12.10e = 0.0: PASSED\n", value);
-	else printf("zdot: %12.10lf != 0.0 : FAILED\n", value);
+	if (abs(value) < eps) printf("zdot: (%12.10e, %12.10e) = 0.0: PASSED\n", value.real(), value.imag());
+	else printf("zdot: (%12.10lf, %12.10lf) != 0.0 : FAILED\n", value.real(), value.imag());
 
+}
+
+void GivensRotations(dtype* H, int ldh, dtype* eBeta, int &rotationsCount, double eps)
+{
+	dtype c, s;
+	dtype oldValue;
+	printf("Givens rotations: %d\n", rotationsCount);
+	for (int i = 0; i < rotationsCount; i++)
+	{
+		c = H[i + ldh * i] / sqrt(H[i + ldh * i] * H[i + ldh * i] + H[i + 1 + ldh * i] * H[i + 1 + ldh * i]);
+		s = H[i + 1 + ldh * i] / sqrt(H[i + ldh * i] * H[i + ldh * i] + H[i + 1 + ldh * i] * H[i + 1 + ldh * i]);     //модификация матрицы H 
+		for (int j = i; j < rotationsCount; j++)
+		{
+			oldValue = H[i + ldh * j];
+			H[i + ldh * j] = oldValue * c + H[i + 1 + ldh * j] * s;
+			H[i + 1 + ldh * j] = H[i + 1 + ldh * j] * c - oldValue * s;
+		}
+
+		// right-hand side modification
+		oldValue = eBeta[i];
+		eBeta[i] = oldValue * c;
+		eBeta[i + 1] = -oldValue * s;
+
+		if (abs(eBeta[i + 1]) < eps)
+		{
+			rotationsCount = i + 1;
+			printf("Break: eBeta[%d] < %lf\n", i + 1, eps);
+			break;
+		}
+	}
+
+
+
+}
+
+void TestFGMRES()
+{
+	printf("----Test FGMRES----\n");
+//	int n = 541; 
+	int n = 841;
+	int i, j;
+	double val_re, val_im;
+	int count = 0;
+//	int non_zeros = 4285;
+	int non_zeros = 4089;
+	int ione = 1;
+
+	int size = n;
+	int m = 500;
+	int iterCount = m;
+	int iter = 0;
+	double norm = 0;
+	double norm_r0 = 0;
+	double beta = 0;
+	double RelRes;
+	int i1, j1, k1;
+	double thresh = 10e-8;
+
+	int nrhs = 1;
+	int lwork = -1;
+	int info = 0;
+	int col_min, row_min;
+	dtype work_size;
+	dtype done = { 1.0, 0.0 };
+	dtype mone = { -1.0, 0.0 };
+	dtype zero = { 0.0, 0.0 };
+
+	dtype *A = alloc_arr<dtype>(n * n); int lda = n;
+	dtype *x_orig = alloc_arr<dtype>(n);
+	dtype *x_sol = alloc_arr<dtype>(n);
+	dtype *f = alloc_arr<dtype>(n);
+
+	dtype *g = alloc_arr<dtype>(size);
+	dtype *x0 = alloc_arr<dtype>(size);
+	dtype *deltaL = alloc_arr<dtype>(size);
+	dtype* work;
+
+	FILE *in = fopen("Matrix2.txt", "r");
+
+	while (!feof(in))
+	{
+		//fscanf(in, "%d %d %lf\n", &i, &j, &val_re);
+		fscanf(in, "%d %d %lf %lf\n", &i, &j, &val_re, &val_im);
+		A[i - 1 + lda * (j - 1)] = dtype{ val_re, val_im };
+		count++;
+	}
+
+	fclose(in);
+
+	if (count != non_zeros) printf("ERROR! %d != %d\n", count, non_zeros);
+	system("pause");
+	//GenSolVector(n, x_orig);
+	for (int i = 0; i < size; i++)
+		x_orig[i] = { 1.0, 0.5 };
+
+	printf("Multiply f := A * u\n");
+	zgemv("no", &n, &n, &done, A, &lda, x_orig, &ione, &zero, f, &ione);
+
+
+	dtype *f_rsd = alloc_arr<dtype>(size);
+	for (int i = 0; i < size; i++)
+		f_rsd[i] = f[i];
+
+	zgemv("no", &n, &n, &done, A, &lda, x_orig, &ione, &mone, f_rsd, &ione);
+
+	RelRes = dznrm2(&size, f_rsd, &ione);
+
+	printf("-----------\n");
+	printf("Residual in 3D with PML ||A * x_sol - f|| = %e\n", RelRes);
+	printf("-----------\n");
+
+	system("pause");
+	printf("-------------FGMRES-----------\n");
+
+	// We need to solve iteratively: (I - \delta L * L_0^{-1})w = g
+
+
+	printf("-----Step 0. Memory allocation-----\n");
+	// matrix of Krylov basis
+	dtype* V = alloc_arr<dtype>(size * (m + 1)); int ldv = size;
+	dtype* w = alloc_arr<dtype>(size);
+
+	// residual vector
+	dtype *r0 = alloc_arr<dtype>(size);
+
+	// additional vector
+	dtype *Ax0 = alloc_arr<dtype>(size);
+
+	// Hessenberg matrix
+	dtype *H = alloc_arr<dtype>((m + 1) * m); int ldh = m + 1;
+	dtype *Hgels = alloc_arr<dtype>((m + 1) * m);
+
+	// the vector of right-hand side for the system with Hessenberg matrix
+	dtype *eBeta = alloc_arr<dtype>(m + 1); int ldb = m + 1;
+
+
+	// 1. First step. Compute r_0 and its norm
+	printf("-----Step 1-----\n");
+#pragma omp parallel for simd schedule(simd:static)
+	for (int i = 0; i < size; i++)
+		x0[i] = 0.0;
+
+	// Multiply matrix A in CSR format by vector x_0 to obtain f1
+	zgemv("no", &n, &n, &done, A, &lda, x0, &ione, &zero, Ax0, &ione);
+
+	norm = dznrm2(&size, f, &ione);
+	printf("norm ||f|| = %lf\n", norm);
+
+	Add_dense(size, ione, 1.0, f, size, -1.0, Ax0, size, r0, size);
+
+	norm = dznrm2(&size, r0, &ione);
+	printf("norm ||r0|| = %lf\n", norm);
+
+	//norm = RelError(zlange, size, 1, r0, f, size, thresh);
+	//printf("r0 = f - Ax0, norm ||r0 - f|| = %lf\n", norm);
+
+	NormalizeVector(size, r0, &V[ldv * 0], beta); // v + size * j = &v[ldv * j]
+
+	TestNormalizedVector(size, &V[0], thresh);
+
+	// 2. The main iterations of algorithm
+	printf("-----Step 2. Iterations-----\n");
+	for (int j = 0; j < m; j++)
+	{
+		printf("iter = %d\n", j);
+		// Compute w[j] := A * v[j]
+		zgemv("no", &n, &n, &done, A, &lda, &V[ldv * j], &ione, &zero, w, &ione);
+
+		for (int i = 0; i <= j; i++)
+		{
+			// H[i + ldh * j] = (w_j * v_i) 
+			//H[i + ldh * j] = zdot(size, w, &V[ldv * i]);
+			
+			zdotc(&H[i + ldh * j], &size, w, &ione, &V[ldv * i], &ione);
+
+			//w[j] = w[j] - H[i][j]*v[i]
+			AddDenseVectorsComplex(size, 1.0, w, -H[i + ldh * j], &V[ldv * i], w);
+		}
+
+		H[j + 1 + ldh * j] = dznrm2(&size, w, &ione);
+		printf("norm H[%d][%d] = %lf %lf\n", j, j, H[j + ldh * j].real(), H[j + ldh * j].imag());
+		printf("norm H[%d][%d] = %lf %lf\n", j + 1, j, H[j + 1 + ldh * j].real(), H[j + 1 + ldh * j].imag());
+
+		// Check the convergence to the exact solution
+		if (abs(H[j + 1 + ldh * j]) < thresh)
+		{
+			iterCount = j + 1;
+			printf("Break! value: %lf < thresh: %lf\n", H[j + 1 + ldh * j].real(), thresh);
+			break;
+		}
+
+		// If not, construct the new vector of basis
+		MultVectorConst(size, w, 1.0 / H[j + 1 + ldh * j], &V[ldv * (j + 1)]);
+		TestNormalizedVector(size, &V[ldv * (j + 1)], thresh);
+		for (int i = 0; i <= j; i++)
+		{
+			//TestOrtogonalizedVectors(size, &V[ldv * (j + 1)], &V[ldv * i], thresh);
+		}
+
+
+		// 3. Solving least squares problem to compute y_k
+		// for x_k = x_0 + V_k * y_k
+		printf("-----Step 3. LS problem-----\n");
+
+		printf("size of basis: %d\n", iterCount);
+
+		// Set eBeta
+#pragma omp parallel for simd schedule(simd:static)
+		for (int i = 0; i < m + 1; i++)
+			eBeta[i] = 0;
+
+		eBeta[0] = beta;
+
+		lwork = -1;
+		col_min = j + 1;
+		row_min = j + 2;
+		//col_min = iterCount;
+		//row_min = iterCount + 1;
+
+//#define GIVENS
+				// Run
+		for (int i = 0; i < m * (m + 1); i++)
+			Hgels[i] = H[i];
+
+#ifndef GIVENS
+		// Query
+		zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
+
+		lwork = (int)work_size.real();
+		work = alloc_arr<dtype>(lwork);
+
+
+		zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, work, &lwork, &info);
+		free_arr(work);
+
+#else
+		iterCount = col_min;
+		//iterCount = m;
+		GivensRotations(Hgels, ldh, eBeta, iterCount, thresh);
+
+		printf("ztrsm...\n");
+		ztrsm("left", "up", "no", "no", &iterCount, &iterCount, &done, Hgels, &ldh, eBeta, &ldb);
+#endif
+		// 4. Multiplication x_k = x_0 + V_k * y_k
+		printf("-----Step 4. Computing x_k-----\n");
+
+		iterCount = col_min;
+
+		zgemv("no", &size, &iterCount, &done, V, &ldv, eBeta, &ione, &done, x0, &ione);
+
+		//system("pause");
+
+		for (int i = 0; i < size; i++)
+			f_rsd[i] = f[i];
+
+		zgemv("no", &n, &n, &done, A, &lda, x0, &ione, &mone, f_rsd, &ione);
+
+		RelRes = dznrm2(&size, f_rsd, &ione);
+
+		printf("-----------\n");
+		printf("Residual in 3D with PML ||A * x_sol - f|| = %e\n", RelRes);
+		printf("-----------\n");
+
+		// Set init cond for next step
+#pragma omp parallel for simd schedule(simd:static)
+		for (int i = 0; i < size; i++)
+			x0[i] = 0.0;
+	}
+	
 }
 
 void Test_Poisson_FFT1D_Real(int n /* grid points in 1 dim */, double eps)
@@ -458,12 +728,12 @@ void Test_Poisson_FT1D_Complex(int n /* grid points in 1 dim */, double eps)
 	DFTI_DESCRIPTOR_HANDLE hand = 0;
 	MKL_LONG status;
 
-	n = 79;
+	n = 80;
 
 	size_m xx;
 
 	double L = 10.0;
-	double h = L / (n - 1);
+	double h = L / (n);
 	double norm;
 	double sum = 0;
 
@@ -514,9 +784,12 @@ void Test_Poisson_FT1D_Complex(int n /* grid points in 1 dim */, double eps)
 	status = DftiSetValue(hand, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
 	if (status != DFTI_NO_ERROR) goto failed;
 
-	printf("Set configuration: CCE storage\n");
-	status = DftiSetValue(hand, DFTI_CONJUGATE_EVEN_STORAGE,
-		DFTI_COMPLEX_COMPLEX);
+	//printf("Set configuration: CCE storage\n");
+	//status = DftiSetValue(hand, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
+	//status = DftiSetValue(hand, DFTI_COMPLEX_STORAGE, DFTI_CONJUGATE_EVEN_STORAGE);
+
+	status = DftiSetValue(hand, DFTI_BACKWARD_SCALE, 1.0 / (n));
+	if (status != DFTI_NO_ERROR) goto failed;
 
 	//	status = DftiSetValue(hand, DFTI_FORWARD_SCALE, 1.0 / n);
 
@@ -528,23 +801,29 @@ void Test_Poisson_FT1D_Complex(int n /* grid points in 1 dim */, double eps)
 
 	MyFT1D_ForwardComplex(n, xx, f, f_MYFFT);
 	printf("h = %lf\n", h);
+
 	for (int i = 0; i < n; i++)
-		printf("f_MYFFT[%d]: %14.12lf + I * %14.12lf, exact: %14.12lf\n",
-			i, f_MYFFT[i].real(), f_MYFFT[i].imag(), -2.0 / (PI * (4 * (i - n / 2) * (i - n / 2) - 1)));
+		printf("f_MYFFT[%d]: %14.12lf + I * %14.12lf, f_FFT[%d]: %14.12lf + I * %14.12lf\n",
+			i, f_MYFFT[i].real(), f_MYFFT[i].imag(), i, f_FFT[i].real(), f_FFT[i].imag());
+
+
+//	for (int i = 0; i < n; i++)
+	//	printf("f_MYFFT[%d]: %14.12lf + I * %14.12lf, exact: %14.12lf\n",
+		//	i, f_MYFFT[i].real(), f_MYFFT[i].imag(), -2.0 / (PI * (4 * (i - n / 2) * (i - n / 2) - 1)));
 
 	//	norm = rel_error_complex(n / 2, 1, f_MYFFT, f_FFT, n, eps);
 	//	if (norm < eps) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
 	//	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
 	//	system("pause");
 
-	/*	for (int i = 0; i < n; i++)
-	if (i < n / 2 - 1) lambda[i] = -(2.0 * PI * i / L) * (2.0 * PI * i / L) - 1.0;
-	else lambda[i] = -(2.0 * PI * (n - i) / L) * (2.0 * PI * (n - i) / L) - 1.0;*/
+	for (int i = 0; i < n; i++)
+	if (i < n / 2 - 1) lambda_mkl[i] = -(pi2l * i) * (pi2l * i) - 1.0;  // 0 ... n / 2 ... 0
+	else lambda_mkl[i] = -(pi2l * (n - i)) * (pi2l * (n - i)) - 1.0;
 
 	for (int i = 0; i < n; i++)
 	{
-		lambda_my[i] = -(pi2l * (i - n / 2) * pi2l * (i - n / 2) + 1);
-		lambda_mkl[i] = -(pi2l * i * pi2l * i  + 1);
+		lambda_my[i] = -(pi2l * (i - n / 2) * pi2l * (i - n / 2) + 1);   //  -n/2 ... 0 ... n / 2
+	//	lambda_mkl[i] = -(pi2l * i * pi2l * i  + 1);
 
 	}
 
@@ -560,10 +839,6 @@ void Test_Poisson_FT1D_Complex(int n /* grid points in 1 dim */, double eps)
 	status = DftiComputeBackward(hand, f_FFT, u_FFT);
 	if (status != DFTI_NO_ERROR) goto failed;
 
-	for (int i = 0; i < n; i++)
-	{
-		u_FFT[i] /= n;
-	}
 
 	for (int i = 0; i < n; i++)
 		printf("u_backward[%d]: %14.12lf  u_MKL[%d]: %14.12lf, u_ex[%d]:  %14.12lf\n", i, u_MYFFT[i].real(),

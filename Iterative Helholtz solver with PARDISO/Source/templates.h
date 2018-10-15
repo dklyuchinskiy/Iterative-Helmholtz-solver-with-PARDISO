@@ -49,6 +49,7 @@ void print_vec(int size, int *vec1, double *vec2, char *name);
 void NormalizeVector(int size, dtype* v, dtype* out, double& norm);
 void GenRHSandSolutionViaSound3D(size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f, point source);
 dtype u_ex_complex_sound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
+void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point source, dtype *x_sol, dtype *f, double thresh);
 
 
 void print_map(const map<vector<int>, dtype>& SD);
@@ -63,6 +64,7 @@ map<vector<int>, double> block3diag_to_CSR(int n1, int n2, int blocks, double *B
 map<vector<int>, double> concat_maps(const map<vector<int>, double>& map1, const map<vector<int>, double>& map2);
 
 dtype zdot(int size, dtype* v1, dtype* v2);
+void ComputeResidual(size_m x, size_m y, size_m z, double kw, dtype* u, dtype *f, dtype* f_res, double &RelRes);
 
 // BinaryTrees.cpp
 
@@ -113,7 +115,7 @@ void GenSparseMatrix(size_m x, size_m y, size_m z, double *BL, int ldbl, double 
 void GenRHSandSolution(size_m x, size_m y, size_m z, dtype *u, dtype *f, point source, int &l);
 void GenSparseMatrixOnline2D(char *str, int w, size_m x, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
 void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
-void GenSparseMatrixOnline2DwithPML(int i, size_m x, size_m y, size_m z, ccsr* Acsr, double kwave2);
+void GenSparseMatrixOnline2DwithPML(int i, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave2, int* freqs);
 void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, double eps);
 map<vector<int>, dtype> Block1DRowMat_to_CSR(int blk, int n1, int n2, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, int& non_zeros_on_prev_level);
 void GenRhs2D(int w, size_m x, size_m y, size_m z, dtype* f, dtype* f2D);

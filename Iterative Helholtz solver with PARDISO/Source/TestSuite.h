@@ -55,6 +55,7 @@ void Test_ExactSolution_1D(int n, double h, double* u, double *f, double eps);
 void TestHankel();
 void TestOrtogonalizedVectors(int n, dtype* vect1, dtype* vect2, double eps);
 void TestNormalizedVector(int n, dtype* vect, double eps);
+void TestFGMRES();
 
 #if 0
 
