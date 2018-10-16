@@ -8,7 +8,7 @@
 *                                     (www.jpmoreau.fr)                  *
 *************************************************************************/
 // Functions using only module COMPLEX.cpp
-#include "..\definitions.h"
+#include "../definitions.h"
 
 #include "complex.h"
 

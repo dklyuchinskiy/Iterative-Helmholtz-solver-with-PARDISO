@@ -1,6 +1,7 @@
 #include "definitions.h"
 #include "templates.h"
 #include "TemplatesForMatrixConstruction.h"
+#include "TestSuite.h"
 
 /*****************************************************
 Source file contains functionality to work
@@ -199,21 +200,15 @@ void DenseDiagMult(int n, dtype *diag, dtype *v, dtype *f)
 
 void take_coord3D(int n1, int n2, int n3, int l, int& i, int& j, int& k)
 {
-	i = 0, j = 0, k = 0;
 	k = l / (n1 * n2);
 	j = (l - k * n1 * n2) / n1;
 	i = l - n1 * n2 * k - n1 * j;
-
-//	printf("l = %d i = %d j = %d k = %d\n", l, i, j, k);
 }
 
 void take_coord2D(int n1, int n2, int l, int& i, int& j)
 {
-	i = 0, j = 0;
 	j = l / n1;
 	i = l - n1 * j;
-
-	//	printf("l = %d i = %d j = %d k = %d\n", l, i, j, k);
 }
 
 void reducePML3D(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2, dtype *vect_red)
@@ -1034,9 +1029,13 @@ dtype beta3D(size_m x, size_m y, size_m z, int diag_case, int i, int j, int k)
 		dtype value;
 
 #ifdef PML
-		value = -alpha(x, i) * (alpha(x, i + 1) + 2.0 * alpha(x, i) + alpha(x, i - 1)) / (2.0 * x.h * x.h) 
-			    -alpha(y, j) * (alpha(y, j + 1) + 2.0 * alpha(y, j) + alpha(y, j - 1)) / (2.0 * y.h * y.h)
-			    -alpha(z, k) * (alpha(z, k + 1) + 2.0 * alpha(z, k) + alpha(z, k - 1)) / (2.0 * z.h * z.h);
+	//	value = -alpha(x, i) * (alpha(x, i + 1) + 2.0 * alpha(x, i) + alpha(x, i - 1)) / (2.0 * x.h * x.h) 
+	//		    -alpha(y, j) * (alpha(y, j + 1) + 2.0 * alpha(y, j) + alpha(y, j - 1)) / (2.0 * y.h * y.h)
+	//		    -alpha(z, k) * (alpha(z, k + 1) + 2.0 * alpha(z, k) + alpha(z, k - 1)) / (2.0 * z.h * z.h);
+
+		value = -alpha(x, i) * (alpha(x, i + 0.5) + alpha(x, i - 0.5)) / (x.h * x.h)
+			    -alpha(y, j) * (alpha(y, j + 0.5) + alpha(y, j - 0.5)) / (y.h * y.h)
+				-alpha(z, k) * (alpha(z, k + 0.5) + alpha(z, k - 0.5)) / (z.h * z.h);
 #else
 		dtype c1 = -2.0 / (x.h * x.h);
 		dtype c2 = -2.0 / (y.h * y.h);
@@ -1059,17 +1058,29 @@ dtype beta3D(size_m x, size_m y, size_m z, int diag_case, int i, int j, int k)
 
 		return value;
 	}
-	else if (diag_case == -1 || diag_case == 1)
+	else if (diag_case == 1)
 	{
-		return alpha(x, i) * (alpha(x, i + 1) + alpha(x, i)) / (2.0 * x.h * x.h);
+		return alpha(x, i) * alpha(x, i + 0.5) / (x.h * x.h);
 	}
-	else if (diag_case == -2 || diag_case == 2)
+	else if (diag_case == -1)
 	{
-		return alpha(y, j) * (alpha(y, j + 1) + alpha(y, j)) / (2.0 * y.h * y.h);
+		return alpha(x, i) * alpha(x, i - 0.5) / (x.h * x.h);
 	}
-	else if (diag_case == -3 || diag_case == 3)
+	else if (diag_case == 2)
 	{
-		return alpha(z, k) * (alpha(z, k + 1) + alpha(z, k)) / (2.0 * z.h * z.h);
+		return alpha(y, j) * alpha(y, j + 0.5) / (y.h * y.h);
+	}
+	else if (diag_case == -2)
+	{
+		return alpha(y, j) * alpha(y, j - 0.5) / (y.h * y.h);
+	}
+	else if (diag_case == 3)
+	{
+		return alpha(z, k) * alpha(z, k + 0.5) / (z.h * z.h);
+	}
+	else if (diag_case == -3)
+	{
+		return alpha(z, k) * alpha(z, k - 0.5) / (z.h * z.h);
 	}
 	return 0;
 }
@@ -1208,6 +1219,241 @@ dtype beta2D_spg(size_m x, size_m y, int diag_case, double k2, int i, int j)
 	return 0;
 }
 
+void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point source, dtype *x_sol, dtype *f, double thresh)
+{
+	printf("-------------FGMRES-----------\n");
+
+	// We need to solve iteratively: (I - \delta L * L_0^{-1})w = g
+
+	int size = x.n * y.n * z.n;
+	int size2D = x.n * y.n;
+	int size_nopml = x.n_nopml * y.n_nopml * z.n_nopml;
+	int m = 7;
+	int iterCount = m;
+	int iter = 0;
+	int ione = 1;
+	double norm = 0;
+	double norm_r0 = 0;
+	double beta = 0;
+	double RelRes;
+	int i1, j1, k1;
+
+	int nrhs = 1;
+	int lwork = -1;
+	int info = 0;
+	int col_min;
+	int row_min;
+	dtype work_size;
+	dtype done = { 1.0, 0.0 };
+	dtype mone = { -1.0, 0.0 };
+
+	dtype *g = alloc_arr<dtype>(size);
+	dtype *x0 = alloc_arr<dtype>(size);
+	dtype *x_init = alloc_arr<dtype>(size);
+	dtype *deltaL = alloc_arr<dtype>(size);
+	dtype* work;
+
+	printf("-----Step 0. Set sound speed and deltaL-----\n");
+	//	SetSoundSpeed3D(x, y, z, sound3D, source);
+	//	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
+#if 1
+	// Gen velocity of sound in 3D domain
+	SetSoundSpeed3D(x, y, z, sound3D, source);
+
+	// Gen velocity of sound in 3D domain
+	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
+
+	char str1[255] = "sound_speed2D";
+	//output(str1, false, x, y, z, sound3D, deltaL);
+	//output2D(str1, false, x, y, sound2D, sound2D);
+
+	// Gen DeltaL function
+	GenerateDeltaL(x, y, z, sound3D, sound2D, deltaL);
+
+	char str2[255] = "sound_speed_deltaL";
+	//output(str2, false, x, y, z, sound3D, deltaL);
+
+	
+	printf("-----Step 0. Memory allocation-----\n");
+	// matrix of Krylov basis
+	dtype* V = alloc_arr<dtype>(size * (m + 1)); int ldv = size;
+	dtype* w = alloc_arr<dtype>(size);
+
+	// residual vector
+	dtype *r0 = alloc_arr<dtype>(size);
+
+	// additional vector
+	dtype *Ax0 = alloc_arr<dtype>(size);
+
+	// Hessenberg matrix
+	dtype *H = alloc_arr<dtype>((m + 1) * m); int ldh = m + 1;
+	dtype *Hgels = alloc_arr<dtype>((m + 1) * m);
+
+	// the vector of right-hand side for the system with Hessenberg matrix
+	dtype *eBeta = alloc_arr<dtype>(m + 1); int ldb = m + 1;
+
+	// vars
+	dtype calpha;
+	double dalpha;
+
+#pragma omp parallel for simd schedule(simd:static)
+	for (int i = 0; i < size; i++)
+		x_init[i] = 0;
+
+	for (int restart = 0; restart < 2; restart++)
+	{
+		printf("------RESTART = %d------\n", restart);
+		// 1. First step. Compute r_0 and its norm
+		printf("-----Step 1-----\n");
+
+		zcopy(&size, x_init, &ione, x0, &ione);
+
+		// Multiply matrix A in CSR format by vector x_0 to obtain f1
+		ApplyCoeffMatrixA(x, y, z, x0, deltaL, Ax0, thresh);
+
+		norm = dznrm2(&size, f, &ione);
+		printf("norm ||f|| = %lf\n", norm);
+
+		//Add_dense(size, ione, 1.0, f, size, -1.0, Ax0, size, r0, size);
+		zcopy(&size, f, &ione, r0, &ione);
+		zaxpy(&size, &mone, Ax0, &ione, r0, &ione); // r0: = f - Ax0
+
+		norm = dznrm2(&size, r0, &ione);
+		printf("norm ||r0|| = %lf\n", norm);
+
+		//norm = RelError(zlange, size, 1, r0, f, size, thresh);
+		//printf("r0 = f - Ax0, norm ||r0 - f|| = %lf\n", norm);
+
+		NormalizeVector(size, r0, &V[ldv * 0], beta); // v + size * j = &v[ldv * j]
+
+		TestNormalizedVector(size, &V[0], thresh);
+
+		// 2. The main iterations of algorithm
+		printf("-----Step 2. Iterations-----\n");
+		for (int j = 0; j < m; j++)
+		{
+			// Compute w[j] := A * v[j]
+			ApplyCoeffMatrixA(x, y, z, &V[ldv * j], deltaL, w, thresh);
+
+			for (int i = 0; i <= j; i++)
+			{
+				// H[i + ldh * j] = (w_j * v_i) 
+				zdotc(&H[i + ldh * j], &size, w, &ione, &V[ldv * i], &ione);
+
+				//w[j] = w[j] - H[i][j]*v[i]
+				//AddDenseVectorsComplex(size, 1.0, w, -H[i + ldh * j], &V[ldv * i], w);
+				calpha = -H[i + ldh * j];
+				zaxpy(&size, &calpha, &V[ldv * i], &ione, w, &ione);
+			}
+
+			H[j + 1 + ldh * j] = dznrm2(&size, w, &ione);
+			printf("norm H[%d][%d] = %lf %lf\n", j, j, H[j + ldh * j].real(), H[j + ldh * j].imag());
+			printf("norm H[%d][%d] = %lf %lf\n", j + 1, j, H[j + 1 + ldh * j].real(), H[j + 1 + ldh * j].imag());
+
+			// Check the convergence to the exact solution
+			if (abs(H[j + 1 + ldh * j]) < thresh)
+			{
+				iterCount = j + 1;
+				printf("Break! value: %lf < thresh: %lf\n", H[j + 1 + ldh * j].real(), thresh);
+				break;
+			}
+
+			// If not, construct the new vector of basis
+			//MultVectorConst(size, w, 1.0 / H[j + 1 + ldh * j], &V[ldv * (j + 1)]);
+			zcopy(&size, w, &ione, &V[ldv * (j + 1)], &ione);
+			dalpha = 1.0 / H[j + 1 + ldh * j].real();
+			zdscal(&size, &dalpha, &V[ldv * (j + 1)], &ione);
+
+			TestNormalizedVector(size, &V[ldv * (j + 1)], thresh);
+			for (int i = 0; i <= j; i++)
+			{
+				TestOrtogonalizedVectors(size, &V[ldv * (j + 1)], &V[ldv * i], thresh);
+			}
+
+
+			// 3. Solving least squares problem to compute y_k
+			// for x_k = x_0 + V_k * y_k
+			printf("-----Step 3. LS problem-----\n");
+
+			printf("size of basis: %d\n", iterCount);
+
+			// Set eBeta
+#pragma omp parallel for simd schedule(simd:static)
+			for (int i = 0; i < m + 1; i++)
+				eBeta[i] = 0;
+
+			eBeta[0] = beta;
+
+			// Set working H because it is destroyed after GELS
+			for (int i = 0; i < m * (m + 1); i++)
+				Hgels[i] = H[i];
+
+			// Query
+			lwork = -1;
+			row_min = j + 2;
+			col_min = j + 1;
+
+			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
+
+			lwork = (int)work_size.real();
+			work = alloc_arr<dtype>(lwork);
+			// Run
+			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, work, &lwork, &info);
+
+			// 4. Multiplication x_k = x_0 + V_k * y_k
+			printf("-----Step 4. Computing x_k-----\n");
+
+			zgemv("no", &size, &col_min, &done, V, &ldv, eBeta, &ione, &done, x0, &ione);
+
+
+			// 5. Solve L_0 * x_sol = x_gmres
+			printf("-----Step 5. Solve the last system-----\n");
+			Solve3DSparseUsingFT(x, y, z, x0, x_sol, thresh);
+
+			// For the next step
+			zcopy(&size, x_init, &ione, x0, &ione);
+
+#endif
+
+			dtype *f_rsd = alloc_arr<dtype>(size);
+			dtype *f_rsd_nopml = alloc_arr<dtype>(size_nopml);
+
+			ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);
+
+			printf("-----------\n");
+			printf("Residual in 3D with PML |A * x_sol - f| = %lf\n", RelRes);
+			printf("-----------\n");
+
+			reducePML3D(x, y, z, size, f_rsd, size_nopml, f_rsd_nopml);
+
+			RelRes = dznrm2(&size_nopml, f_rsd_nopml, &ione);
+
+			printf("-----------\n");
+			printf("Residual in 3D phys domain |A * x_sol - f| = %lf\n", RelRes);
+			printf("-----------\n");
+
+#ifdef OUTPUT
+			if (j == m - 1)
+			{
+				FILE* out = fopen("ResidualVector.txt", "w");
+				for (int i = 0; i < size_nopml; i++)
+				{
+					take_coord3D(x.n_nopml, y.n_nopml, z.n_nopml, i, i1, j1, k1);
+					fprintf(out, "%d %d %d %lf %lf\n", i1, j1, k1, f_rsd_nopml[i].real(), f_rsd_nopml[i].imag());
+				}
+				fclose(out);
+			}
+#endif
+
+			free_arr(f_rsd);
+			free_arr(f_rsd_nopml);
+			free_arr(work);
+		}
+
+		zcopy(&size, x_sol, &ione, x_init, &ione);
+	}
+}
+
 void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, double eps)
 {
 	int n = x.n * y.n;
@@ -1333,9 +1579,11 @@ void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtyp
 #else
 	int count = 0;
 	int count_bound = 0;
+	bool right_value = 0;
 
 	for (int l1 = 0; l1 < size; l1++)
 	{
+		printf("l1 = %d\n", l1);
 		Acsr->ia[l1] = count + 1;
 		for (int l2 = 0; l2 < size; l2++)
 		{
@@ -1346,8 +1594,8 @@ void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtyp
 			{
 				Acsr->ja[count] = l2 + 1;
 #ifdef HELMHOLTZ
-				Acsr->values[count] = dtype{ k * k, 0 };
-				Acsr->values[count++] += beta3D(x, y, z, 0, i1, j1, k1);
+				Acsr->values[count] = beta3D(x, y, z, 0, i1, j1, k1);
+				Acsr->values[count++] += dtype{ k * k, 0 };
 #else
 				Acsr->values[count++] = beta3D(x, y, z, 0, i1, j1, k1);
 #endif
@@ -1376,6 +1624,7 @@ void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtyp
 			{
 				Acsr->ja[count] = l2 + 1;
 				Acsr->values[count++] = beta3D(x, y, z, 3, i1, j1, k1);
+				right_value = true;
 			}
 			else if (l1 == l2 + x.n * y.n)
 			{	
@@ -1383,7 +1632,9 @@ void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtyp
 				Acsr->values[count++] = beta3D(x, y, z, -3, i1, j1, k1);
 			}
 
+			if (right_value == true) break;
 		}
+		right_value = false;
 
 	//	if ((i1 == 0 || j1 == 0 || k1 == 0 || i1 == x.n - 1 || j1 == y.n -1 || k1 == z.n - 1) && Acsr->ja[count - 1] != 0) count_bound++;
 	}
@@ -1405,7 +1656,7 @@ void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtyp
 
 }
 
-void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave_beta2)
+void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave_beta2, int* freqs)
 {
 	int size = x.n * y.n;
 	int size2 = size - y.n;
@@ -1423,72 +1674,79 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, size_m z, ccsr* A
 
 	if (non_zeros_in_2Dblock3diag != Acsr->non_zeros) printf("ERROR! Uncorrect value of non_zeros inside 2D: %d != %d\n", non_zeros_in_2Dblock3diag, Acsr->non_zeros);
 
-	printf("Gen 2D matrix for frequency w = %d, k^2 - ky^2 = (%lf %lf)\n", w - z.n / 2, kwave_beta2.real(), kwave_beta2.imag());
-
+	printf("Gen 2D matrix for frequency w = %d, k^2 - ky^2 = (%lf %lf)\n", w, kwave_beta2.real(), kwave_beta2.imag());
 	// All elements
-
-	dtype *diag = alloc_arr<dtype>(size); // 0
-	dtype *subXdiag = alloc_arr<dtype>(size2); // -1
-	dtype *supXdiag = alloc_arr<dtype>(size2); // 1
-	dtype *subYdiag = alloc_arr<dtype>(size3); // -2
-	dtype *supYdiag = alloc_arr<dtype>(size3); // 2
 
 	int j1, k1;
 	int j2, k2;
 
 	int count = 0;
+	int count2 = 0;
 
-	for (int l1 = 0; l1 < size; l1++)
+	if (w == -1)
 	{
-		Acsr->ia[l1] = count + 1;
-		for (int l2 = 0; l2 < size; l2++)
+
+		for (int l1 = 0; l1 < size; l1++)
 		{
-			take_coord2D(x.n, y.n, l1, j1, k1);
-			take_coord2D(x.n, y.n, l2, j2, k2);
-
-			if (l1 == l2)
+			Acsr->ia[l1] = count + 1;
+			for (int l2 = 0; l2 < size; l2++)
 			{
-				Acsr->ja[count] = l2 + 1;
+				take_coord2D(x.n, y.n, l1, j1, k1);
+				take_coord2D(x.n, y.n, l2, j2, k2);
+
+				if (l1 == l2)
+				{
+					Acsr->ja[count] = l2 + 1;
+					freqs[count2++] = count;
 #ifdef HELMHOLTZ
-				//Acsr->values[count] = dtype{ kwave2, 0 };
-				//Acsr->values[count] += dtype{ 0, k * k * beta_eq };
-				//Acsr->values[count] = dtype{ k * k, 0 };
-				//Acsr->values[count] -= dtype{ kww, 0 };
-				Acsr->values[count++] = beta2D_pml(x, y, 0, kwave_beta2, j1, k1);
+					//Acsr->values[count] = dtype{ kwave2, 0 };
+					//Acsr->values[count] += dtype{ 0, k * k * beta_eq };
+					//Acsr->values[count] = dtype{ k * k, 0 };
+					//Acsr->values[count] -= dtype{ kww, 0 };
+					Acsr->values[count++] = beta2D_pml(x, y, 0, kwave_beta2, j1, k1);
 #else
-				Acsr->values[count++] = beta2D(x, y, 0, j1, k1);
+					Acsr->values[count++] = beta2D(x, y, 0, j1, k1);
 #endif
-				
-			}
-			else if (l1 == l2 - 1 && (l1 + 1) % x.n != 0)
-			{
-				Acsr->ja[count] = l2 + 1;
-				Acsr->values[count++] = beta2D_pml(x, y, 1, kwave_beta2, j1, k1); // right
-			}
-			else if (l1 == l2 + 1 && l1 % x.n != 0)
-			{
-				Acsr->ja[count] = l2 + 1;
-				Acsr->values[count++] = beta2D_pml(x, y, -1, kwave_beta2, j1, k1); // left
-			}
-			else if (l1 == l2 - x.n)
-			{
-				Acsr->ja[count] = l2 + 1;
-				Acsr->values[count++] = beta2D_pml(x, y, 2, kwave_beta2, j1, k1); // right
-			}
-			else if (l1 == l2 + x.n)
-			{
-				Acsr->ja[count] = l2 + 1;
-				Acsr->values[count++] = beta2D_pml(x, y, -2, kwave_beta2, j1, k1); // left
-			}
 
+				}
+				else if (l1 == l2 - 1 && (l1 + 1) % x.n != 0)
+				{
+					Acsr->ja[count] = l2 + 1;
+					Acsr->values[count++] = beta2D_pml(x, y, 1, kwave_beta2, j1, k1); // right
+				}
+				else if (l1 == l2 + 1 && l1 % x.n != 0)
+				{
+					Acsr->ja[count] = l2 + 1;
+					Acsr->values[count++] = beta2D_pml(x, y, -1, kwave_beta2, j1, k1); // left
+				}
+				else if (l1 == l2 - x.n)
+				{
+					Acsr->ja[count] = l2 + 1;
+					Acsr->values[count++] = beta2D_pml(x, y, 2, kwave_beta2, j1, k1); // right
+				}
+				else if (l1 == l2 + x.n)
+				{
+					Acsr->ja[count] = l2 + 1;
+					Acsr->values[count++] = beta2D_pml(x, y, -2, kwave_beta2, j1, k1); // left
+				}
+
+			}
+		}
+
+		if (non_zeros_in_2Dblock3diag != count || size != count2) printf("FAILED generation!!! %d != %d\n", non_zeros_in_2Dblock3diag, count);
+		else
+		{
+			printf("SUCCESSED BASIC 2D generation!\n");
+			printf("Non_zeros inside generating PML function: %d\n", count);
 		}
 	}
-
-	if (non_zeros_in_2Dblock3diag != count) printf("FAILED generation!!! %d != %d\n", non_zeros_in_2Dblock3diag, count);
 	else
 	{
-		printf("SUCCESSED 2D generation!\n");
-		printf("Non_zeros inside generating PML function: %d\n", count);
+#pragma omp parallel for simd schedule(simd:static)
+		for (int i = 0; i < size; i++)
+			Acsr->values[freqs[i]] += kwave_beta2;
+	
+		printf("SUCCESSED 2D generation for frequency %d!\n", w);
 	}
 
 }
@@ -2128,10 +2386,13 @@ void GenRHSandSolution2D_Syntetic(size_m x, size_m y, ccsr *Dcsr, dtype *u, dtyp
 
 void GenSolVector(int size, dtype *vector)
 {
+	double real, imag;
 	srand((unsigned int)time(0));
 	for (int i = 0; i < size; i++)
 	{
-		vector[i] = random(0.0, 1.0);
+		real = random(0.0, 1.0);
+		imag = random(0.0, 1.0);
+		vector[i] = { real, imag };
 		//	printf("%lf\n", vector[i].real());
 	}
 }
@@ -2370,7 +2631,7 @@ void ApplyCoeffMatrixA(size_m x, size_m y, size_m z, dtype *w, dtype* deltaL, dt
 	OpTwoMatrices(size, 1, g, deltaL, g, size, '*');
 
 	// g:= w - g
-	OpTwoMatrices(size, 1, g, w, g, size, '-');
+	OpTwoMatrices(size, 1, w, g, g, size, '-');
 }
 
 void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, double thresh)
@@ -2384,12 +2645,15 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 #endif
 
 	int size = x.n * y.n * z.n;
+	int size2D = x.n * y.n;
 	MKL_LONG status;
 	double norm = 0;
 
 	dtype *x_sol_prd = alloc_arr<dtype>(size);
-	dtype *x_sol_fft_nopml = alloc_arr<dtype>(x.n_nopml * y.n_nopml * z.n);
+	//dtype *x_sol_fft_nopml = alloc_arr<dtype>(x.n_nopml * y.n_nopml * z.n);
 	dtype *f_FFT = alloc_arr<dtype>(size);
+	dtype *f2D = alloc_arr<dtype>(size2D);
+	//dtype *x_sol_ex = alloc_arr<dtype>(size2D);
 	
 	
 	// f(x,y,z) -> fy(x,z) 
@@ -2397,24 +2661,22 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 	DFTI_DESCRIPTOR_HANDLE my_desc2_handle;
 
 	// Create 1D FFT of COMPLEX DOUBLE case
-//	status = DftiCreateDescriptor(&my_desc1_handle, DFTI_DOUBLE, DFTI_REAL, 1, z.n);
-//	status = DftiSetValue(my_desc1_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
+	status = DftiCreateDescriptor(&my_desc1_handle, DFTI_DOUBLE, DFTI_COMPLEX, 1, z.n);
+	status = DftiSetValue(my_desc1_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
+	status = DftiSetValue(my_desc1_handle, DFTI_BACKWARD_SCALE, 1.0 / z.n);
 //	status = DftiSetValue(my_desc1_handle, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
-//	status = DftiCommitDescriptor(my_desc1_handle);
-
-	//for (int i = 0; i < size_nopml; i++)
-	//	printf("%lf %lf\n", f[i].real(), f[i].imag());
+	status = DftiCommitDescriptor(my_desc1_handle);
 
 	// We make n2 * n3 FFT's for one dimensional direction x with n1 grid points
 
 #ifdef PRINT
 	printf("Applying 1D Fourier transformation for 3D RHS\n");
 #endif
-	for (int k = 0; k < x.n * y.n; k++)
+	for (int k = 0; k < size2D; k++)
 	{
-		//status = DftiComputeForward(my_desc1_handle, &f[n1 * k], &f_FFT[n1 * k]);
+		status = DftiComputeForward(my_desc1_handle, &f[z.n * k], &f_FFT[z.n * k]);
 		//MyFFT1D_ForwardComplexSin(n1, &f[n1 * k], &f_FFT[n1 * k]);
-		MyFT1D_ForwardComplex(z.n, z, &f[z.n * k], &f_FFT[z.n * k]);
+		//MyFT1D_ForwardComplex(z.n, z, &f[z.n * k], &f_FFT[z.n * k]);
 	}
 
 #ifdef PRINT
@@ -2425,7 +2687,6 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 
 
 	// Calling the solver
-	int size2D = x.n * y.n;
 	int mtype = 13;
 	int *iparm = alloc_arr<int>(64);
 	int *perm = alloc_arr<int>(size2D);
@@ -2467,6 +2728,7 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 	double k = (double)kk;
 	double k2 = k * k;
 	int nhalf = z.n / 2;
+	double kww;
 	int src;
 
 	char *str1, *str2, *str3;
@@ -2475,12 +2737,29 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 	str3 = alloc_arr<char>(255);
 	bool pml_flag = false;
 
-	for (int i = 0; i < z.n; i++)
+	int* freqs = alloc_arr<int>(size);
+
+	GenSparseMatrixOnline2DwithPML(-1, x, y, z, D2csr, 0, freqs);
+
+	for (int k = 0; k < z.n; k++)
 	{
 		int count = 0;
 //		printf("-------------Iter: %d------------------\n", i);
 
-		double kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (z.l * z.l);
+#define MKL_FFT
+
+#ifdef MKL_FFT
+		if (k < z.n / 2 - 1)
+		{
+			kww = 4.0 * PI * PI * k * k / (z.l * z.l);
+		}
+		else
+		{
+			kww = 4.0 * PI * PI * (z.n - k) * (z.n - k) / (z.l * z.l);
+		}
+#else
+		kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (z.l * z.l);
+#endif
 		double kwave2 = k2 - kww;
 
 		if (kww > 2.5 * k2) continue;
@@ -2489,8 +2768,6 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 		dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } - kww;
 
 		dtype alpha_k;
-		dtype *f2D = alloc_arr<dtype>(x.n * y.n);
-		dtype *x_sol_ex = alloc_arr<dtype>(x.n * y.n);
 
 		double nu = 1;
 		double c = 300;
@@ -2511,37 +2788,23 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 
 		// источник в каждой задаче в середине 
 		//GenSparseMatrixOnline2D("FT", i, x, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
-		GenSparseMatrixOnline2DwithPML(i, x, y, z, D2csr, kwave_beta2);
 
-		GenRhs2D(i, x, y, z, f_FFT, f2D);
+		GenSparseMatrixOnline2DwithPML(k, x, y, z, D2csr, kwave_beta2, freqs);
 
-		for (int j = 0; j < x.n * y.n; j++)
-			if (abs(f2D[j]) != 0)
-			{
-	//			printf("i = %d, f2d[%d] = %lf %lf\n", i, j, f2D[j].real(), f2D[j].imag());
-				src = j;
-				//f2D[j] = 1.0 / (x.h * y.h);
-				//count++;
-			}
-
-		/*
-		for (int j = 0; j < n2 * n3; j++)
-		if (f2D[j].real() < 0)
-		{
-		//printf("i = %d, f2d[%d] = %lf %lf\n", i, j, f2D[j].real(), f2D[j].imag());
-		f2D[j] *= -1;
-		count++;
-		}*/
+		GenRhs2D(k, x, y, z, f_FFT, f2D);
 
 		// normalization of rhs
+		alpha_k = f2D[size2D/2] / (1.0 / (x.h * y.h));
 
-		alpha_k = f2D[src] / (1.0 / (x.h * y.h));
-
-		//	printf("alpha_k = %lf %lf\n", alpha_k.real(), alpha_k.imag());
 
 		//	GenRHSandSolution2D_Syntetic(y, z, D2csr, &u2Dsynt[i * size2D], f2D);
-		pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f2D, &x_sol_prd[i * size2D], &error);
+		pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f2D, &x_sol_prd[k * size2D], &error);
+		if (error != 0) printf("Error: PARDISO!!!\n");
 		//		norm = rel_error(zlange, n2 * n3, 1, &u2Dsynt[i * size2D], &x_sol_prd[i * size2D], n2 * n3, thresh);
+
+#pragma omp parallel for simd schedule(simd:static)
+		for (int i = 0; i < size; i++)
+			D2csr->values[freqs[i]] -= kwave_beta2;
 
 		double eps = 0.01; // 1 percent
 
@@ -2590,12 +2853,8 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 		reducePML2D(x, y, size2D, &x_sol_prd[i * size2D], size2D_nopml, &x_sol_fft_nopml[i * size2D_nopml]);
 		check_exact_sol_Hankel(alpha_k, kwave2, x, y, &x_sol_fft_nopml[i * size2D_nopml], thresh);
 #endif
-	
 
-		printf("End for w = %d\n", i);
-
-		free(f2D);
-		free_arr(x_sol_ex);
+		printf("End for w = %d\n", k);
 	}
 
 	//("Reducing PML after taking a solution\n");
@@ -2603,26 +2862,32 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 #ifdef PRINT
 	printf("Backward 1D FFT's of %d x %d times to each point of 2D solution\n", x.n_nopml, y.n_nopml);
 #endif
-	for (int k = 0; k < x.n * y.n; k++)
+	for (int k = 0; k < size2D; k++)
 	{
 		dtype* u1D = alloc_arr<dtype>(z.n);
 		GenSol1DBackward(k, x, y, z, x_sol_prd, u1D);		 // new u1D on each iteration
-															 //	status = DftiComputeBackward(my_desc1_handle, u1D, &x_sol[k * n1]);
+		status = DftiComputeBackward(my_desc1_handle, u1D, &x_sol[k * z.n]);
 															 //	MyFFT1D_BackwardComplexSin(n1, u1D, &x_sol[k * n1]);
-		MyFT1D_BackwardComplex(z.n, z, u1D, &x_sol[k * z.n]);
+	//	MyFT1D_BackwardComplex(z.n, z, u1D, &x_sol[k * z.n]);
 		free(u1D);
 	}
 
-//	status = DftiFreeDescriptor(&my_desc1_handle);
-//	printf("------------- The end of algorithm ----------------------\n");
+	status = DftiFreeDescriptor(&my_desc1_handle);
+	printf("------------- The end of algorithm ----------------------\n");
 
 
 	int ione = 1;
 	//zlacpy("All", &size_nopml, &ione, x_sol, &size_nopml, x_pard_nopml_cpy, &size_nopml);
 
 	free_arr(x_sol_prd);
-	free_arr(x_sol_fft_nopml);
+	//free_arr(x_sol_fft_nopml);
 	free_arr(f_FFT);
+	free_arr(iparm);
+	free_arr(perm);
+	free_arr(pt);
+	free_arr(freqs);
+	free(f2D);
+	//free_arr(x_sol_ex);
 
 }
 
@@ -2669,6 +2934,66 @@ void GenRHSandSolution2D(size_m x, size_m y, ccsr* D2csr, dtype* u_ex2D, dtype* 
 		norm = resid_2D_Hankel(x, y, D2csr, u_ex2D, f2D, sourcePML);
 		printf("resid ||A * x_sol - kf|| 2D Hankel: %lf\n", norm);
 	}
+}
+
+dtype uf(size_m& x, size_m& y, size_m& z, int i, int j, int k, dtype* u)
+{
+	int size2D = x.n * y.n;
+	if (i < 0 || j < 0 || k < 0 || i > x.n - 1 || j > y.n - 1 || k > z.n - 1)
+	{
+		return 0;
+	}
+	else
+	{
+		return u[i + x.n * j + size2D * k];
+	}
+}
+
+void ComputeResidual(size_m x, size_m y, size_m z, double kw, dtype* u, dtype* f, dtype *f_res, double &RelRes)
+{
+	int size = x.n * y.n * z.n;
+	int size2D = x.n * y.n;
+	int i, j, k;
+	int count = 0;
+	int ione = 1;
+
+	for (int l = 0; l < size; l++)
+	{
+		take_coord3D(x.n, y.n, z.n, l, i, j, k);
+		if (k > 1 && k < z.n - 2)
+		{
+			f_res[l] =
+				(uf(x, y, z, i - 1, j, k, u) - 2.0 * uf(x, y, z, i, j, k, u) + uf(x, y, z, i + 1, j, k, u)) / (x.h * x.h) + 
+				(uf(x, y, z, i, j - 1, k, u) - 2.0 * uf(x, y, z, i, j, k, u) + uf(x, y, z, i, j + 1, k, u)) / (y.h * y.h) +
+				(uf(x, y, z, i - 1, j, k - 1, u) - 2.0 * uf(x, y, z, i, j, k, u) + uf(x, y, z, i, j, k + 1, u)) / (z.h * z.h) +
+			//	(u[i - 1 + x.n * j + size2D * k] - 2.0 * u[i + x.n * j + size2D * k] + u[i + 1 + x.n * j + size2D * k]) / (x.h * x.h) +
+			//	(u[i + x.n * (j - 1) + size2D * k] - 2.0 * u[i + x.n * j + size2D * k] + u[i + x.n * (j + 1) + size2D * k]) / (y.h * y.h) +
+			//	(u[i + x.n * j + size2D * (k - 1)] - 2.0 * u[i + x.n * j + size2D * k] + u[i + x.n * j + size2D * (k + 1)]) / (z.h * z.h) +
+				dtype{ kw * kw , 0 } * uf(x, y, z, i, j, k, u);
+			count++;
+		}
+		else
+		{
+			f_res[l] = 0;
+			count++;
+		}
+	}
+
+	if (count != size) printf("FAIL!!! Uncorrect multiplication f: = A * u\n");
+	else printf("Successed residual\n");
+
+#pragma omp parallel for simd schedule(simd:static)
+	for (int i = 0; i < size; i++)
+		f_res[i] = f_res[i] - f[i];
+
+	for (int k = 0; k < z.n; k++)
+	{
+		int src = size2D / 2;
+		NullifySource2D(x, y, &f_res[k * size2D], src, 2);
+	}
+
+	RelRes = dznrm2(&size, f_res, &ione);
+
 }
 
 void Solve1DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f1D, dtype *x_sol_prd, double thresh)
@@ -2792,7 +3117,7 @@ void GenExact1DHelmholtz(int n, size_m x, dtype *x_sol_ex, double k, point sourc
 }
 
 
-void NullifySource(size_m x, size_m y, dtype *x_ex, dtype* x_sol, int src, int npoints)
+void NullifySource2D(size_m x, size_m y, dtype *u, int src, int npoints)
 {
 	int isrc, jsrc;
 	jsrc = src / x.n;
@@ -2800,11 +3125,11 @@ void NullifySource(size_m x, size_m y, dtype *x_ex, dtype* x_sol, int src, int n
 
 	for (int l = 0; l <= npoints; l++)
 	{
-		x_ex[isrc - l + x.n * jsrc] = x_sol[isrc - l + x.n * jsrc] = 0;
-		x_ex[isrc + l + x.n * jsrc] = x_sol[isrc + l + x.n * jsrc] = 0;
+		u[isrc - l + x.n * jsrc] = 0;
+		u[isrc + l + x.n * jsrc] = 0;
 
-		x_ex[isrc + x.n * (jsrc - l)] = x_sol[isrc + x.n * (jsrc - l)] = 0;
-		x_ex[isrc + x.n * (jsrc + l)] = x_sol[isrc + x.n * (jsrc + l)] = 0;
+		u[isrc + x.n * (jsrc - l)] = 0;
+		u[isrc + x.n * (jsrc + l)] = 0;
 	}
 }
 
@@ -2903,7 +3228,8 @@ void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_s
 				i, j, i + x.n * j, i * x.h, j * y.h);
 #endif
 
-	NullifySource(x, y, x_sol_ex, x_sol_prd, src, 1);
+	NullifySource2D(x, y, x_sol_ex, src, 1);
+	NullifySource2D(x, y, x_sol_prd, src, 1);
 	x_sol_ex[src] = x_sol_prd[src] = 0;
 
 	output2D(str1, pml_flag, x, y, x_sol_ex, x_sol_prd);
@@ -2995,7 +3321,7 @@ void MultVectorConst(int n, dtype* v1, dtype alpha, dtype* v2)
 {
 #pragma omp parallel for simd schedule(simd:static)
 	for (int i = 0; i < n; i++)
-		v2[i] = v1[i] / alpha;
+		v2[i] = v1[i] * alpha;
 }
 
 #if 0

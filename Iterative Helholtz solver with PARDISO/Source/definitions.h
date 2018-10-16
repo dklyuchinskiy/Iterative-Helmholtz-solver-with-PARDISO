@@ -27,12 +27,21 @@ typedef double rtype;
 typedef std::complex<double> dtype;
 #define MKL_Complex16 dtype
 
+#if defined(_WIN32) || defined(WIN32)
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl.h"
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl_dfti.h"
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl_rci.h"
 
 #include "source_bessel\basis.h"
-#include "source_bessel\vmblock.h""
+#include "source_bessel\vmblock.h"
+#else
+#include "mkl.h"
+#include "mkl_dfti.h"
+#include "mkl_rci.h"
+
+#include "basis.h"
+#include "vmblock.h"
+#endif
 
 //#define DEBUG
 
@@ -130,8 +139,8 @@ typedef struct list qlist;
 //#define GEN_BLOCK_CSR
 //#define SOLVE_3D_PROBLEM
 
-#define OUTPUT
-#define GNUPLOT
+//#define OUTPUT
+//#define GNUPLOT
 //#define GEN_3D_MATRIX
 
 #ifdef HELMHOLTZ
@@ -139,7 +148,7 @@ typedef struct list qlist;
 #define c_z 1280
 /*--------------*/
 #define ky 1.8
-#define beta_eq 0.1
+#define beta_eq 0.005
 #define kk (2.0 * (PI) * (omega) / (c_z))
 
 //#define kk ((omega) / (c_z))

@@ -16,7 +16,7 @@
 * REF.: "Numerical Algorithms with C, By Gisela Engeln-Muellges        *
 *        and Frank Uhlig, Springer-Verlag, 1996" [BIBLI 11].           *
 ***********************************************************************/     
-#include "..\definitions.h"
+#include "../definitions.h"
            
      
   REAL sqr(REAL x)                    /* square a floating point number */

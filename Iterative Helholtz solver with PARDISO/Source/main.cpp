@@ -207,7 +207,16 @@ int main()
 					   // 150 pts  - 20 % and 10 % if beta = 0.05;
 					   //          - 6 % and 3 % if beta = 0.1
 					   // 200 pts  - 4 % and 4 % if beta = 0.1
-	int spg_pts = 200;  // 250 pts  - 3 % and 3 % if beta = 0.1
+	int spg_pts = 250;  // 250 pts  - 3 % and 3 % if beta = 0.1
+
+	// 3D
+	// 200 pt - 33 % if beta = 0.1
+	//		  - 20 % if beta = 0.05
+	//		  - 12 % if beta = 0.01
+	//		  - 11 % if beta = 0.005
+	// 250 pt - 20 % if beta = 0.05
+	//        - 10 % if beta = 0.005 - the best (range - 0.08 - 0.01)
+	//		  - 11 % if beta = 0.001
 #else
 	int pml_pts = 0;
 #endif
@@ -236,7 +245,7 @@ int main()
 	int size = n * NB;		// size of vector x and f: n1 * n2 * n3
 	int size2D = n;
 	int smallsize = 1600;
-	double thresh = 1e-5;	// stop level of algorithm by relative error
+	double thresh = 1e-6;	// stop level of algorithm by relative error
 	int ItRef = 200;		// Maximal number of iterations in refirement
 	char bench[255] = "display"; // parameter into solver to show internal results
 	int sparse_size = n + 2 * (n - 1) + 2 * (n - n1);
@@ -345,11 +354,12 @@ int main()
 
 	dtype *D, *D_nopml;
 	dtype *B_mat, *B_mat_nopml;
+	dtype *B, *B_nopml;
 
-	dtype *B = alloc_arr<dtype>(size - n); // vector of diagonal elementes
-	dtype *B_nopml = alloc_arr<dtype>(size_nopml - n_nopml); // vector of diagonal elementes
+//	B = alloc_arr<dtype>(size - n); // vector of diagonal elementes
+//	B_nopml = alloc_arr<dtype>(size_nopml - n_nopml); // vector of diagonal elementes
 
-	dtype *x_pard = alloc_arr<dtype>(size);
+//	dtype *x_pard = alloc_arr<dtype>(size);
 
 	// Memory for 3D CSR matrix
 	ccsr *Dcsr;
@@ -364,14 +374,12 @@ int main()
 	// Memory allocation for coefficient matrix A
 	// the size of matrix A: n^3 * n^3 = n^6
 
-	D = alloc_arr<dtype>(n * n); // it's a matrix with size n^3 * n^2 = size * n
-	B_mat = alloc_arr<dtype>(n * n);
+//	D = alloc_arr<dtype>(n * n); // it's a matrix with size n^3 * n^2 = size * n
+//	B_mat = alloc_arr<dtype>(n * n);
 
-	D_nopml = alloc_arr<dtype>(n_nopml * n_nopml);
-	B_mat_nopml = alloc_arr<dtype>(n_nopml * n_nopml);
+//	D_nopml = alloc_arr<dtype>(n_nopml * n_nopml);
+//	B_mat_nopml = alloc_arr<dtype>(n_nopml * n_nopml);
 
-	int ldd = n;
-	int ldb = n;
 #endif
 
 #ifdef _OPENMP
@@ -402,7 +410,6 @@ int main()
 
 	GenRHSandSolutionViaSound3D(x, y, z, x_orig, f, source);
 
-
 	// Generation of sparse coefficient matrix
 #ifdef GEN_3D_MATRIX
 	//printf("--------------- Gen sparse 3D matrix in CSR format... ---------------\n");
@@ -412,14 +419,14 @@ int main()
 #if 1
 	printf("-------------- Gen sparse 3D matrix in CSR format with PML... ------------\n");
 	timer1 = omp_get_wtime();
-	GenSparseMatrixOnline3DwithPML(x, y, z, B, B_mat, n, D, n, B_mat, n, Dcsr, thresh);
+//	GenSparseMatrixOnline3DwithPML(x, y, z, B, B_mat, n, D, n, B_mat, n, Dcsr, thresh);
 	timer2 = omp_get_wtime() - timer1;
 
 	printf("Time of GenSparseMatrixOnline3DwithPML: %lf\n", timer2);
 
 	printf("-------------- Gen sparse 3D matrix in CSR format with no PML... ------------\n");
 	timer1 = omp_get_wtime();
-	GenSparseMatrixOnline3DwithPML(x_nopml, y_nopml, z_nopml, B_nopml, B_mat_nopml, n_nopml, D_nopml, n_nopml, B_mat_nopml, n_nopml, Dcsr_nopml, thresh);
+//	GenSparseMatrixOnline3DwithPML(x_nopml, y_nopml, z_nopml, B_nopml, B_mat_nopml, n_nopml, D_nopml, n_nopml, B_mat_nopml, n_nopml, Dcsr_nopml, thresh);
 	timer2 = omp_get_wtime() - timer1;
 
 	printf("Time of GenSparseMatrixOnline3DnoPML: %lf\n", timer2);
@@ -433,6 +440,7 @@ int main()
 	printf("Analytic non_zeros in three 2D block-row: %d\n", non_zeros_in_3diag + 2 * n);
 	printf("Analytic non_zeros in 3D block-tridiagonal matrix: %d\n", non_zeros_in_3Dblock3diag);
 
+#if 0
 	// Test PML
 	printf("----------------- Running test PML... -----------\n");
 	timer1 = omp_get_wtime();
@@ -441,6 +449,7 @@ int main()
 	printf("Time of Test_PMLBlock3Diag_in_CSR: %lf\n", timer2);
 
 	system("pause");
+#endif
 #endif
 
 #ifdef SOLVE_3D_PROBLEM
@@ -519,171 +528,7 @@ int main()
 
 #endif
 
-	printf("-------------FGMRES-----------\n");
-
-	// We need to solve iteratively: (I - \delta L * L_0^{-1})w = g
-
-	int m = 5;
-	int iterCount = m;
-	int iter = 0;
-	double norm_r0 = 0;
-	double beta = 0;
-
-	dtype *g = alloc_arr<dtype>(size);
-	dtype *x0 = alloc_arr<dtype>(size);
-	dtype *x_gmres = alloc_arr<dtype>(size);
-	dtype *deltaL = alloc_arr<dtype>(size);
-
-	printf("-----Step 0. Set sound speed and deltaL-----\n");
-//	SetSoundSpeed3D(x, y, z, sound3D, source);
-//	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
-#if 1
-	// Gen velocity of sound in 3D domain
-	SetSoundSpeed3D(x, y, z, sound3D, source);
-
-	// Gen velocity of sound in 3D domain
-	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
-	
-	char str1[255] = "sound_speed2D";
-	//output(str1, false, x, y, z, sound3D, deltaL);
-	//output2D(str1, false, x, y, sound2D, sound2D);
-
-	// Gen DeltaL function
-	GenerateDeltaL(x, y, z, sound3D, sound2D, deltaL);
-	char str2[255] = "sound_speed_deltaL";
-	//output(str2, false, x, y, z, sound3D, deltaL);
-
-
-	printf("-----Step 0. Memory allocation-----\n");
-	// matrix of Krylov basis
-	dtype* V = alloc_arr<dtype>(size * (m + 1)); int ldv = size;
-	dtype* w = alloc_arr<dtype>(size);
-
-	// residual vector
-	dtype *r0 = alloc_arr<dtype>(size);
-
-	// additional vector
-	dtype *Ax0 = alloc_arr<dtype>(size);
-
-	// Hessenberg matrix
-	dtype *H = alloc_arr<dtype>((m + 1) * m); int ldh = m + 1;
-
-	// the vector of right-hand side for the system with Hessenberg matrix
-	dtype *eBeta = alloc_arr<dtype>(m + 1);
-
-
-	// 1. First step. Compute r_0 and its norm
-	printf("-----Step 1-----\n");
-#pragma omp parallel for simd schedule(simd:static)
-	for (int i = 0; i < size; i++)
-		x0[i] = 0;
-	
-	// Multiply matrix A in CSR format by vector x_0 to obtain f1
-	ApplyCoeffMatrixA(x, y, z, x0, deltaL, Ax0, thresh);
-
-	norm = dznrm2(&size, f, &ione);
-	printf("norm ||f|| = %lf\n", norm);
-
-	Add_dense(size, ione, 1.0, f, size, -1.0, Ax0, size, r0, size);
-
-	norm = dznrm2(&size, r0, &ione);
-	printf("norm ||r0|| = %lf\n", norm);
-
-	norm = RelError(zlange, size, 1, r0, f, size, thresh);
-	printf("r0 = f - Ax0, norm ||r0 - f|| = %lf\n", norm);
-
-	NormalizeVector(size, r0, &V[ldv * 0], beta); // v + size * j = &v[ldv * j]
-
-	TestNormalizedVector(size, &V[0], thresh);
-
-	// 2. The main iterations of algorithm
-	printf("-----Step 2. Iterations-----\n");
-	for (int j = 0; j < m; j++)
-	{
-		// Compute w[j] := A * v[j]
-		ApplyCoeffMatrixA(x, y, z, &V[ldv * j], deltaL, w, thresh);
-		
-		for (int i = 0; i <= j; i++)
-		{
-			// H[i + ldh * j] = (w_j * v_i) 
-			H[i + ldh * j] = zdot(size, w, &V[ldv * i]);
-			//printf("norm H[0][0] = %lf %lf\n", H[j + ldh * j].real(), H[j + ldh * j].imag());
-
-			//w[j] = w[j] - H[i][j]*v[i]
-			printf("||w|| = %lf\n", dznrm2(&size, w, &ione));
-			printf("||w - v||: %lf\n", RelError(zlange, size, 1, w, &V[0], size, thresh));
-			AddDenseVectorsComplex(size, 1.0, w, -H[i + ldh * j], &V[ldv * i], w);
-		}
-
-		H[j + 1 + ldh * j] = dznrm2(&size, w, &ione);
-		printf("norm H[%d][%d] = %lf %lf\n", j, j, H[j + 1 + ldh * j].real(), H[j + 1 + ldh * j].imag());
-		printf("norm H[%d][%d] = %lf %lf\n", j + 1, j, H[j + 1 + ldh * j].real(), H[j + 1 + ldh * j].imag());
-
-		// Check the convergence to the exact solution
-		if (H[j + 1 + ldh * j].real() < thresh)
-		{
-			iterCount = j + 1;
-			printf("Break! value: %lf < thresh: %lf\n", H[j + 1 + ldh * j].real(), thresh);
-			break;
-		}
-	
-		// If not, construct the new vector of basis
-		MultVectorConst(size, w, 1.0 / H[j + 1 + ldh * j], &V[ldv * (j + 1)]);
-		TestNormalizedVector(size, &V[ldv * (j + 1)], thresh);
-		for (int i = 0; i <= j; i++)
-		{
-			TestOrtogonalizedVectors(size, &V[ldv * (j + 1)], &V[ldv * i], thresh);
-		}
-	} 
-	
-	// 3. Solving least squares problem to compute y_k
-	// for x_k = x_0 + V_k * y_k
-	printf("-----Step 3. LS problem-----\n");
-	int nrhs = 1;
-	int ldb = size;
-	int lwork = -1;
-	int info = 0;
-	dtype work_size;
-	dtype done = { 1.0, 0.0 };
-	dtype mone = { -1.0, 0.0 };
-
-	printf("size of basis: %d\n", iterCount);
-
-	// Set eBeta
-	eBeta[0] = beta;
-	printf("eBeta[0] = (%lf, %lf)\n", eBeta[0].real(), eBeta[0].imag());
-
-	// Query
-	zgels("no", &ldh, &iterCount, &nrhs, H, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
-
-	lwork = (int)work_size.real();
-	dtype* work = alloc_arr<dtype>(lwork);
-	// Run
-	zgels("no", &ldh, &iterCount, &nrhs, H, &ldh, eBeta, &ldb, work, &lwork, &info);
-	printf("eBeta[0] = (%lf, %lf)\n", eBeta[0].real(), eBeta[0].imag());
-
-	// 4. Multiplication x_k = x_0 + V_k * y_k
-	printf("-----Step 4. Computing x_k-----\n");
-
-	zgemv("no", &size, &iterCount, &mone, V, &ldv, eBeta, &ione, &done, x0, &ione);
-
-	//system("pause");
-
-	norm = RelError(zlange, size, 1, x0, f, size, thresh);
-	printf("x_gmres = f, norm ||x_gmres - f|| = %lf\n", norm);
-
-	FILE* out = fopen("x_k_vector.txt", "w");
-	for (int i = 0; i < size; i++)
-		fprintf(out, "%lf\n", x0[i]);
-	fclose(out);
-
-
-	// 5. Solve L_0 * x_sol = x_gmres
-	printf("-----Step 5. Solve the last system-----\n");
-	Solve3DSparseUsingFT(x, y, z, x0, x_sol, thresh);
-#endif
-
-//#define TEST1D
+	//#define TEST1D
 
 #ifdef TEST1D
 	dtype *f1D = alloc_arr<dtype>(x.n);
@@ -691,7 +536,7 @@ int main()
 	Solve1DSparseHelmholtz(x, y, z, f1D, x_sol1D, thresh);
 #endif
 
-//#define TEST2D
+	//#define TEST2D
 
 #ifdef TEST2D
 	dtype *f2D = alloc_arr<dtype>(x.n * y.n);
@@ -699,6 +544,60 @@ int main()
 	Solve2DSparseHelmholtz(x, y, z, f2D, x_sol2D, thresh);
 #endif
 
+//#define TEST3D
+
+#ifdef TEST3D
+	TestFGMRES();
+#endif
+
+	dtype *f_rsd = alloc_arr<dtype>(size);
+	dtype *f_rsd_nopml = alloc_arr<dtype>(size_nopml);
+
+	int i1, j1, k1;
+
+	printf("---Residual exact solution---\n");
+	ComputeResidual(x, y, z, (double)kk, x_orig, f, f_rsd, RelRes);
+	printf("-----------\n");
+	printf("Residual in 3D with PML |A * x_sol - f| = %e\n", RelRes);
+	printf("-----------\n");
+
+
+	for (int k = 0; k < z.n; k++)
+	{
+		f_rsd[k * size2D + size2D / 2] = 0;
+
+		int l = k * size2D + size2D / 2;
+		
+		take_coord3D(x.n, y.n, z.n, l, i1, j1, k1);
+		printf("i = %d j = %d k = %d\n", i1, j1, k1);
+	}
+
+	for (int k = 0; k < z.n; k++)
+	{
+		int src = size2D / 2;
+		NullifySource2D(x, y, &f_rsd[k * size2D], src, 2);
+	}
+
+#ifdef OUTPUT
+	FILE* out = fopen("ResidualVectorOrig.dat", "w");
+	for (int i = 0; i < size; i++)
+	{
+		take_coord3D(x.n, y.n, z.n, i, i1, j1, k1);
+		fprintf(out, "%d %d %d %lf %lf\n", i1, j1, k1, f_rsd[i].real(), f_rsd[i].imag());
+	}
+	fclose(out);
+#endif
+	
+	reducePML3D(x, y, z, size, f_rsd, size_nopml, f_rsd_nopml);
+
+	RelRes = dznrm2(&size_nopml, f_rsd_nopml, &ione);
+	printf("-----------\n");
+	printf("Residual in 3D psys dom  |A * x_sol - f| = %e\n", RelRes);
+	printf("-----------\n");
+	system("pause");
+
+	// ------------ FGMRES-------------
+	FGMRES(x, y, z, sound2D, sound3D, source, x_sol, f, thresh);
 
 
 	dtype *g_nopml = alloc_arr<dtype>(size_nopml);
@@ -714,54 +613,17 @@ int main()
 	for (int k = 0; k < z.n_nopml; k++)
 		x_orig_nopml[k * size2D_nopml + size2D_nopml / 2] = x_sol_nopml[k * size2D_nopml + size2D_nopml / 2] = 0;
 
+//	ResidCSR(x_nopml, y_nopml, z_nopml, Dcsr_nopml, x_sol_nopml, f_nopml, g_nopml, RelRes);
+//	printf("-----------\n");
+//	printf("Residual in 3D  ||A * x_sol - f|| = %lf\n", RelRes);
+//	printf("-----------\n");
 
-	//ResidCSR(x_nopml, y_nopml, z_nopml, Dcsr_nopml, x_sol_nopml, f_nopml, g_nopml, RelRes);
-
-//	for (int i = 0; i < size_nopml; i++)
-	//	printf("g_nopml[%d] = %lf %lf\n", i, g_nopml[i].real(), g_nopml[i].imag());
-//	printf("--------------------\n");
-//	printf("RelRes ||A * u_sol - f|| = %lf\n", RelRes);
-//	printf("--------------------\n");
-
-	//system("pause");
-
-#ifdef GEN_3D_MATRIX
-	ItRef = 100;
-
-	if (RelRes < thresh)
-	{
-		success = 1;
-		itcount = 0;
-	}
-	else {
-		
-		while (RelRes > thresh && itcount < ItRef)
-		{
-			extendPML3D(x, y, z, size_nopml, g_nopml, size, g);
-			Solve3DSparseUsingFT(x, y, z, g, f_FFT, x_sol_prd, x_pard_nopml, x_pard_nopml_cpy, x_sol_fft_nopml, x1_nopml, x_orig, x_orig_nopml, thresh);
-
-#pragma omp parallel for simd schedule(simd:static)
-			for (int i = 0; i < size_nopml; i++)
-				x_sol[i] += x1_nopml[i];
-
-			ResidCSR(x_nopml, y_nopml, z_nopml, Dcsr_nopml, x_sol, f_nopml, g_nopml, RelRes);
-
-			printf("---------------iteration: %d, RelRes = %lf---------------\n", itcount, RelRes);
-			itcount++;
-			system("pause");
-		}
-
-		if (RelRes < thresh && ItRef < itcount) success = 1;
-	}
-
-
-	if (success == 0) printf("No convergence\nResidual norm: %lf\n", RelRes);
-	free_arr(work);
-#endif
-
-	//system("pause");
+	system("pause");
 	// Output
+
+#ifdef OUTPUT
 	output("Charts100/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+#endif
 
 	check_norm_result(x.n_nopml, y.n_nopml, z.n_nopml, x_orig_nopml, x_sol_nopml);
 

@@ -7,7 +7,7 @@
  **********************************************************/
 #include <malloc.h>
 
-#include "..\definitions.h"
+#include "../definitions.h"
 /***********************************************************************
 *                                                                      *
 * Management of a set of dynamically allocated vectors and matrices    *
