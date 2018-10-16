@@ -1249,6 +1249,7 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 
 	dtype *g = alloc_arr<dtype>(size);
 	dtype *x0 = alloc_arr<dtype>(size);
+	dtype *x_init = alloc_arr<dtype>(size);
 	dtype *deltaL = alloc_arr<dtype>(size);
 	dtype* work;
 
@@ -1295,153 +1296,159 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 	dtype calpha;
 	double dalpha;
 
-
-	// 1. First step. Compute r_0 and its norm
-	printf("-----Step 1-----\n");
 #pragma omp parallel for simd schedule(simd:static)
 	for (int i = 0; i < size; i++)
-		x0[i] = 0;
+		x_init[i] = 0;
 
-	// Multiply matrix A in CSR format by vector x_0 to obtain f1
-	ApplyCoeffMatrixA(x, y, z, x0, deltaL, Ax0, thresh);
-
-	norm = dznrm2(&size, f, &ione);
-	printf("norm ||f|| = %lf\n", norm);
-
-	//Add_dense(size, ione, 1.0, f, size, -1.0, Ax0, size, r0, size);
-	zcopy(&size, f, &ione, r0, &ione);
-	zaxpy(&size, &mone, Ax0, &ione, r0, &ione); // r0: = f - Ax0
-
-	norm = dznrm2(&size, r0, &ione);
-	printf("norm ||r0|| = %lf\n", norm);
-
-	//norm = RelError(zlange, size, 1, r0, f, size, thresh);
-	//printf("r0 = f - Ax0, norm ||r0 - f|| = %lf\n", norm);
-
-	NormalizeVector(size, r0, &V[ldv * 0], beta); // v + size * j = &v[ldv * j]
-
-	TestNormalizedVector(size, &V[0], thresh);
-
-	// 2. The main iterations of algorithm
-	printf("-----Step 2. Iterations-----\n");
-	for (int j = 0; j < m; j++)
+	for (int restart = 0; restart < 2; restart++)
 	{
-		// Compute w[j] := A * v[j]
-		ApplyCoeffMatrixA(x, y, z, &V[ldv * j], deltaL, w, thresh);
+		printf("------RESTART = %d------\n", restart);
+		// 1. First step. Compute r_0 and its norm
+		printf("-----Step 1-----\n");
 
-		for (int i = 0; i <= j; i++)
+		zcopy(&size, x_init, &ione, x0, &ione);
+
+		// Multiply matrix A in CSR format by vector x_0 to obtain f1
+		ApplyCoeffMatrixA(x, y, z, x0, deltaL, Ax0, thresh);
+
+		norm = dznrm2(&size, f, &ione);
+		printf("norm ||f|| = %lf\n", norm);
+
+		//Add_dense(size, ione, 1.0, f, size, -1.0, Ax0, size, r0, size);
+		zcopy(&size, f, &ione, r0, &ione);
+		zaxpy(&size, &mone, Ax0, &ione, r0, &ione); // r0: = f - Ax0
+
+		norm = dznrm2(&size, r0, &ione);
+		printf("norm ||r0|| = %lf\n", norm);
+
+		//norm = RelError(zlange, size, 1, r0, f, size, thresh);
+		//printf("r0 = f - Ax0, norm ||r0 - f|| = %lf\n", norm);
+
+		NormalizeVector(size, r0, &V[ldv * 0], beta); // v + size * j = &v[ldv * j]
+
+		TestNormalizedVector(size, &V[0], thresh);
+
+		// 2. The main iterations of algorithm
+		printf("-----Step 2. Iterations-----\n");
+		for (int j = 0; j < m; j++)
 		{
-			// H[i + ldh * j] = (w_j * v_i) 
-			zdotc(&H[i + ldh * j], &size, w, &ione, &V[ldv * i], &ione);
+			// Compute w[j] := A * v[j]
+			ApplyCoeffMatrixA(x, y, z, &V[ldv * j], deltaL, w, thresh);
 
-			//w[j] = w[j] - H[i][j]*v[i]
-			//AddDenseVectorsComplex(size, 1.0, w, -H[i + ldh * j], &V[ldv * i], w);
-			calpha = -H[i + ldh * j];
-			zaxpy(&size, &calpha, &V[ldv * i], &ione, w, &ione);
-		}
+			for (int i = 0; i <= j; i++)
+			{
+				// H[i + ldh * j] = (w_j * v_i) 
+				zdotc(&H[i + ldh * j], &size, w, &ione, &V[ldv * i], &ione);
 
-		H[j + 1 + ldh * j] = dznrm2(&size, w, &ione);
-		printf("norm H[%d][%d] = %lf %lf\n", j, j, H[j + ldh * j].real(), H[j + ldh * j].imag());
-		printf("norm H[%d][%d] = %lf %lf\n", j + 1, j, H[j + 1 + ldh * j].real(), H[j + 1 + ldh * j].imag());
+				//w[j] = w[j] - H[i][j]*v[i]
+				//AddDenseVectorsComplex(size, 1.0, w, -H[i + ldh * j], &V[ldv * i], w);
+				calpha = -H[i + ldh * j];
+				zaxpy(&size, &calpha, &V[ldv * i], &ione, w, &ione);
+			}
 
-		// Check the convergence to the exact solution
-		if (abs(H[j + 1 + ldh * j]) < thresh)
-		{
-			iterCount = j + 1;
-			printf("Break! value: %lf < thresh: %lf\n", H[j + 1 + ldh * j].real(), thresh);
-			break;
-		}
+			H[j + 1 + ldh * j] = dznrm2(&size, w, &ione);
+			printf("norm H[%d][%d] = %lf %lf\n", j, j, H[j + ldh * j].real(), H[j + ldh * j].imag());
+			printf("norm H[%d][%d] = %lf %lf\n", j + 1, j, H[j + 1 + ldh * j].real(), H[j + 1 + ldh * j].imag());
 
-		// If not, construct the new vector of basis
-		//MultVectorConst(size, w, 1.0 / H[j + 1 + ldh * j], &V[ldv * (j + 1)]);
-		zcopy(&size, w, &ione, &V[ldv * (j + 1)], &ione);
-		dalpha = 1.0 / H[j + 1 + ldh * j].real();
-		zdscal(&size, &dalpha, &V[ldv * (j + 1)], &ione);
+			// Check the convergence to the exact solution
+			if (abs(H[j + 1 + ldh * j]) < thresh)
+			{
+				iterCount = j + 1;
+				printf("Break! value: %lf < thresh: %lf\n", H[j + 1 + ldh * j].real(), thresh);
+				break;
+			}
 
-		TestNormalizedVector(size, &V[ldv * (j + 1)], thresh);
-		for (int i = 0; i <= j; i++)
-		{
-			TestOrtogonalizedVectors(size, &V[ldv * (j + 1)], &V[ldv * i], thresh);
-		}
+			// If not, construct the new vector of basis
+			//MultVectorConst(size, w, 1.0 / H[j + 1 + ldh * j], &V[ldv * (j + 1)]);
+			zcopy(&size, w, &ione, &V[ldv * (j + 1)], &ione);
+			dalpha = 1.0 / H[j + 1 + ldh * j].real();
+			zdscal(&size, &dalpha, &V[ldv * (j + 1)], &ione);
+
+			TestNormalizedVector(size, &V[ldv * (j + 1)], thresh);
+			for (int i = 0; i <= j; i++)
+			{
+				TestOrtogonalizedVectors(size, &V[ldv * (j + 1)], &V[ldv * i], thresh);
+			}
 
 
-		// 3. Solving least squares problem to compute y_k
-		// for x_k = x_0 + V_k * y_k
-		printf("-----Step 3. LS problem-----\n");
+			// 3. Solving least squares problem to compute y_k
+			// for x_k = x_0 + V_k * y_k
+			printf("-----Step 3. LS problem-----\n");
 
-		printf("size of basis: %d\n", iterCount);
+			printf("size of basis: %d\n", iterCount);
 
-		// Set eBeta
+			// Set eBeta
 #pragma omp parallel for simd schedule(simd:static)
-		for (int i = 0; i < m + 1; i++)
-			eBeta[i] = 0;
+			for (int i = 0; i < m + 1; i++)
+				eBeta[i] = 0;
 
-		eBeta[0] = beta;
+			eBeta[0] = beta;
 
-		// Set working H because it is destroyed after GELS
-		for (int i = 0; i < m * (m + 1); i++)
-			Hgels[i] = H[i];
+			// Set working H because it is destroyed after GELS
+			for (int i = 0; i < m * (m + 1); i++)
+				Hgels[i] = H[i];
 
-		// Query
-		lwork = -1;
-		row_min = j + 2;
-		col_min = j + 1;
+			// Query
+			lwork = -1;
+			row_min = j + 2;
+			col_min = j + 1;
 
-		zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
+			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
 
-		lwork = (int)work_size.real();
-		work = alloc_arr<dtype>(lwork);
-		// Run
-		zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, work, &lwork, &info);
+			lwork = (int)work_size.real();
+			work = alloc_arr<dtype>(lwork);
+			// Run
+			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, work, &lwork, &info);
 
-		// 4. Multiplication x_k = x_0 + V_k * y_k
-		printf("-----Step 4. Computing x_k-----\n");
+			// 4. Multiplication x_k = x_0 + V_k * y_k
+			printf("-----Step 4. Computing x_k-----\n");
 
-		zgemv("no", &size, &col_min, &done, V, &ldv, eBeta, &ione, &done, x0, &ione);
+			zgemv("no", &size, &col_min, &done, V, &ldv, eBeta, &ione, &done, x0, &ione);
 
 
-		// 5. Solve L_0 * x_sol = x_gmres
-		printf("-----Step 5. Solve the last system-----\n");
-		Solve3DSparseUsingFT(x, y, z, x0, x_sol, thresh);
+			// 5. Solve L_0 * x_sol = x_gmres
+			printf("-----Step 5. Solve the last system-----\n");
+			Solve3DSparseUsingFT(x, y, z, x0, x_sol, thresh);
 
-		// For the next step
-#pragma omp parallel for simd schedule(simd:static)
-		for (int i = 0; i < size; i++)
-			x0[i] = 0;
+			// For the next step
+			zcopy(&size, x_init, &ione, x0, &ione);
 
 #endif
 
-		dtype *f_rsd = alloc_arr<dtype>(size);
-		dtype *f_rsd_nopml = alloc_arr<dtype>(size_nopml);
+			dtype *f_rsd = alloc_arr<dtype>(size);
+			dtype *f_rsd_nopml = alloc_arr<dtype>(size_nopml);
 
-		ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);
+			ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);
 
-		printf("-----------\n");
-		printf("Residual in 3D with PML |A * x_sol - f| = %lf\n", RelRes);
-		printf("-----------\n");
+			printf("-----------\n");
+			printf("Residual in 3D with PML |A * x_sol - f| = %lf\n", RelRes);
+			printf("-----------\n");
 
-		reducePML3D(x, y, z, size, f_rsd, size_nopml, f_rsd_nopml);
+			reducePML3D(x, y, z, size, f_rsd, size_nopml, f_rsd_nopml);
 
-		RelRes = dznrm2(&size_nopml, f_rsd_nopml, &ione);
+			RelRes = dznrm2(&size_nopml, f_rsd_nopml, &ione);
 
-		printf("-----------\n");
-		printf("Residual in 3D phys domain |A * x_sol - f| = %lf\n", RelRes);
-		printf("-----------\n");
+			printf("-----------\n");
+			printf("Residual in 3D phys domain |A * x_sol - f| = %lf\n", RelRes);
+			printf("-----------\n");
 
-		if (j == m - 1)
-		{
-			FILE* out = fopen("ResidualVector.txt", "w");
-			for (int i = 0; i < size_nopml; i++)
+			if (j == m - 1)
 			{
-				take_coord3D(x.n_nopml, y.n_nopml, z.n_nopml, i, i1, j1, k1);
-				fprintf(out, "%d %d %d %lf %lf\n", i1, j1, k1, f_rsd_nopml[i].real(), f_rsd_nopml[i].imag());
+				FILE* out = fopen("ResidualVector.txt", "w");
+				for (int i = 0; i < size_nopml; i++)
+				{
+					take_coord3D(x.n_nopml, y.n_nopml, z.n_nopml, i, i1, j1, k1);
+					fprintf(out, "%d %d %d %lf %lf\n", i1, j1, k1, f_rsd_nopml[i].real(), f_rsd_nopml[i].imag());
+				}
+				fclose(out);
 			}
-			fclose(out);
+
+			free_arr(f_rsd);
+			free_arr(f_rsd_nopml);
+			free_arr(work);
 		}
 
-		free_arr(f_rsd);
-		free_arr(f_rsd_nopml);
-		free_arr(work);
+		zcopy(&size, x_sol, &ione, x_init, &ione);
 	}
 }
 

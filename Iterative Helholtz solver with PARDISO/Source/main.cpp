@@ -207,12 +207,16 @@ int main()
 					   // 150 pts  - 20 % and 10 % if beta = 0.05;
 					   //          - 6 % and 3 % if beta = 0.1
 					   // 200 pts  - 4 % and 4 % if beta = 0.1
-	int spg_pts = 200;  // 250 pts  - 3 % and 3 % if beta = 0.1
+	int spg_pts = 250;  // 250 pts  - 3 % and 3 % if beta = 0.1
 
 	// 3D
 	// 200 pt - 33 % if beta = 0.1
 	//		  - 20 % if beta = 0.05
-	//		  - 11 % if beta = 0.01
+	//		  - 12 % if beta = 0.01
+	//		  - 11 % if beta = 0.005
+	// 250 pt - 20 % if beta = 0.05
+	//        - 10 % if beta = 0.005 - the best (range - 0.08 - 0.01)
+	//		  - 11 % if beta = 0.001
 #else
 	int pml_pts = 0;
 #endif
@@ -241,7 +245,7 @@ int main()
 	int size = n * NB;		// size of vector x and f: n1 * n2 * n3
 	int size2D = n;
 	int smallsize = 1600;
-	double thresh = 1e-5;	// stop level of algorithm by relative error
+	double thresh = 1e-6;	// stop level of algorithm by relative error
 	int ItRef = 200;		// Maximal number of iterations in refirement
 	char bench[255] = "display"; // parameter into solver to show internal results
 	int sparse_size = n + 2 * (n - 1) + 2 * (n - n1);
