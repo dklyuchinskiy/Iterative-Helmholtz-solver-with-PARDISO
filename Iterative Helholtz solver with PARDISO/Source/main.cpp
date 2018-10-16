@@ -578,7 +578,7 @@ int main()
 		NullifySource2D(x, y, &f_rsd[k * size2D], src, 2);
 	}
 
-#ifdef FOUT
+#ifdef OUTPUT
 	FILE* out = fopen("ResidualVectorOrig.dat", "w");
 	for (int i = 0; i < size; i++)
 	{
@@ -596,6 +596,7 @@ int main()
 	printf("-----------\n");
 	system("pause");
 
+	// ------------ FGMRES-------------
 	FGMRES(x, y, z, sound2D, sound3D, source, x_sol, f, thresh);
 
 
@@ -619,7 +620,10 @@ int main()
 
 	system("pause");
 	// Output
+
+#ifdef OUTPUT
 	output("Charts100/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+#endif
 
 	check_norm_result(x.n_nopml, y.n_nopml, z.n_nopml, x_orig_nopml, x_sol_nopml);
 

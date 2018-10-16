@@ -1432,6 +1432,7 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 			printf("Residual in 3D phys domain |A * x_sol - f| = %lf\n", RelRes);
 			printf("-----------\n");
 
+#ifdef OUTPUT
 			if (j == m - 1)
 			{
 				FILE* out = fopen("ResidualVector.txt", "w");
@@ -1442,6 +1443,7 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 				}
 				fclose(out);
 			}
+#endif
 
 			free_arr(f_rsd);
 			free_arr(f_rsd_nopml);
@@ -2791,29 +2793,9 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 
 		GenRhs2D(k, x, y, z, f_FFT, f2D);
 
-		for (int j = 0; j < size2D; j++)
-			if (abs(f2D[j]) != 0)
-			{
-	//			printf("i = %d, f2d[%d] = %lf %lf\n", i, j, f2D[j].real(), f2D[j].imag());
-				src = j;
-				//f2D[j] = 1.0 / (x.h * y.h);
-				//count++;
-			}
-
-		/*
-		for (int j = 0; j < n2 * n3; j++)
-		if (f2D[j].real() < 0)
-		{
-		//printf("i = %d, f2d[%d] = %lf %lf\n", i, j, f2D[j].real(), f2D[j].imag());
-		f2D[j] *= -1;
-		count++;
-		}*/
-
 		// normalization of rhs
+		alpha_k = f2D[size2D/2] / (1.0 / (x.h * y.h));
 
-		alpha_k = f2D[src] / (1.0 / (x.h * y.h));
-
-		//	printf("alpha_k = %lf %lf\n", alpha_k.real(), alpha_k.imag());
 
 		//	GenRHSandSolution2D_Syntetic(y, z, D2csr, &u2Dsynt[i * size2D], f2D);
 		pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f2D, &x_sol_prd[k * size2D], &error);
@@ -2871,11 +2853,8 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 		reducePML2D(x, y, size2D, &x_sol_prd[i * size2D], size2D_nopml, &x_sol_fft_nopml[i * size2D_nopml]);
 		check_exact_sol_Hankel(alpha_k, kwave2, x, y, &x_sol_fft_nopml[i * size2D_nopml], thresh);
 #endif
-	
 
 		printf("End for w = %d\n", k);
-
-	
 	}
 
 	//("Reducing PML after taking a solution\n");

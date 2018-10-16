@@ -7,7 +7,7 @@
 *                         C++ Release By J-P Moreau, Paris (07/10/2005). *
 *                                     (www.jpmoreau.fr)                  *
 *************************************************************************/
-#include "..\definitions.h"
+#include "../definitions.h"
 
 #include "complex.h"
 

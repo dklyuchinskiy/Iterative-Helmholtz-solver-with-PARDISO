@@ -9,7 +9,7 @@
 !                                       (www.jpmoreau.fr)
 !--------------------------------------------------------------------*/
 //Module COMPLEX
-#include "..\definitions.h"
+#include "../definitions.h"
 
 const int NMAX = 10;
 
