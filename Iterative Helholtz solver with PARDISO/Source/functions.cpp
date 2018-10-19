@@ -347,50 +347,41 @@ void reducePML1D(size_m x, int size1, dtype *vect, int size2, dtype *vect_red)
 	else printf("PML 1D is reduced successfully!\n");
 }
 
-void check_norm_result(int n1, int n2, int n3, dtype* x_orig_nopml, dtype* x_sol)
+void check_norm_result(int n1, int n2, int n3, dtype* x_orig_nopml, dtype* x_sol_nopml)
 {
-	dtype *x_orig_new = alloc_arr<dtype>(n1 * n2 * n3);
-	dtype *x_sol_new = alloc_arr<dtype>(n1 * n2 * n3);
-
 	printf("------------ACCURACY CHECK---------\n");
 
-	int size = n1 * n2;
+	int size2D = n1 * n2;
 
-	double *x_orig_re = alloc_arr<double>(size);
-	double *x_orig_im = alloc_arr<double>(size);
+	double *x_orig_re = alloc_arr<double>(size2D);
+	double *x_orig_im = alloc_arr<double>(size2D);
 
-	double *x_sol_re = alloc_arr<double>(size);
-	double *x_sol_im = alloc_arr<double>(size);
+	double *x_sol_re = alloc_arr<double>(size2D);
+	double *x_sol_im = alloc_arr<double>(size2D);
 
 	double eps1p = 0.01;
-
-#pragma omp parallel for simd schedule(simd:static)
-	for (int i = 0; i < n1 * n2 * n3; i++)
-	{
-		x_orig_new[i] = x_orig_nopml[i];
-		x_sol_new[i] = x_sol[i];
-	}
-
 
 	for (int k = 0; k < n3; k++)
 	{
 #pragma omp parallel for simd schedule(simd:static)
-		for (int i = 0; i < size; i++)
+		for (int i = 0; i < size2D; i++)
 		{
-			x_orig_re[i] = x_orig_new[i + k * size].real();
-			x_orig_im[i] = x_orig_new[i + k * size].imag();
-			x_sol_re[i] = x_sol_new[i + k * size].real();
-			x_sol_im[i] = x_sol_new[i + k * size].imag();
+			x_orig_re[i] = x_orig_nopml[i + k * size2D].real();
+			x_orig_im[i] = x_orig_nopml[i + k * size2D].imag();
+			x_sol_re[i] = x_sol_nopml[i + k * size2D].real();
+			x_sol_im[i] = x_sol_nopml[i + k * size2D].imag();
 		}
 
-		double norm = rel_error(zlange, size, 1, &x_sol_new[k * size], &x_orig_new[k * size], size, 0.001);
-		double norm_re = rel_error(dlange, size, 1, x_sol_re, x_orig_re, size, eps1p);
-		double norm_im = rel_error(dlange, size, 1, x_sol_im, x_orig_im, size, eps1p);
+		double norm = RelError(zlange, size2D, 1, &x_sol_nopml[k * size2D], &x_orig_nopml[k * size2D], size2D, 0.001);
+		double norm_re = rel_error(dlange, size2D, 1, x_sol_re, x_orig_re, size2D, eps1p);
+		double norm_im = rel_error(dlange, size2D, 1, x_sol_im, x_orig_im, size2D, eps1p);
 		printf("i = %d norm = %lf norm_re = %lf norm_im = %lf\n", k, norm, norm_re, norm_im);
 	}
 
-	free_arr(x_orig_new);
-	free_arr(x_sol_new);
+	free_arr(x_sol_re);
+	free_arr(x_sol_im);
+	free_arr(x_orig_re);
+	free_arr(x_orig_im);
 
 }
 
@@ -1228,7 +1219,7 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 	int size = x.n * y.n * z.n;
 	int size2D = x.n * y.n;
 	int size_nopml = x.n_nopml * y.n_nopml * z.n_nopml;
-	int m = 7;
+	int m = 5;
 	int iterCount = m;
 	int iter = 0;
 	int ione = 1;
@@ -1300,7 +1291,7 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 	for (int i = 0; i < size; i++)
 		x_init[i] = 0;
 
-	for (int restart = 0; restart < 2; restart++)
+	for (int restart = 0; restart < 1; restart++)
 	{
 		printf("------RESTART = %d------\n", restart);
 		// 1. First step. Compute r_0 and its norm
@@ -1339,6 +1330,7 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 			{
 				// H[i + ldh * j] = (w_j * v_i) 
 				zdotc(&H[i + ldh * j], &size, w, &ione, &V[ldv * i], &ione);
+				//H[i + ldh * j] = zdot(size, w, &V[ldv * i]);
 
 				//w[j] = w[j] - H[i][j]*v[i]
 				//AddDenseVectorsComplex(size, 1.0, w, -H[i + ldh * j], &V[ldv * i], w);
@@ -1429,7 +1421,7 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point 
 			RelRes = dznrm2(&size_nopml, f_rsd_nopml, &ione);
 
 			printf("-----------\n");
-			printf("Residual in 3D phys domain |A * x_sol - f| = %lf\n", RelRes);
+			printf("Residual in 3D phys domain |A * x_sol - f| = %e\n", RelRes);
 			printf("-----------\n");
 
 #ifdef OUTPUT
@@ -2653,6 +2645,8 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 	//dtype *x_sol_fft_nopml = alloc_arr<dtype>(x.n_nopml * y.n_nopml * z.n);
 	dtype *f_FFT = alloc_arr<dtype>(size);
 	dtype *f2D = alloc_arr<dtype>(size2D);
+	dtype* u1D = alloc_arr<dtype>(z.n);
+	dtype* u1D_BFFT = alloc_arr<dtype>(z.n);
 	//dtype *x_sol_ex = alloc_arr<dtype>(size2D);
 	
 	
@@ -2862,14 +2856,21 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 #ifdef PRINT
 	printf("Backward 1D FFT's of %d x %d times to each point of 2D solution\n", x.n_nopml, y.n_nopml);
 #endif
-	for (int k = 0; k < size2D; k++)
+	for (int w = 0; w < size2D; w++)
 	{
-		dtype* u1D = alloc_arr<dtype>(z.n);
-		GenSol1DBackward(k, x, y, z, x_sol_prd, u1D);		 // new u1D on each iteration
+		GenSol1DBackward(w, x, y, z, x_sol_prd, u1D);		 // new u1D on each iteration
+
+#if 0
 		status = DftiComputeBackward(my_desc1_handle, u1D, &x_sol[k * z.n]);
-															 //	MyFFT1D_BackwardComplexSin(n1, u1D, &x_sol[k * n1]);
+#else
+		status = DftiComputeBackward(my_desc1_handle, u1D, u1D_BFFT);
+
+		for (int k = 0; k < z.n; k++)
+			x_sol[w + k * size2D] = u1D_BFFT[k];
+#endif
+	
+	//	MyFFT1D_BackwardComplexSin(n1, u1D, &x_sol[k * n1]);
 	//	MyFT1D_BackwardComplex(z.n, z, u1D, &x_sol[k * z.n]);
-		free(u1D);
 	}
 
 	status = DftiFreeDescriptor(&my_desc1_handle);
@@ -2882,6 +2883,8 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, 
 	free_arr(x_sol_prd);
 	//free_arr(x_sol_fft_nopml);
 	free_arr(f_FFT);
+	free_arr(u1D);
+	free_arr(u1D_BFFT);
 	free_arr(iparm);
 	free_arr(perm);
 	free_arr(pt);
@@ -2985,6 +2988,18 @@ void ComputeResidual(size_m x, size_m y, size_m z, double kw, dtype* u, dtype* f
 #pragma omp parallel for simd schedule(simd:static)
 	for (int i = 0; i < size; i++)
 		f_res[i] = f_res[i] - f[i];
+
+	int i1, j1, k1;
+
+	for (int k = 0; k < z.n; k++)
+	{
+		f_res[k * size2D + size2D / 2] = 0;
+
+		int l = k * size2D + size2D / 2;
+
+		take_coord3D(x.n, y.n, z.n, l, i1, j1, k1);
+	//	printf("i = %d j = %d k = %d\n", i1, j1, k1);
+	}
 
 	for (int k = 0; k < z.n; k++)
 	{

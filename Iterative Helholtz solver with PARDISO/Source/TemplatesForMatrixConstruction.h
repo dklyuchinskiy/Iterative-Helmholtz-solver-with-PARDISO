@@ -79,7 +79,7 @@ double RelError(double(*LANGE)(const char *, const int*, const int*, const Matri
 	// Norm of residual
 #pragma omp parallel for schedule(static)
 	for (int j = 0; j < n; j++)
-		//#pragma omp simd
+#pragma omp simd
 		for (int i = 0; i < m; i++)
 			Hdiff[i + ldh * j] = Hrec[i + ldh * j] - Hinit[i + ldh * j];
 

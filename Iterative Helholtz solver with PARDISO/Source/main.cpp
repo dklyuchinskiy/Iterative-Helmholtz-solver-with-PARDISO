@@ -561,22 +561,13 @@ int main()
 	printf("Residual in 3D with PML |A * x_sol - f| = %e\n", RelRes);
 	printf("-----------\n");
 
+	reducePML3D(x, y, z, size, f_rsd, size_nopml, f_rsd_nopml);
 
-	for (int k = 0; k < z.n; k++)
-	{
-		f_rsd[k * size2D + size2D / 2] = 0;
-
-		int l = k * size2D + size2D / 2;
-		
-		take_coord3D(x.n, y.n, z.n, l, i1, j1, k1);
-		printf("i = %d j = %d k = %d\n", i1, j1, k1);
-	}
-
-	for (int k = 0; k < z.n; k++)
-	{
-		int src = size2D / 2;
-		NullifySource2D(x, y, &f_rsd[k * size2D], src, 2);
-	}
+	RelRes = dznrm2(&size_nopml, f_rsd_nopml, &ione);
+	printf("-----------\n");
+	printf("Residual in 3D psys dom  |A * x_sol - f| = %e\n", RelRes);
+	printf("-----------\n");
+	system("pause");
 
 #ifdef OUTPUT
 	FILE* out = fopen("ResidualVectorOrig.dat", "w");
@@ -587,18 +578,9 @@ int main()
 	}
 	fclose(out);
 #endif
-	
-	reducePML3D(x, y, z, size, f_rsd, size_nopml, f_rsd_nopml);
-
-	RelRes = dznrm2(&size_nopml, f_rsd_nopml, &ione);
-	printf("-----------\n");
-	printf("Residual in 3D psys dom  |A * x_sol - f| = %e\n", RelRes);
-	printf("-----------\n");
-	system("pause");
 
 	// ------------ FGMRES-------------
 	FGMRES(x, y, z, sound2D, sound3D, source, x_sol, f, thresh);
-
 
 	dtype *g_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *f_nopml = alloc_arr<dtype>(size_nopml);
@@ -607,7 +589,7 @@ int main()
 	printf("size = %d size_no_pml = %d\n", size, size_nopml);
 
 	reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
-	reducePML3D_FT(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
+	reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 	reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
 	for (int k = 0; k < z.n_nopml; k++)
@@ -620,6 +602,9 @@ int main()
 
 	system("pause");
 	// Output
+
+#define OUPUT
+#define GNUPLOT
 
 #ifdef OUTPUT
 	output("Charts100/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);

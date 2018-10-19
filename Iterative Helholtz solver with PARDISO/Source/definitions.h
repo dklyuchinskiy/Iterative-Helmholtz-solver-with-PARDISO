@@ -31,17 +31,14 @@ typedef std::complex<double> dtype;
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl.h"
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl_dfti.h"
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl_rci.h"
-
-#include "source_bessel\basis.h"
-#include "source_bessel\vmblock.h"
 #else
 #include "mkl.h"
 #include "mkl_dfti.h"
 #include "mkl_rci.h"
-
-#include "basis.h"
-#include "vmblock.h"
 #endif
+
+#include "source_bessel/basis.h"
+#include "source_bessel/vmblock.h"
 
 //#define DEBUG
 
