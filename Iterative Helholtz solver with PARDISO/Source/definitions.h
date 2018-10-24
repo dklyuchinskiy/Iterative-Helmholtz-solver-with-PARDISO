@@ -31,17 +31,14 @@ typedef std::complex<double> dtype;
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl.h"
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl_dfti.h"
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl_rci.h"
-
-#include "source_bessel\basis.h"
-#include "source_bessel\vmblock.h"
 #else
 #include "mkl.h"
 #include "mkl_dfti.h"
 #include "mkl_rci.h"
-
-#include "basis.h"
-#include "vmblock.h"
 #endif
+
+#include "source_bessel/basis.h"
+#include "source_bessel/vmblock.h"
 
 //#define DEBUG
 
@@ -127,7 +124,9 @@ typedef struct list qlist;
 #ifdef PML
 //#define LENGTH 900
 #define LENGTH 1200
-//#define LENGTH 1200
+#define LENGTH_X 5120
+#define LENGTH_Y 5120
+#define LENGTH_Z 2560
 //#define LENGTH 200
 #else
 #define LENGTH 1500
