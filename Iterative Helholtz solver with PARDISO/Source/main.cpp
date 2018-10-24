@@ -207,7 +207,7 @@ int main()
 					   // 150 pts  - 20 % and 10 % if beta = 0.05;
 					   //          - 6 % and 3 % if beta = 0.1
 					   // 200 pts  - 4 % and 4 % if beta = 0.1
-	int spg_pts = 250;  // 250 pts  - 3 % and 3 % if beta = 0.1
+	int spg_pts = 200;  // 250 pts  - 3 % and 3 % if beta = 0.1
 
 	// 3D
 	// 200 pt - 33 % if beta = 0.1
@@ -232,9 +232,9 @@ int main()
 
 	x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-	int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
-	int n2 = 99 + 2 * y.pml_pts;
-	int n3 = 99 + 2 * z.spg_pts;
+	int n1 = 159 + 2 * x.pml_pts;		    // number of point across the directions
+	int n2 = 159 + 2 * y.pml_pts;
+	int n3 = 79 + 2 * z.spg_pts;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 
@@ -265,9 +265,9 @@ int main()
 	x_nopml.n_nopml = y_nopml.n_nopml = x_nopml.n;
 	z_nopml.n_nopml = z_nopml.n;
 
-	x.l = LENGTH + (double)(2 * x.pml_pts * LENGTH) / (x.n_nopml + 1);
-	y.l = LENGTH + (double)(2 * y.pml_pts * LENGTH) / (y.n_nopml + 1);
-	z.l = LENGTH + (double)(2 * z.spg_pts * LENGTH) / (z.n_nopml + 1);
+	x.l = LENGTH_X + (double)(2 * x.pml_pts * LENGTH_X) / (x.n_nopml + 1);
+	y.l = LENGTH_Y + (double)(2 * y.pml_pts * LENGTH_Y) / (y.n_nopml + 1);
+	z.l = LENGTH_Z + (double)(2 * z.spg_pts * LENGTH_Z) / (z.n_nopml + 1);
 
 	x.h = x.l / (x.n + 1);  // x.n + 1 grid points of the whole domain
 	y.h = y.l / (y.n + 1);  // x.n - 1 - inner points
@@ -603,14 +603,18 @@ int main()
 	system("pause");
 	// Output
 
-#define OUPUT
+#define OUTPUT
 #define GNUPLOT
 
 #ifdef OUTPUT
-	output("Charts100/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+	output("Charts160/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
 #endif
 
+	printf("----------------------------------------------\n");
+
 	check_norm_result(x.n_nopml, y.n_nopml, z.n_nopml, x_orig_nopml, x_sol_nopml);
+
+	check_norm_circle(x_nopml, y_nopml, z_nopml, x_orig_nopml, x_sol_nopml, source, thresh);
 
 	printf("Computing error ||x_{exact}-x_{comp_fft}||/||x_{exact}||\n");
 	norm = rel_error(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
@@ -628,11 +632,11 @@ int main()
 	printf("----------------------------------------------\n");
 
 #ifdef GNUPLOT
-	printf("Printing results...\n");
-	gnuplot("Charts100/model_ft", "Charts100/real/ex_pard", pml_flag, 4, x, y, z);
-	gnuplot("Charts100/model_ft", "Charts100/imag/ex_pard", pml_flag, 5, x, y, z);
-	gnuplot("Charts100/model_ft", "Charts100/real/helm_ft", pml_flag, 6, x, y, z);
-	gnuplot("Charts100/model_ft", "Charts100/imag/helm_ft", pml_flag, 7, x, y, z);
+	pml_flag = true;
+	gnuplot("Charts160/model_ft", "Charts160/real/ex_pard", pml_flag, 4, x, y, z);
+	gnuplot("Charts160/model_ft", "Charts160/imag/ex_pard", pml_flag, 5, x, y, z);
+	gnuplot("Charts160/model_ft", "Charts160/real/helm_ft", pml_flag, 6, x, y, z);
+	gnuplot("Charts160/model_ft", "Charts160/imag/helm_ft", pml_flag, 7, x, y, z);
 #else
 	printf("No printing results...\n");
 #endif

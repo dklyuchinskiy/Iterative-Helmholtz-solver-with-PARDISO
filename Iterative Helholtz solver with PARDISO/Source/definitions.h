@@ -124,7 +124,9 @@ typedef struct list qlist;
 #ifdef PML
 //#define LENGTH 900
 #define LENGTH 1200
-//#define LENGTH 1200
+#define LENGTH_X 5120
+#define LENGTH_Y 5120
+#define LENGTH_Z 2560
 //#define LENGTH 200
 #else
 #define LENGTH 1500

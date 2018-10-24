@@ -49,8 +49,8 @@ void print_vec(int size, int *vec1, double *vec2, char *name);
 void NormalizeVector(int size, dtype* v, dtype* out, double& norm);
 void GenRHSandSolutionViaSound3D(size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f, point source);
 dtype u_ex_complex_sound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
-void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, point source, dtype *x_sol, dtype *f, double thresh);
-
+void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, const point source, dtype *x_sol, const dtype *f, double thresh);
+void check_norm_circle(size_m x, size_m y, size_m z, dtype* x_orig_nopml, dtype* x_sol_nopml, point source, double thresh);
 
 void print_map(const map<vector<int>, dtype>& SD);
 void print_csr(int n, dcsr* A);
@@ -64,7 +64,7 @@ map<vector<int>, double> block3diag_to_CSR(int n1, int n2, int blocks, double *B
 map<vector<int>, double> concat_maps(const map<vector<int>, double>& map1, const map<vector<int>, double>& map2);
 
 dtype zdot(int size, dtype* v1, dtype* v2);
-void ComputeResidual(size_m x, size_m y, size_m z, double kw, dtype* u, dtype *f, dtype* f_res, double &RelRes);
+void ComputeResidual(size_m x, size_m y, size_m z, double kw, const dtype* u, const dtype *f, dtype* f_res, double &RelRes);
 
 // BinaryTrees.cpp
 
@@ -198,9 +198,9 @@ void GenRHSandSolution2D_Syntetic(size_m x, size_m y, ccsr *Dcsr, dtype *u, dtyp
 void GenExact1DHelmholtz(int n, size_m x, dtype *x_sol_ex, double k, point sourcePML);
 
 //
-void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, dtype *f, dtype* x_sol, double thresh);
-void ApplyCoeffMatrixA(size_m x, size_m y, size_m z, dtype *w, dtype* deltaL, dtype* g, double thresh);
-void OpTwoMatrices(int m, int n, dtype *Y1, dtype *Y2, dtype *Yres, int ldy, char sign);
+void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x_sol, double thresh);
+void ApplyCoeffMatrixA(size_m x, size_m y, size_m z, const dtype *w, const dtype* deltaL, dtype* g, double thresh);
+void OpTwoMatrices(int m, int n, const dtype *Y1, const dtype *Y2, dtype *Yres, int ldy, char sign);
 void SetRHS1D(size_m xx, dtype* fD, point source, int& l);
 void SetRHS2D(size_m xx, size_m yy, dtype* fD, point source, int& l);
 void SetRHS3D(size_m xx, size_m yy, size_m zz, dtype* fD, point source, int& l);
