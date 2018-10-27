@@ -196,7 +196,11 @@ int main()
 #if 1
 int main()
 {
+#define PERF
+
+#ifndef PERF
 	TestAll();
+#endif
 //	system("pause");
 //	return 0;
 #if 1
@@ -217,6 +221,8 @@ int main()
 	// 250 pt - 20 % if beta = 0.05
 	//        - 10 % if beta = 0.005 - the best (range - 0.08 - 0.01)
 	//		  - 11 % if beta = 0.001
+
+	// betas.doc - 28-30 % for ppw = 10
 #else
 	int pml_pts = 0;
 #endif
@@ -232,9 +238,9 @@ int main()
 
 	x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-	int n1 = 159 + 2 * x.pml_pts;		    // number of point across the directions
-	int n2 = 159 + 2 * y.pml_pts;
-	int n3 = 79 + 2 * z.spg_pts;
+	int n1 = 319 + 2 * x.pml_pts;		    // number of point across the directions
+	int n2 = 319 + 2 * y.pml_pts;
+	int n3 = 159 + 2 * z.spg_pts;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 
@@ -251,7 +257,13 @@ int main()
 	int sparse_size = n + 2 * (n - 1) + 2 * (n - n1);
 	int non_zeros_in_3diag = n + (n - 1) * 2 + (n - n1) * 2 - (n1 - 1) * 2;
 	int ione = 1;
-	bool pml_flag;
+	int success = 0;
+	int itcount = 0;
+	double RelRes = 0;
+	double norm = 0;
+	bool pml_flag = 1;
+	int i1, j1, k1;
+	
 
 	double timer1, timer2, all_time;
 
@@ -292,8 +304,10 @@ int main()
 	// h = 10, 1280 x 1280, N = 120 - 2 волны
 	// 40 точек h = 30, L = 600, omega = 4, 6, 10
 
+#ifndef PERF
 	TestHankel();
 	system("pause");
+#endif
 
 	double lambda = (double)(c_z) / omega;
 	double ppw = lambda / x.h;
@@ -301,52 +315,32 @@ int main()
 	printf("The length of the wave: %lf\n", lambda);
 	printf("ppw: %lf\n", ppw);
 
-	// Solution, right hand side and block B
+	// Solution and right hand side
 	dtype *x_orig = alloc_arr<dtype>(size);
+	dtype *x_sol = alloc_arr<dtype>(size);
 	dtype *f = alloc_arr<dtype>(size);
+	dtype *g = alloc_arr<dtype>(size);
 	dtype *sound3D = alloc_arr<dtype>(size);
 	dtype *sound2D = alloc_arr<dtype>(size2D);
-	dtype *x_sol = alloc_arr<dtype>(size);
-
 
 	int n_nopml = x.n_nopml * y.n_nopml;
 	int size_nopml = n_nopml * z.n_nopml;
 	int size2D_nopml = n_nopml;
 
-	int success = 0;
-	int itcount = 0;
-	double RelRes = 0;
-	double norm = 0;
-	pml_flag = 1;
-
 	dtype *x_orig_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
+	dtype *f_nopml = alloc_arr<dtype>(size_nopml);
+	dtype *g_nopml = alloc_arr<dtype>(size_nopml);
 	
-	ccsr *Dcsr_nopml;
-	int non_zeros_nopml = (n_nopml + (n_nopml - 1) * 2 + (n_nopml - x.n_nopml) * 2 - (y.n_nopml - 1) * 2) * z.n_nopml + 2 * (size_nopml - n_nopml);
-	Dcsr_nopml = (ccsr*)malloc(sizeof(ccsr));
-	Dcsr_nopml->values = alloc_arr<dtype>(non_zeros_nopml);
-	Dcsr_nopml->ia = alloc_arr<int>(size_nopml + 1);
-	Dcsr_nopml->ja = alloc_arr<int>(non_zeros_nopml);
-	Dcsr_nopml->ia[size_nopml] = non_zeros_nopml + 1;
-	Dcsr_nopml->non_zeros = non_zeros_nopml;
-
-	ccsr *Dcsr_reduced;
-	Dcsr_reduced = (ccsr*)malloc(sizeof(ccsr));
-	Dcsr_reduced->values = alloc_arr<dtype>(non_zeros_nopml);
-	Dcsr_reduced->ia = alloc_arr<int>(size_nopml + 1);
-	Dcsr_reduced->ja = alloc_arr<int>(non_zeros_nopml);
-	Dcsr_reduced->ia[size_nopml] = non_zeros_nopml + 1;
-	Dcsr_reduced->non_zeros = non_zeros_nopml;
-
 
 	x_nopml.l = y_nopml.l = z_nopml.l = (double)(LENGTH);
 	x_nopml.h = x_nopml.l / (double)(x_nopml.n + 1);  // x.n + 1 grid points of the whole domain
 	y_nopml.h = y_nopml.l / (double)(y_nopml.n + 1);  // x.n - 1 - inner points
 	z_nopml.h = z_nopml.l / (double)(z_nopml.n + 1);  // 2 points - for the boundaries
 
-
+#ifndef PERF
 	system("pause");
+#endif
 
 #ifdef GEN_3D_MATRIX
 
@@ -388,14 +382,13 @@ int main()
 	omp_set_dynamic(0);
 	nthr = 2;
 	omp_set_num_threads(nthr);
+	mkl_set_num_threads(2);
 	printf("Run in parallel on %d threads\n", nthr);
 #else
 	printf("Run sequential version on 1 thread\n");
 #endif
 
 	printf("Grid steps: hx = %lf hy = %lf hz = %lf\n", x.h, y.h, z.h);
-
-	all_time = omp_get_wtime();
 
 #ifndef STRUCT_CSR
 	// Generation matrix of coefficients, vector of solution (to compare with obtained) and vector of RHS
@@ -417,6 +410,15 @@ int main()
 
 
 #if 1
+	ccsr *Dcsr_nopml;
+	int non_zeros_nopml = (n_nopml + (n_nopml - 1) * 2 + (n_nopml - x.n_nopml) * 2 - (y.n_nopml - 1) * 2) * z.n_nopml + 2 * (size_nopml - n_nopml);
+	Dcsr_nopml = (ccsr*)malloc(sizeof(ccsr));
+	Dcsr_nopml->values = alloc_arr<dtype>(non_zeros_nopml);
+	Dcsr_nopml->ia = alloc_arr<int>(size_nopml + 1);
+	Dcsr_nopml->ja = alloc_arr<int>(non_zeros_nopml);
+	Dcsr_nopml->ia[size_nopml] = non_zeros_nopml + 1;
+	Dcsr_nopml->non_zeros = non_zeros_nopml;
+
 	printf("-------------- Gen sparse 3D matrix in CSR format with PML... ------------\n");
 	timer1 = omp_get_wtime();
 //	GenSparseMatrixOnline3DwithPML(x, y, z, B, B_mat, n, D, n, B_mat, n, Dcsr, thresh);
@@ -442,6 +444,14 @@ int main()
 
 #if 0
 	// Test PML
+	ccsr *Dcsr_reduced;
+	Dcsr_reduced = (ccsr*)malloc(sizeof(ccsr));
+	Dcsr_reduced->values = alloc_arr<dtype>(non_zeros_nopml);
+	Dcsr_reduced->ia = alloc_arr<int>(size_nopml + 1);
+	Dcsr_reduced->ja = alloc_arr<int>(non_zeros_nopml);
+	Dcsr_reduced->ia[size_nopml] = non_zeros_nopml + 1;
+	Dcsr_reduced->non_zeros = non_zeros_nopml;
+
 	printf("----------------- Running test PML... -----------\n");
 	timer1 = omp_get_wtime();
 	Test_PMLBlock3Diag_in_CSR(x, y, z, Dcsr, Dcsr_nopml, Dcsr_reduced, thresh);
@@ -550,24 +560,22 @@ int main()
 	TestFGMRES();
 #endif
 
-	dtype *f_rsd = alloc_arr<dtype>(size);
-	dtype *f_rsd_nopml = alloc_arr<dtype>(size_nopml);
-
-	int i1, j1, k1;
-
 	printf("---Residual exact solution---\n");
-	ComputeResidual(x, y, z, (double)kk, x_orig, f, f_rsd, RelRes);
+	ComputeResidual(x, y, z, (double)kk, x_orig, f, g, RelRes);
 	printf("-----------\n");
 	printf("Residual in 3D with PML |A * x_sol - f| = %e\n", RelRes);
 	printf("-----------\n");
 
-	reducePML3D(x, y, z, size, f_rsd, size_nopml, f_rsd_nopml);
+	reducePML3D(x, y, z, size, g, size_nopml, g_nopml);
 
-	RelRes = dznrm2(&size_nopml, f_rsd_nopml, &ione);
+	RelRes = dznrm2(&size_nopml, g_nopml, &ione);
 	printf("-----------\n");
 	printf("Residual in 3D psys dom  |A * x_sol - f| = %e\n", RelRes);
 	printf("-----------\n");
+
+#ifndef PERF
 	system("pause");
+#endif
 
 #ifdef OUTPUT
 	FILE* out = fopen("ResidualVectorOrig.dat", "w");
@@ -580,10 +588,13 @@ int main()
 #endif
 
 	// ------------ FGMRES-------------
+	all_time = omp_get_wtime();
+
 	FGMRES(x, y, z, sound2D, sound3D, source, x_sol, f, thresh);
 
-	dtype *g_nopml = alloc_arr<dtype>(size_nopml);
-	dtype *f_nopml = alloc_arr<dtype>(size_nopml);
+	all_time = omp_get_wtime() - all_time;
+	printf("Time: %lf\n", all_time);
+
 	RelRes = 0;
 
 	printf("size = %d size_no_pml = %d\n", size, size_nopml);
@@ -600,14 +611,18 @@ int main()
 //	printf("Residual in 3D  ||A * x_sol - f|| = %lf\n", RelRes);
 //	printf("-----------\n");
 
+#ifndef PERF
 	system("pause");
+#endif
 	// Output
 
+#ifndef PERF
 #define OUTPUT
 #define GNUPLOT
+#endif
 
 #ifdef OUTPUT
-	output("Charts160/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+	output("Charts200/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
 #endif
 
 	printf("----------------------------------------------\n");
@@ -633,10 +648,10 @@ int main()
 
 #ifdef GNUPLOT
 	pml_flag = true;
-	gnuplot("Charts160/model_ft", "Charts160/real/ex_pard", pml_flag, 4, x, y, z);
-	gnuplot("Charts160/model_ft", "Charts160/imag/ex_pard", pml_flag, 5, x, y, z);
-	gnuplot("Charts160/model_ft", "Charts160/real/helm_ft", pml_flag, 6, x, y, z);
-	gnuplot("Charts160/model_ft", "Charts160/imag/helm_ft", pml_flag, 7, x, y, z);
+	gnuplot("Charts200/model_ft", "Charts200/real/ex_pard", pml_flag, 4, x, y, z);
+	gnuplot("Charts200/model_ft", "Charts200/imag/ex_pard", pml_flag, 5, x, y, z);
+	gnuplot("Charts200/model_ft", "Charts200/real/helm_ft", pml_flag, 6, x, y, z);
+	gnuplot("Charts200/model_ft", "Charts200/imag/helm_ft", pml_flag, 7, x, y, z);
 #else
 	printf("No printing results...\n");
 #endif
@@ -649,8 +664,9 @@ int main()
 	free_arr(x_sol);
 	free_arr(f);
 
-
+#ifndef PERF
 	system("pause");
+#endif
 
 	return 0;
 #endif

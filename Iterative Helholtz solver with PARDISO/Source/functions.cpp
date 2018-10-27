@@ -1401,63 +1401,66 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, const 
 				TestOrtogonalizedVectors(size, &V[ldv * (j + 1)], &V[ldv * i], thresh);
 			}
 
+			if (j == m - 1)
+			{
+				// 3. Solving least squares problem to compute y_k
+				// for x_k = x_0 + V_k * y_k
+				printf("-----Step 3. LS problem-----\n");
 
-			// 3. Solving least squares problem to compute y_k
-			// for x_k = x_0 + V_k * y_k
-			printf("-----Step 3. LS problem-----\n");
+				printf("size of basis: %d\n", iterCount);
 
-			printf("size of basis: %d\n", iterCount);
-
-			// Set eBeta
+				// Set eBeta
 #pragma omp parallel for simd schedule(simd:static)
-			for (int i = 0; i < m + 1; i++)
-				eBeta[i] = 0;
+				for (int i = 0; i < m + 1; i++)
+					eBeta[i] = 0;
 
-			eBeta[0] = beta;
+				eBeta[0] = beta;
 
-			// Set working H because it is destroyed after GELS
-			for (int i = 0; i < m * (m + 1); i++)
-				Hgels[i] = H[i];
+				// Set working H because it is destroyed after GELS
+				for (int i = 0; i < m * (m + 1); i++)
+					Hgels[i] = H[i];
 
-			// Query
-			lwork = -1;
-			row_min = j + 2;
-			col_min = j + 1;
+				// Query
+				lwork = -1;
+				row_min = j + 2;
+				col_min = j + 1;
 
-			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
+				zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
 
-			lwork = (int)work_size.real();
-			work = alloc_arr<dtype>(lwork);
-			// Run
-			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, work, &lwork, &info);
+				lwork = (int)work_size.real();
+				work = alloc_arr<dtype>(lwork);
+				// Run
+				zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, work, &lwork, &info);
+				free_arr(work);
 
-			// 4. Multiplication x_k = x_0 + V_k * y_k
-			printf("-----Step 4. Computing x_k-----\n");
+				// 4. Multiplication x_k = x_0 + V_k * y_k
+				printf("-----Step 4. Computing x_k-----\n");
 
-			zgemv("no", &size, &col_min, &done, V, &ldv, eBeta, &ione, &done, x0, &ione);
+				zgemv("no", &size, &col_min, &done, V, &ldv, eBeta, &ione, &done, x0, &ione);
 
-			// 5. Check |(I - deltaL * L^{-1}) * x_k - f|
+				// 5. Check |(I - deltaL * L^{-1}) * x_k - f|
 
-			ApplyCoeffMatrixA(x, y, z, x0, deltaL, Ax0, thresh);
-			zaxpy(&size, &mone, f, &ione, Ax0, &ione); // Ax0: = Ax0 - f
+				ApplyCoeffMatrixA(x, y, z, x0, deltaL, Ax0, thresh);
+				zaxpy(&size, &mone, f, &ione, Ax0, &ione); // Ax0: = Ax0 - f
 
-			RelRes = dznrm2(&size, Ax0, &ione);
-			printf("-----------\n");
-			printf("Residual in 3D with PML |(I - deltaL * L^{-1}) * x_sol - f| = %lf\n", RelRes);
-			printf("-----------\n");
+				RelRes = dznrm2(&size, Ax0, &ione);
+				printf("-----------\n");
+				printf("Residual in 3D with PML |(I - deltaL * L^{-1}) * x_sol - f| = %lf\n", RelRes);
+				printf("-----------\n");
 
-			reducePML3D(x, y, z, size, Ax0, size_nopml, Ax0_nopml);
+				reducePML3D(x, y, z, size, Ax0, size_nopml, Ax0_nopml);
 
-			RelRes = dznrm2(&size_nopml, Ax0_nopml, &ione);
+				RelRes = dznrm2(&size_nopml, Ax0_nopml, &ione);
 
-			printf("-----------\n");
-			printf("Residual in 3D phys domain |(I - deltaL * L^{-1}) * x_sol - f| = %e\n", RelRes);
-			printf("-----------\n");
+				printf("-----------\n");
+				printf("Residual in 3D phys domain |(I - deltaL * L^{-1}) * x_sol - f| = %e\n", RelRes);
+				printf("-----------\n");
 
 
-			// 6. Solve L_0 * x_sol = x_gmres
-			printf("-----Step 5. Solve the last system-----\n");
-			Solve3DSparseUsingFT(x, y, z, x0, x_sol, thresh);
+				// 6. Solve L_0 * x_sol = x_gmres
+				printf("-----Step 5. Solve the last system-----\n");
+				Solve3DSparseUsingFT(x, y, z, x0, x_sol, thresh);
+			}
 
 			// For the next step
 			zcopy(&size, x_init, &ione, x0, &ione);
@@ -1496,7 +1499,6 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, const 
 
 			free_arr(f_rsd);
 			free_arr(f_rsd_nopml);
-			free_arr(work);
 		}
 
 		zcopy(&size, x_sol, &ione, x_init, &ione);
@@ -2949,7 +2951,7 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 	free_arr(perm);
 	free_arr(pt);
 	free_arr(freqs);
-	free(f2D);
+	free_arr(f2D);
 	//free_arr(x_sol_ex);
 
 }
