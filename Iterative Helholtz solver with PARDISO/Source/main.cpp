@@ -211,7 +211,7 @@ int main()
 					   // 150 pts  - 20 % and 10 % if beta = 0.05;
 					   //          - 6 % and 3 % if beta = 0.1
 					   // 200 pts  - 4 % and 4 % if beta = 0.1
-	int spg_pts = 200;  // 250 pts  - 3 % and 3 % if beta = 0.1
+	int spg_pts = 400;  // 250 pts  - 3 % and 3 % if beta = 0.1
 
 	// 3D
 	// 200 pt - 33 % if beta = 0.1
@@ -221,8 +221,11 @@ int main()
 	// 250 pt - 20 % if beta = 0.05
 	//        - 10 % if beta = 0.005 - the best (range - 0.08 - 0.01)
 	//		  - 11 % if beta = 0.001
+	// 1000 pt - 9% if beta = beta = 0.005
 
-	// betas.doc - 28-30 % for ppw = 10
+	// betas.doc - 28-30 % for ppw = 10 with spg = 250 pts
+	//			 - 11% for ppw = 20 with spg = 500 pts
+	//		     - 10% with stable z ppw = 20 with spg > 1000
 #else
 	int pml_pts = 0;
 #endif
@@ -238,9 +241,9 @@ int main()
 
 	x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-	int n1 = 319 + 2 * x.pml_pts;		    // number of point across the directions
-	int n2 = 319 + 2 * y.pml_pts;
-	int n3 = 159 + 2 * z.spg_pts;
+	int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
+	int n2 = 99 + 2 * y.pml_pts;
+	int n3 = 99 + 2 * z.spg_pts;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 
@@ -263,6 +266,7 @@ int main()
 	double norm = 0;
 	bool pml_flag = 1;
 	int i1, j1, k1;
+	double norm_re, norm_im;
 	
 
 	double timer1, timer2, all_time;
@@ -315,17 +319,36 @@ int main()
 	printf("The length of the wave: %lf\n", lambda);
 	printf("ppw: %lf\n", ppw);
 
+	int n_nopml = x.n_nopml * y.n_nopml;
+	int size_nopml = n_nopml * z.n_nopml;
+	int size2D_nopml = n_nopml;
+
+	printf("-----Memory required:-----\n");
+	double total = 0;
+	total = double(size) / (1024 * 1024 * 1024);
+	total *= 4;
+	total += double(size2D) / (1024 * 1024 * 1024);
+	total += double(4 * size_nopml) / (1024 * 1024 * 1024);
+	total *= 8;
+	total *= 2;
+
+	printf("Initial = %lf GB\n", total);
+
+	total = (double)size / (1024 * 1024 * 1024);
+	total *= 9;
+	total *= 8;
+	total *= 2;
+
+	printf("FGMRES = %lf GB\n", total);
+
+
+	system("pause");
+
 	// Solution and right hand side
 	dtype *x_orig = alloc_arr<dtype>(size);
 	dtype *x_sol = alloc_arr<dtype>(size);
 	dtype *f = alloc_arr<dtype>(size);
 	dtype *g = alloc_arr<dtype>(size);
-	dtype *sound3D = alloc_arr<dtype>(size);
-	dtype *sound2D = alloc_arr<dtype>(size2D);
-
-	int n_nopml = x.n_nopml * y.n_nopml;
-	int size_nopml = n_nopml * z.n_nopml;
-	int size2D_nopml = n_nopml;
 
 	dtype *x_orig_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
@@ -337,7 +360,7 @@ int main()
 	x_nopml.h = x_nopml.l / (double)(x_nopml.n + 1);  // x.n + 1 grid points of the whole domain
 	y_nopml.h = y_nopml.l / (double)(y_nopml.n + 1);  // x.n - 1 - inner points
 	z_nopml.h = z_nopml.l / (double)(z_nopml.n + 1);  // 2 points - for the boundaries
-
+	
 #ifndef PERF
 	system("pause");
 #endif
@@ -582,7 +605,7 @@ int main()
 	for (int i = 0; i < size; i++)
 	{
 		take_coord3D(x.n, y.n, z.n, i, i1, j1, k1);
-		fprintf(out, "%d %d %d %lf %lf\n", i1, j1, k1, f_rsd[i].real(), f_rsd[i].imag());
+	//	fprintf(out, "%d %d %d %lf %lf\n", i1, j1, k1, f_rsd[i].real(), f_rsd[i].imag());
 	}
 	fclose(out);
 #endif
@@ -590,7 +613,7 @@ int main()
 	// ------------ FGMRES-------------
 	all_time = omp_get_wtime();
 
-	FGMRES(x, y, z, sound2D, sound3D, source, x_sol, f, thresh);
+	FGMRES(x, y, z, source, x_sol, f, thresh);
 
 	all_time = omp_get_wtime() - all_time;
 	printf("Time: %lf\n", all_time);
@@ -599,12 +622,21 @@ int main()
 
 	printf("size = %d size_no_pml = %d\n", size, size_nopml);
 
+#if 1
+	for (int k = 0; k < z.n; k++)
+	{
+		int src = size2D / 2;
+		NullifySource2D(x, y, &x_sol[k * size2D], src, 5);
+		NullifySource2D(x, y, &x_orig[k * size2D], src, 5);
+	}
+#endif
+
 	reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
 	reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 	reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
-	for (int k = 0; k < z.n_nopml; k++)
-		x_orig_nopml[k * size2D_nopml + size2D_nopml / 2] = x_sol_nopml[k * size2D_nopml + size2D_nopml / 2] = 0;
+//	for (int k = 0; k < z.n_nopml; k++)
+	//	x_orig_nopml[k * size2D_nopml + size2D_nopml / 2] = x_sol_nopml[k * size2D_nopml + size2D_nopml / 2] = 0;
 
 //	ResidCSR(x_nopml, y_nopml, z_nopml, Dcsr_nopml, x_sol_nopml, f_nopml, g_nopml, RelRes);
 //	printf("-----------\n");
@@ -622,21 +654,35 @@ int main()
 #endif
 
 #ifdef OUTPUT
-	output("Charts200/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+	output("Charts200v2/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
 #endif
 
 	printf("----------------------------------------------\n");
 
-	check_norm_result(x.n_nopml, y.n_nopml, z.n_nopml, x_orig_nopml, x_sol_nopml);
+	free_arr(f);
+	free_arr(g);
+	free_arr(f_nopml);
+	free_arr(g_nopml);
 
-	check_norm_circle(x_nopml, y_nopml, z_nopml, x_orig_nopml, x_sol_nopml, source, thresh);
+	double *x_orig_re = alloc_arr<double>(size_nopml);
+	double *x_sol_re = alloc_arr<double>(size_nopml);
+	double *x_orig_im = alloc_arr<double>(size_nopml);
+	double *x_sol_im = alloc_arr<double>(size_nopml);
 
 	printf("Computing error ||x_{exact}-x_{comp_fft}||/||x_{exact}||\n");
+
+	check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
+	check_norm_circle(x_nopml, y_nopml, z_nopml, x_orig_nopml, x_sol_nopml, source, thresh);
+
+	norm_re = rel_error(dlange, size_nopml, 1, x_sol_re, x_orig_re, size_nopml, thresh);
+	norm_im = rel_error(dlange, size_nopml, 1, x_sol_im, x_orig_im, size_nopml, thresh);
 	norm = rel_error(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
 
+	printf("norm_re = %lf\n", norm_re, thresh);
+	printf("norm_im = %lf\n", norm_im, thresh);
+	printf("norm_full = %lf\n", norm, thresh);
 
-	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
-	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
+
 
 //	printf("Computing error ||x_{comp_prd}-x_{comp_fft}||/||x_{comp_prd}||\n");
 //	norm = rel_error(zlange, size_nopml, 1, x_pard_nopml_cpy, x_pard_nopml, size_nopml, thresh);
@@ -648,10 +694,10 @@ int main()
 
 #ifdef GNUPLOT
 	pml_flag = true;
-	gnuplot("Charts200/model_ft", "Charts200/real/ex_pard", pml_flag, 4, x, y, z);
-	gnuplot("Charts200/model_ft", "Charts200/imag/ex_pard", pml_flag, 5, x, y, z);
-	gnuplot("Charts200/model_ft", "Charts200/real/helm_ft", pml_flag, 6, x, y, z);
-	gnuplot("Charts200/model_ft", "Charts200/imag/helm_ft", pml_flag, 7, x, y, z);
+	gnuplot("Charts200v2/model_ft", "Charts200v2/real/ex_pard", pml_flag, 4, x, y, z);
+	gnuplot("Charts200v2/model_ft", "Charts200v2/imag/ex_pard", pml_flag, 5, x, y, z);
+	gnuplot("Charts200v2/model_ft", "Charts200v2/real/helm_ft", pml_flag, 6, x, y, z);
+	gnuplot("Charts200v2/model_ft", "Charts200v2/imag/helm_ft", pml_flag, 7, x, y, z);
 #else
 	printf("No printing results...\n");
 #endif
@@ -662,11 +708,8 @@ int main()
 #endif
 	free_arr(x_orig);
 	free_arr(x_sol);
-	free_arr(f);
 
-#ifndef PERF
 	system("pause");
-#endif
 
 	return 0;
 #endif

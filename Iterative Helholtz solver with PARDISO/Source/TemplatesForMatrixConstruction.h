@@ -74,7 +74,7 @@ double RelError(double(*LANGE)(const char *, const int*, const int*, const Matri
 	int m, int n, MatrixType *Hrec, MatrixType *Hinit, int ldh, double eps)
 {
 	double norm = 0;
-	dtype *Hdiff = alloc_arr<dtype>(m * n);
+	MatrixType *Hdiff = alloc_arr<MatrixType>(m * n);
 
 	// Norm of residual
 #pragma omp parallel for schedule(static)

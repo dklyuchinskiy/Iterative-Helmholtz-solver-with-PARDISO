@@ -28,9 +28,9 @@ typedef std::complex<double> dtype;
 #define MKL_Complex16 dtype
 
 #if defined(_WIN32) || defined(WIN32)
-#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl.h"
-#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl_dfti.h"
-#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018.2.185\windows\mkl\include\mkl_rci.h"
+#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018\windows\mkl\include\mkl.h"
+#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018\windows\mkl\include\mkl_dfti.h"
+#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2018\windows\mkl\include\mkl_rci.h"
 #else
 #include "mkl.h"
 #include "mkl_dfti.h"
@@ -123,11 +123,17 @@ typedef struct list qlist;
 #ifdef HELMHOLTZ
 #ifdef PML
 //#define LENGTH 900
-#define LENGTH 1200
+//#define LENGTH 1200
+#define LENGTH 3200
 
+#if 0
 #define LENGTH_X 5120
 #define LENGTH_Y 5120
 #define LENGTH_Z 2560
+#endif
+#define LENGTH_X LENGTH
+#define LENGTH_Y LENGTH
+#define LENGTH_Z LENGTH
 
 #if 0
 #define LENGTH_X 3200
