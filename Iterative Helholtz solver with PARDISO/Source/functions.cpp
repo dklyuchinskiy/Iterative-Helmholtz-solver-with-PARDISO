@@ -385,6 +385,46 @@ void check_norm_result(int n1, int n2, int n3, dtype* x_orig_nopml, dtype* x_sol
 
 }
 
+void check_norm_result2(int n1, int n2, int n3, double ppw, double spg, dtype* x_orig_nopml, dtype* x_sol_nopml,
+	double* x_orig_re, double* x_orig_im, double *x_sol_re, double *x_sol_im)
+{
+	printf("------------ACCURACY CHECK---------\n");
+
+	int size2D = n1 * n2;
+	int size = size2D * n3;
+
+	double eps1p = 0.01;
+	double *norms_re = alloc_arr<double>(n3);
+	double *norms_im = alloc_arr<double>(n3);
+
+#pragma omp parallel for simd schedule(simd:static)
+	for (int i = 0; i < size; i++)
+	{
+		x_orig_re[i] = x_orig_nopml[i].real();
+		x_orig_im[i] = x_orig_nopml[i].imag();
+		x_sol_re[i] = x_sol_nopml[i].real();
+		x_sol_im[i] = x_sol_nopml[i].imag();
+	}
+
+	for (int k = 0; k < n3; k++)
+	{
+		double norm = RelError(zlange, size2D, 1, &x_sol_nopml[k * size2D], &x_orig_nopml[k * size2D], size, 0.001);
+		norms_re[k] = RelError(dlange, size2D, 1, &x_sol_re[k * size2D], &x_orig_re[k * size2D], size, eps1p);
+		norms_im[k] = RelError(dlange, size2D, 1, &x_sol_im[k * size2D], &x_orig_im[k * size2D], size, eps1p);
+		printf("i = %d norm = %lf norm_re = %lf norm_im = %lf\n", k, norm, norms_re[k], norms_im[k]);
+	}
+
+	FILE* fout;
+	char str[255];
+	sprintf(str, "NORMS_N%d_FREQ%d_PPW%4.2lf_SPG%lf.dat", n1, (int)omega, ppw, spg);
+	fout = fopen(str, "w");
+
+	for (int k = 0; k < n3; k++)
+		fprintf(fout, "%d %lf %lf\n", k, norms_re[k], norms_im[k]);
+
+	fclose(fout);
+}
+
 void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_sol, point source, double thresh)
 {
 	int n1 = xx.n;
@@ -395,7 +435,7 @@ void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_
 	int size = size2D * n3;
 	
 	double x, y, z;
-	double r0 = 60;
+	double r0 = 160;
 	double r;
 	double r_max = xx.l;
 	double norm;
@@ -1248,7 +1288,7 @@ dtype beta2D_spg(size_m x, size_m y, int diag_case, double k2, int i, int j)
 	return 0;
 }
 
-void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, const point source, dtype *x_sol, const dtype *f, double thresh)
+void FGMRES(size_m x, size_m y, size_m z, const point source, dtype *x_sol, const dtype *f, double thresh)
 {
 	printf("-------------FGMRES-----------\n");
 
@@ -1276,10 +1316,9 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, const 
 	dtype done = { 1.0, 0.0 };
 	dtype mone = { -1.0, 0.0 };
 
-	dtype *g = alloc_arr<dtype>(size);
-	dtype *x0 = alloc_arr<dtype>(size);
-	dtype *x_init = alloc_arr<dtype>(size);
 	dtype *deltaL = alloc_arr<dtype>(size);
+	dtype *sound3D = alloc_arr<dtype>(size);
+	dtype *sound2D = alloc_arr<dtype>(size2D);
 	dtype* work;
 
 	printf("-----Step 0. Set sound speed and deltaL-----\n");
@@ -1299,11 +1338,17 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, const 
 	// Gen DeltaL function
 	GenerateDeltaL(x, y, z, sound3D, sound2D, deltaL);
 
+	free_arr(sound2D);
+	free_arr(sound3D);
+
 	char str2[255] = "sound_speed_deltaL";
 	//output(str2, false, x, y, z, sound3D, deltaL);
-
 	
 	printf("-----Step 0. Memory allocation-----\n");
+	// init cond
+	dtype *x0 = alloc_arr<dtype>(size);
+	dtype *x_init = alloc_arr<dtype>(size);
+
 	// matrix of Krylov basis
 	dtype* V = alloc_arr<dtype>(size * (m + 1)); int ldv = size;
 	dtype* w = alloc_arr<dtype>(size);
@@ -1400,8 +1445,8 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, const 
 			{
 				TestOrtogonalizedVectors(size, &V[ldv * (j + 1)], &V[ldv * i], thresh);
 			}
+		}
 
-			if (j == m - 1)
 			{
 				// 3. Solving least squares problem to compute y_k
 				// for x_k = x_0 + V_k * y_k
@@ -1422,8 +1467,11 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, const 
 
 				// Query
 				lwork = -1;
-				row_min = j + 2;
-				col_min = j + 1;
+				//row_min = j + 2;
+				//col_min = j + 1;
+
+				row_min = m + 1;
+				col_min = m;
 
 				zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
 
@@ -1473,7 +1521,7 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, const 
 			ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);
 
 			printf("-----------\n");
-			printf("Residual in 3D with PML |A * x_sol - f| = %lf\n", RelRes);
+			printf("Residual in 3D with PML |A * x_sol - f| = %e\n", RelRes);
 			printf("-----------\n");
 
 			reducePML3D(x, y, z, size, f_rsd, size_nopml, f_rsd_nopml);
@@ -1485,7 +1533,7 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, const 
 			printf("-----------\n");
 
 #ifdef OUTPUT
-			if (j == m - 1)
+		//	if (j == m - 1)
 			{
 				FILE* out = fopen("ResidualVector.txt", "w");
 				for (int i = 0; i < size_nopml; i++)
@@ -1499,10 +1547,16 @@ void FGMRES(size_m x, size_m y, size_m z, dtype* sound2D, dtype* sound3D, const 
 
 			free_arr(f_rsd);
 			free_arr(f_rsd_nopml);
-		}
+		
 
 		zcopy(&size, x_sol, &ione, x_init, &ione);
 	}
+
+	free_arr(H);
+	free_arr(w);
+	free_arr(V);
+	free_arr(Ax0);
+	free_arr(r0);
 }
 
 void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, double eps)
@@ -3067,7 +3121,7 @@ void ComputeResidual(size_m x, size_m y, size_m z, double kw, const dtype* u, co
 	for (int k = 0; k < z.n; k++)
 	{
 		int src = size2D / 2;
-		NullifySource2D(x, y, &f_res[k * size2D], src, 2);
+		NullifySource2D(x, y, &f_res[k * size2D], src, 5);
 	}
 
 	RelRes = dznrm2(&size, f_res, &ione);
