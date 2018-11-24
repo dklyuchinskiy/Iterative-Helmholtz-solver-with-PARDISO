@@ -206,12 +206,12 @@ int main()
 #if 1
 
 #ifdef PML
-	int pml_pts = 20; // 100 pts  - 10 % and 9 % if beta = 0.1
+	int pml_pts = 200; // 100 pts  - 10 % and 9 % if beta = 0.1
 					   //		      6 % and 7 % if beta = 0.2
 					   // 150 pts  - 20 % and 10 % if beta = 0.05;
 					   //          - 6 % and 3 % if beta = 0.1
 					   // 200 pts  - 4 % and 4 % if beta = 0.1
-	int spg_pts = 400;  // 250 pts  - 3 % and 3 % if beta = 0.1
+	int spg_pts = 200;  // 250 pts  - 3 % and 3 % if beta = 0.1
 
 	// 3D
 	// 200 pt - 33 % if beta = 0.1
@@ -341,6 +341,24 @@ int main()
 
 	printf("FGMRES = %lf GB\n", total);
 
+
+	system("pause");
+
+#define TEST1D
+
+#ifdef TEST1D
+	dtype *f1D = alloc_arr<dtype>(x.n);
+	dtype *x_sol1D = alloc_arr<dtype>(x.n);
+	Solve1DSparseHelmholtz(x, y, z, f1D, x_sol1D, thresh);
+#endif
+
+#define TEST2D
+
+#ifdef TEST2D
+	dtype *f2D = alloc_arr<dtype>(x.n * y.n);
+	dtype *x_sol2D = alloc_arr<dtype>(x.n * y.n);
+	Solve2DSparseHelmholtz(x, y, z, f2D, x_sol2D, thresh);
+#endif
 
 	system("pause");
 
@@ -559,22 +577,6 @@ int main()
 	system("pause");
 #endif
 
-#endif
-
-	//#define TEST1D
-
-#ifdef TEST1D
-	dtype *f1D = alloc_arr<dtype>(x.n);
-	dtype *x_sol1D = alloc_arr<dtype>(x.n);
-	Solve1DSparseHelmholtz(x, y, z, f1D, x_sol1D, thresh);
-#endif
-
-	//#define TEST2D
-
-#ifdef TEST2D
-	dtype *f2D = alloc_arr<dtype>(x.n * y.n);
-	dtype *x_sol2D = alloc_arr<dtype>(x.n * y.n);
-	Solve2DSparseHelmholtz(x, y, z, f2D, x_sol2D, thresh);
 #endif
 
 //#define TEST3D

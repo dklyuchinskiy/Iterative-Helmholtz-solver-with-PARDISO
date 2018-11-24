@@ -124,7 +124,8 @@ typedef struct list qlist;
 #ifdef PML
 //#define LENGTH 900
 //#define LENGTH 1200
-#define LENGTH 3200
+#define LENGTH 1200
+//#define LENGTH 3200
 
 #if 0
 #define LENGTH_X 5120
@@ -160,7 +161,8 @@ typedef struct list qlist;
 #define c_z 1280
 /*--------------*/
 #define ky 1.8
-#define beta_eq 0.005
+//#define beta_eq 0.005
+#define beta_eq 0.1
 #define kk (2.0 * (PI) * (omega) / (c_z))
 
 //#define kk ((omega) / (c_z))

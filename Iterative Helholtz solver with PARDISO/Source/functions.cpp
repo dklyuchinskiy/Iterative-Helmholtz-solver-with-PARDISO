@@ -2713,6 +2713,7 @@ void gnuplot1D(char *splot, char *sout, bool pml_flag, int col, size_m x)
 	fprintf(file1, "set term png font \"Times-Roman, 16\"\n");
 	//fprintf(file, "set view map\n");
 	fprintf(file1, "set xrange[0:%lf]\n", x.l);
+	fprintf(file1, "set yrange[-50:50]\n");
 
 	fprintf(file1, "set output '%s_re.png'\n", sout);
 	fprintf(file1, "plot '%s.dat' u 1:%d w linespoints pt 7 pointsize 1 notitle\n\n", splot, col);
@@ -3130,6 +3131,7 @@ void ComputeResidual(size_m x, size_m y, size_m z, double kw, const dtype* u, co
 
 void Solve1DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f1D, dtype *x_sol_prd, double thresh)
 {
+	// Init condtitions: N = 1200, ppw = 26, omega = 4, sponge = 200 -  4 %
 	printf("-----------Test 1D Helmholtz--------\n");
 	ccsr *D1csr;
 	int size1D = x.n;
@@ -3189,6 +3191,7 @@ void Solve1DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f1D, dtype *x_s
 	dtype *x_sol_prd_nopml = alloc_arr<dtype>(size1D_nopml);
 
 	double ppw = 1.0 / (sqrt(abs(kwave2)) / (2.0 * PI)) / z.h;
+	printf("ppw = %lf\n", ppw);
 
 	// источник в каждой задаче в середине 
 
@@ -3220,7 +3223,6 @@ void Solve1DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f1D, dtype *x_s
 
 	double norm = RelError(zlange, size1D_nopml, 1, x_sol_prd_nopml, x_sol_ex_nopml, size1D_nopml, thresh);
 	printf("Norm 1D solution ||x_sol - x_ex|| / ||x_ex|| = %lf\n", norm);
-
 
 }
 
@@ -3313,7 +3315,7 @@ void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_s
 
 
 	int count = 0;
-	int i = 50;
+	int i = nhalf;
 
 	double kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (z.l * z.l);
 	double kwave2 = k * k - kww;
@@ -3360,8 +3362,8 @@ void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_s
 				i, j, i + x.n * j, i * x.h, j * y.h);
 #endif
 
-	NullifySource2D(x, y, x_sol_ex, src, 1);
-	NullifySource2D(x, y, x_sol_prd, src, 1);
+	NullifySource2D(x, y, x_sol_ex, src, 3);
+	NullifySource2D(x, y, x_sol_prd, src, 3);
 	x_sol_ex[src] = x_sol_prd[src] = 0;
 
 	output2D(str1, pml_flag, x, y, x_sol_ex, x_sol_prd);
@@ -3373,9 +3375,9 @@ void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_s
 	reducePML2D(x, y, size2D, x_sol_prd, size2D_nopml, x_sol_prd_nopml);
 
 	norm = RelError(zlange, size2D_nopml, 1, x_sol_prd_nopml, x_sol_ex_nopml, size2D_nopml, thresh);
-	printf("Norm 1D solution ||x_sol - x_ex|| / ||x_ex|| = %lf\n", norm);
+	printf("Norm 2D solution ||x_sol - x_ex|| / ||x_ex|| = %lf\n", norm);
 
-	check_exact_sol_Hankel(alpha_k, kwave2, x, y, x_sol_prd_nopml, thresh);
+//	check_exact_sol_Hankel(alpha_k, kwave2, x, y, x_sol_prd_nopml, thresh);
 
 }
 
