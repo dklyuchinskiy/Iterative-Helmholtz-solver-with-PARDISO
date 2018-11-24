@@ -162,7 +162,7 @@ typedef struct list qlist;
 /*--------------*/
 #define ky 1.8
 //#define beta_eq 0.005
-#define beta_eq 0.1
+#define beta_eq 0.25
 #define kk (2.0 * (PI) * (omega) / (c_z))
 
 //#define kk ((omega) / (c_z))

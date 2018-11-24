@@ -204,14 +204,15 @@ int main()
 //	system("pause");
 //	return 0;
 #if 1
-
-#ifdef PML
-	int pml_pts = 200; // 100 pts  - 10 % and 9 % if beta = 0.1
+						
+#ifdef PML			   // 50 pts   - 7 % and 8 % ib beta = 0.3 (ppw = 26)
+					  //			- 5 % and 6 % if beta = 0.25
+	int pml_pts = 50; // 100 pts  - 10 % and 9 % if beta = 0.1
 					   //		      6 % and 7 % if beta = 0.2
 					   // 150 pts  - 20 % and 10 % if beta = 0.05;
 					   //          - 6 % and 3 % if beta = 0.1
-					   // 200 pts  - 4 % and 4 % if beta = 0.1
-	int spg_pts = 200;  // 250 pts  - 3 % and 3 % if beta = 0.1
+					   // 200 pts  - 4 % and 4 % if beta = 0.1, 6 % and ? if beta = 0.2
+ 	int spg_pts = 50;  // 250 pts  - 3 % and 3 % if beta = 0.1
 
 	// 3D
 	// 200 pt - 33 % if beta = 0.1
