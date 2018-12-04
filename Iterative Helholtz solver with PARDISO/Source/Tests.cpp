@@ -916,6 +916,41 @@ void TestHankel()
 
 }
 
+int TestDomainCorrelation(int n1, int n2, dtype* u_sol, double thresh)
+{
+	int size2D = n1 * n2;
+	int passed = 0;
+	int ione = 1;
+	double norm = 0;
+
+	dtype numb = u_sol[3 * size2D / 4];
+
+	for(int k = 0; k < size2D; k++)
+		u_sol[k] -= numb;
+
+	norm = dznrm2(&size2D, u_sol, &ione);
+
+	if (norm < thresh) passed = 1;
+	else printf("norm = %lf\n", norm);
+
+	for(int k = 0; k < size2D; k++)
+		u_sol[k] += numb;
+
+	return passed;
+}
+
+void Test1DHelmholtz(int n1, int n2, int n3, dtype* u_sol, double thresh, char *str)
+{
+	int n = 0;
+	int size2D = n1 * n2;
+	for (int k = 0; k < n3; k++)
+	{
+		n += TestDomainCorrelation(n1, n2, &u_sol[k * size2D], thresh);
+	}
+
+	printf("PASSED PLAINS for %s SOLUTION: %d of %d\n", str, n, n3);
+}
+
 void Shell_FFT1D_Complex(ptr_test_fft func, const string& test_name, int& numb, int& fail_count)
 {
 	double eps = 10e-6;

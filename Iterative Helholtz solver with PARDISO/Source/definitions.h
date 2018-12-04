@@ -124,8 +124,12 @@ typedef struct list qlist;
 #ifdef PML
 //#define LENGTH 900
 //#define LENGTH 1200
-#define LENGTH 1200
-//#define LENGTH 3200
+#define LENGTH 3200
+
+//#define LENGTH 1200
+
+//#define LENGTH 5
+
 
 #if 0
 #define LENGTH_X 5120
@@ -156,14 +160,19 @@ typedef struct list qlist;
 //#define GNUPLOT
 //#define GEN_3D_MATRIX
 
+
+//#define TEST_HELM_1D
+
 #ifdef HELMHOLTZ
-#define omega 4.0
+#define nu 2.0
 #define c_z 1280
 /*--------------*/
 #define ky 1.8
 //#define beta_eq 0.005
-#define beta_eq 0.25
-#define kk (2.0 * (PI) * (omega) / (c_z))
+#define beta_eq 0.2
+
+#define omega 2.0 * (PI) * (nu)
+#define kk ((omega) / (c_z))
 
 //#define kk ((omega) / (c_z))
 #else
