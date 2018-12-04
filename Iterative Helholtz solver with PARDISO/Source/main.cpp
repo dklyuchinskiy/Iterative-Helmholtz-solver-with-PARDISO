@@ -331,7 +331,7 @@ int main()
 	printf("-----Memory required:-----\n");
 	double total = 0;
 	total = double(size) / (1024 * 1024 * 1024);
-	total *= 4;
+	total *= 4 + 2; // 2 for 2D problems - FFT + PARDISO
 	total += double(size2D) / (1024 * 1024 * 1024);
 	total += double(4 * size_nopml) / (1024 * 1024 * 1024);
 	total *= 8;

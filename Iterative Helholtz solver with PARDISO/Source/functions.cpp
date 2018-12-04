@@ -2925,26 +2925,23 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 	double norm = 0;
 
 	dtype *x_sol_prd = alloc_arr<dtype>(size);
-	//dtype *x_sol_fft_nopml = alloc_arr<dtype>(x.n_nopml * y.n_nopml * z.n);
-
-	dtype *f_FFT_in = alloc_arr<dtype>(z.n);
-	dtype *f_FFT_out = alloc_arr<dtype>(size);
-	dtype *f2D = alloc_arr<dtype>(size2D);
+	dtype *f_FFT = alloc_arr<dtype>(size);
 	dtype* u1D = alloc_arr<dtype>(z.n);
 	dtype* u1D_BFFT = alloc_arr<dtype>(z.n);
-	//dtype *x_sol_ex = alloc_arr<dtype>(size2D);
-	
 	
 	// f(x,y,z) -> fy(x,z) 
-	DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
-	DFTI_DESCRIPTOR_HANDLE my_desc2_handle;
+	DFTI_DESCRIPTOR_HANDLE my_desc_handle;
+
+	MKL_LONG strides_in[2] = { 0, size2D };
+	MKL_LONG strides_out[2] = { 0, size2D };
 
 	// Create 1D FFT of COMPLEX DOUBLE case
-	status = DftiCreateDescriptor(&my_desc1_handle, DFTI_DOUBLE, DFTI_COMPLEX, 1, z.n);
-	status = DftiSetValue(my_desc1_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
-	status = DftiSetValue(my_desc1_handle, DFTI_BACKWARD_SCALE, 1.0 / z.n);
-//	status = DftiSetValue(my_desc1_handle, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
-	status = DftiCommitDescriptor(my_desc1_handle);
+	status = DftiCreateDescriptor(&my_desc_handle, DFTI_DOUBLE, DFTI_COMPLEX, 1, z.n);
+	status = DftiSetValue(my_desc_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
+	status = DftiSetValue(my_desc_handle, DFTI_BACKWARD_SCALE, 1.0 / z.n);
+	status = DftiSetValue(my_desc_handle, DFTI_INPUT_STRIDES, strides_in);
+	status = DftiSetValue(my_desc_handle, DFTI_OUTPUT_STRIDES, strides_out);
+	status = DftiCommitDescriptor(my_desc_handle);
 
 	// We make n1 * n2 FFT's for one dimensional direction z with n3 grid points
 
@@ -2953,13 +2950,9 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 #endif
 	for (int w = 0; w < size2D; w++)
 	{
-		for (int k = 0; k < z.n; k++)
-			f_FFT_in[k] = f[size2D * k + w];
-
-		status = DftiComputeForward(my_desc1_handle, f_FFT_in, &f_FFT_out[z.n * w]);
-		//status = DftiComputeForward(my_desc1_handle, (void*)&f[z.n * k], &f_FFT[z.n * k]);
-		//MyFFT1D_ForwardComplexSin(n1, &f[n1 * k], &f_FFT[n1 * k]);
-		//MyFT1D_ForwardComplex(z.n, z, &f[z.n * k], &f_FFT[z.n * k]);
+		status = DftiComputeForward(my_desc_handle, (void*)&f[w], &f_FFT[w]);
+		
+		//status = DftiComputeForward(my_desc_handle, f_FFT_in, &f_FFT_out[z.n * w]);
 	}
 
 //#define PRINT
@@ -3101,30 +3094,18 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 
 		GenSparseMatrixOnline2DwithPML(k, x, y, z, D2csr, kwave_beta2, freqs);
 
-		//GenRhs2D(k, x, y, z, f_FFT, f2D);
-
-		for (int w = 0; w < size2D; w++)
-			f2D[w] = f_FFT_out[z.n * w + k];
-
-		// normalization of rhs
-		alpha_k = f2D[size2D/2] / (1.0 / (x.h * y.h));
-
-
 		//	GenRHSandSolution2D_Syntetic(y, z, D2csr, &u2Dsynt[i * size2D], f2D);
-		pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f2D, &x_sol_prd[k * size2D], &error);
+		pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, &f_FFT[k * size2D], &x_sol_prd[k * size2D], &error);
 		if (error != 0) printf("Error: PARDISO!!!\n");
-		//		norm = rel_error(zlange, n2 * n3, 1, &u2Dsynt[i * size2D], &x_sol_prd[i * size2D], n2 * n3, thresh);
 
 #pragma omp parallel for simd schedule(simd:static)
 		for (int i = 0; i < size; i++)
 			D2csr->values[freqs[i]] -= kwave_beta2;
 
-		double eps = 0.01; // 1 percent
-
 #ifdef PRINT
+		double eps = 0.01; // 1 percent
 		if (norm < eps) printf("Resid 2D Hankel norm %12.10e < eps %12.10lf: PASSED\n\n", norm, eps);
 		else printf("Resid 2D Hankel norm %12.10lf > eps %12.10lf : FAILED\n\n", norm, eps);
-#endif
 		//sprintf(str1, "ChartsPML/model_pml_%lf", kwave2);
 		//sprintf(str2, "ChartsPML/model_pml_ex_%lf", kwave2);
 		//sprintf(str3, "ChartsPML/model_pml_pard_%lf", kwave2);
@@ -3132,10 +3113,14 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 		//sprintf(str1, "ChartsSPONGE/model_pml_%lf", kwave2);
 		//sprintf(str2, "ChartsSPONGE/model_pml_ex_%lf", kwave2);
 		//sprintf(str3, "ChartsSPONGE/model_pml_pard_%lf", kwave2);
+#endif
 
 //#define CHECK_ACCURACY
 
 #ifdef CHECK_ACCURACY
+		// normalization of rhs
+		alpha_k = f_FFT_out[k*size2D + size2D / 2] / (1.0 / (x.h * y.h));
+
 		if (kwave2 > 0)
 		{
 			get_exact_2D_Hankel(x.n, y.n, x, y, x_sol_ex, sqrt(kwave2), sourcePML);
@@ -3166,8 +3151,6 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 		reducePML2D(x, y, size2D, &x_sol_prd[i * size2D], size2D_nopml, &x_sol_fft_nopml[i * size2D_nopml]);
 		check_exact_sol_Hankel(alpha_k, kwave2, x, y, &x_sol_fft_nopml[i * size2D_nopml], thresh);
 #endif
-
-		//printf("End for w = %d\n", k);
 	}
 
 	printf("Missed: %d of %d\nSolved: %d of %d\n", count, z.n, z.n - count, z.n);
@@ -3176,48 +3159,25 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 
 	printf("time elapsed for 2D problems: %lf\n", time);
 
-	//("Reducing PML after taking a solution\n");
-
 #ifdef PRINT
 	printf("Backward 1D FFT's of %d x %d times to each point of 2D solution\n", x.n_nopml, y.n_nopml);
 #endif
 	for (int w = 0; w < size2D; w++)
 	{
-		GenSol1DBackward(w, x, y, z, x_sol_prd, u1D);		 // new u1D on each iteration
+		status = DftiComputeBackward(my_desc_handle, &x_sol_prd[w], &x_sol[w]);
 
-#if 0
-		status = DftiComputeBackward(my_desc1_handle, u1D, &x_sol[k * z.n]);
-#else
-		status = DftiComputeBackward(my_desc1_handle, u1D, u1D_BFFT);
-
-		for (int k = 0; k < z.n; k++)
-			x_sol[w + k * size2D] = u1D_BFFT[k];
-#endif
-	
-	//	MyFFT1D_BackwardComplexSin(n1, u1D, &x_sol[k * n1]);
-	//	MyFT1D_BackwardComplex(z.n, z, u1D, &x_sol[k * z.n]);
+		// status = DftiComputeBackward(my_desc_handle, u1D, u1D_BFFT);
 	}
 
-	status = DftiFreeDescriptor(&my_desc1_handle);
+	status = DftiFreeDescriptor(&my_desc_handle);
 	printf("------------- The end of algorithm ----------------------\n");
 
-
-	int ione = 1;
-	//zlacpy("All", &size_nopml, &ione, x_sol, &size_nopml, x_pard_nopml_cpy, &size_nopml);
-
 	free_arr(x_sol_prd);
-	//free_arr(x_sol_fft_nopml);
-	free_arr(f_FFT_in);
-	free_arr(f_FFT_out);
-	free_arr(u1D);
-	free_arr(u1D_BFFT);
+	free_arr(f_FFT);
 	free_arr(iparm);
 	free_arr(perm);
 	free_arr(pt);
 	free_arr(freqs);
-	free_arr(f2D);
-	//free_arr(x_sol_ex);
-
 }
 
 void GenRHSandSolution1D(size_m x, dtype* u_ex1D, dtype* f1D, double k, point sourcePML, int &src)
