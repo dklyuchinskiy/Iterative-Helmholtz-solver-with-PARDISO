@@ -212,7 +212,7 @@ int main()
 					   // 150 pts  - 20 % and 10 % if beta = 0.05;
 					   //          - 6 % and 3 % if beta = 0.1
 					   // 200 pts  - 4 % and 4 % if beta = 0.1, 6 % and ? if beta = 0.2
-	int spg_pts = 100; // 250 pts  - 3 % and 3 % if beta = 0.1
+	int spg_pts = 50; // 250 pts  - 3 % and 3 % if beta = 0.1
 
 	// 3D
 	// 100 pt - 19 % if beta = 0.05
@@ -318,7 +318,7 @@ int main()
 
 	double lambda = (double)(c_z) / nu;
 	double ppw = lambda / x.h;
-	int niter = 10;
+	int niter = 12;
 
 	printf("The length of the wave: %lf\n", lambda);
 	printf("ppw: %lf\n", ppw);
@@ -339,7 +339,7 @@ int main()
 
 	printf("Initial = %lf GB\n", total);
 
-	total = (double)size / (1024 * 1024 * 1024);
+	total = double(size) / (1024 * 1024 * 1024);
 	total *= (niter + 1) + 4;
 	total *= 8;
 	total *= 2;
@@ -383,7 +383,7 @@ int main()
 	x_nopml.h = x_nopml.l / (double)(x_nopml.n + 1);  // x.n + 1 grid points of the whole domain
 	y_nopml.h = y_nopml.l / (double)(y_nopml.n + 1);  // x.n - 1 - inner points
 	z_nopml.h = z_nopml.l / (double)(z_nopml.n + 1);  // 2 points - for the boundaries
-	
+
 #ifndef PERF
 	system("pause");
 #endif
@@ -668,7 +668,7 @@ int main()
 
 #define OUTPUT
 #ifdef OUTPUT
-	output("Charts200v3/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+	output("ChartsFreq4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
 #endif
 
 	printf("----------------------------------------------\n");
@@ -685,7 +685,7 @@ int main()
 
 	printf("Computing error ||x_{exact}-x_{comp_fft}||/||x_{exact}||\n");
 #ifndef TEST_HELM_1D
-	check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
+	check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, niter, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
 	check_norm_circle(x_nopml, y_nopml, z_nopml, x_orig_nopml, x_sol_nopml, source, thresh);
 
 	norm_re = rel_error(dlange, size_nopml, 1, x_sol_re, x_orig_re, size_nopml, thresh);
@@ -712,10 +712,10 @@ int main()
 
 #ifdef GNUPLOT
 	pml_flag = true;
-//	gnuplot("Charts200v3/model_ft", "Charts200v3/real/ex_pard", pml_flag, 4, x, y, z);
-//	gnuplot("Charts200v3/model_ft", "Charts200v3/imag/ex_pard", pml_flag, 5, x, y, z);
-//	gnuplot("Charts200v3/model_ft", "Charts200v3/real/helm_ft", pml_flag, 6, x, y, z);
-//	gnuplot("Charts200v3/model_ft", "Charts200v3/imag/helm_ft", pml_flag, 7, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/ex_pard", pml_flag, 4, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/imag/ex_pard", pml_flag, 5, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/helm_ft", pml_flag, 6, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/imag/helm_ft", pml_flag, 7, x, y, z);
 #else
 	printf("No printing results...\n");
 #endif

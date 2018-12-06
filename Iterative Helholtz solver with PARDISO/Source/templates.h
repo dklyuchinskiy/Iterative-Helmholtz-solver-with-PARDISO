@@ -170,7 +170,7 @@ void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_s
 dtype beta2D(size_m x, size_m y, int diag_case, int i, int j);
 dtype beta1D(size_m x, int diag_case, double k2, int i);
 void NullifySource2D(size_m x, size_m y, dtype *u, int src, int npoints);
-void check_norm_result2(int n1, int n2, int n3, double ppw, double spg, dtype* x_orig_nopml, dtype* x_sol_nopml,
+void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double spg, dtype* x_orig_nopml, dtype* x_sol_nopml,
 	double* x_orig_re, double* x_orig_im, double *x_sol_re, double *x_sol_im);
 
 // Queue

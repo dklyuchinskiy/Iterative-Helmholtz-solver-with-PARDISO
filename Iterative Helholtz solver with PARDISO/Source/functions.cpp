@@ -385,7 +385,7 @@ void check_norm_result(int n1, int n2, int n3, dtype* x_orig_nopml, dtype* x_sol
 
 }
 
-void check_norm_result2(int n1, int n2, int n3, double ppw, double spg, dtype* x_orig_nopml, dtype* x_sol_nopml,
+void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double spg, dtype* x_orig_nopml, dtype* x_sol_nopml,
 	double* x_orig_re, double* x_orig_im, double *x_sol_re, double *x_sol_im)
 {
 	printf("------------ACCURACY CHECK---------\n");
@@ -416,7 +416,7 @@ void check_norm_result2(int n1, int n2, int n3, double ppw, double spg, dtype* x
 
 	FILE* fout;
 	char str[255];
-	sprintf(str, "NORMS_N%d_FREQ%d_PPW%4.2lf_SPG%6.lf_BETA%5.3lf.dat", n1, (int)nu, ppw, spg, beta_eq);
+	sprintf(str, "Nit%d_N%d_Lx%d_FREQ%d_PPW%4.2lf_SPG%6.lf_BETA%5.3lf.dat", niter, n1, (int)LENGTH_X, (int)nu, ppw, spg, beta_eq);
 	fout = fopen(str, "w");
 
 	for (int k = 0; k < n3; k++)
@@ -437,11 +437,11 @@ void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_
 	double x, y, z;
 	double r0 = 160;
 	double r;
-	double r_max = xx.l;
+	double r_max = xx.l - 5 * xx.h;
 	double norm;
 
-	dtype* x_sol_circ = alloc_arr<dtype>(xx.n * yy.n * zz.n);
-	dtype* x_orig_circ = alloc_arr<dtype>(xx.n * yy.n * zz.n);
+	dtype* x_sol_circ = alloc_arr<dtype>(size);
+	dtype* x_orig_circ = alloc_arr<dtype>(size);
 
 	for(int k = 0; k < n3; k++)
 		for(int j = 0; j < n2; j++)
@@ -451,7 +451,7 @@ void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_
 				y = (j + 1) * yy.h - source.y;
 				z = (k + 1) * zz.h - source.z;
 				r = sqrt(x * x + y * y + z * z);
-				if (r >= r0 || r <= r_max)
+				if (r >= r0 && r <= r_max)
 				{
 					x_sol_circ[i + n1 * j + size2D * k] = x_sol[i + n1 * j + size2D * k];
 					x_orig_circ[i + n1 * j + size2D * k] = x_orig[i + n1 * j + size2D * k];
@@ -461,6 +461,9 @@ void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_
 	norm = RelError(zlange, size, 1, x_sol_circ, x_orig_circ, size, thresh);
 
 	printf("Norm in circle: r0 < r < r_max: %lf\n", norm);
+
+	free_arr(x_sol_circ);
+	free_arr(x_orig_circ);
 }
 
 
@@ -1391,6 +1394,11 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	dtype *sound3D = alloc_arr<dtype>(size);
 	dtype *sound2D = alloc_arr<dtype>(size2D);
 	dtype* work;
+	
+	FILE *output;
+	char str0[255];
+	sprintf(str0, "convergence_N%d_Lx%d_FREQ%d_SPG%6.lf_BETA%5.3lf.dat", x.n_nopml, (int)LENGTH_X, (int)nu, z.h * 2 * z.spg_pts, beta_eq);
+	output = fopen(str0, "w");
 
 	printf("-----Step 0. Set sound speed and deltaL-----\n");
 	//	SetSoundSpeed3D(x, y, z, sound3D, source);
@@ -1415,7 +1423,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	free_arr(sound2D);
 	free_arr(sound3D);
 	
-	printf("-----Step 0. Memory allocation-----\n");
+	printf("-----Step 1. Memory allocation-----\n");
 	// init cond
 	dtype *x0 = alloc_arr<dtype>(size);
 	dtype *x_init = alloc_arr<dtype>(size);
@@ -1437,6 +1445,10 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	// the vector of right-hand side for the system with Hessenberg matrix
 	dtype *eBeta = alloc_arr<dtype>(m + 1); int ldb = m + 1;
 
+	// resid
+	dtype *f_rsd = alloc_arr<dtype>(size);
+	dtype *f_rsd_nopml = alloc_arr<dtype>(size_nopml);
+
 	// vars
 	dtype calpha;
 	double dalpha;
@@ -1449,7 +1461,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	{
 		printf("------RESTART = %d------\n", restart);
 		// 1. First step. Compute r_0 and its norm
-		printf("-----Step 1-----\n");
 
 		zcopy(&size, x_init, &ione, x0, &ione);
 
@@ -1511,18 +1522,20 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			zdscal(&size, &dalpha, &V[ldv * (j + 1)], &ione);
 
 			TestNormalizedVector(size, &V[ldv * (j + 1)], thresh);
+#if 0
 			for (int i = 0; i <= j; i++)
 			{
 				TestOrtogonalizedVectors(size, &V[ldv * (j + 1)], &V[ldv * i], thresh);
 			}
-		}
-
-		{
+#endif
+		
 			// 3. Solving least squares problem to compute y_k
 			// for x_k = x_0 + V_k * y_k
 			printf("-----Step 3. LS problem-----\n");
 
 			printf("size of basis: %d\n", iterCount);
+
+			zcopy(&size, x_init, &ione, x0, &ione);
 
 			// Set eBeta
 #pragma omp parallel for simd schedule(simd:static)
@@ -1537,11 +1550,11 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 
 			// Query
 			lwork = -1;
-			//row_min = j + 2;
-			//col_min = j + 1;
+			row_min = j + 2;
+			col_min = j + 1;
 
-			row_min = m + 1;
-			col_min = m;
+		//	row_min = m + 1;
+		//	col_min = m;
 
 			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
 
@@ -1574,33 +1587,12 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			printf("Residual in 3D phys domain |(I - deltaL * L^{-1}) * x_sol - f| = %e\n", RelRes);
 			printf("-----------\n");
 
-
-			// 6. Solve L_0 * x_sol = x_gmres
-			printf("-----Step 5. Solve the last system-----\n");
-			Solve3DSparseUsingFT(x, y, z, x0, x_sol, thresh);
+			fprintf(output, "%d %e\n", j, RelRes);
 		}
-
+		
 			// For the next step
-			zcopy(&size, x_init, &ione, x0, &ione);
-
+			zcopy(&size, x0, &ione, x_init, &ione);
 #endif
-
-			dtype *f_rsd = alloc_arr<dtype>(size);
-			dtype *f_rsd_nopml = alloc_arr<dtype>(size_nopml);
-
-			ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);
-
-			printf("-----------\n");
-			printf("Residual in 3D with PML |A * x_sol - f| = %e\n", RelRes);
-			printf("-----------\n");
-
-			reducePML3D(x, y, z, size, f_rsd, size_nopml, f_rsd_nopml);
-
-			RelRes = dznrm2(&size_nopml, f_rsd_nopml, &ione);
-
-			printf("-----------\n");
-			printf("Residual in 3D phys domain |A * x_sol - f| = %e\n", RelRes);
-			printf("-----------\n");
 
 #ifdef OUTPUT
 		//	if (j == m - 1)
@@ -1614,13 +1606,29 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 				fclose(out);
 			}
 #endif
+	} // End of iterations
 
-			free_arr(f_rsd);
-			free_arr(f_rsd_nopml);
-		
+	// 6. Solve L_0 * x_sol = x_gmres
+	printf("-----Step 5. Solve the last system-----\n");
+	Solve3DSparseUsingFT(x, y, z, x0, x_sol, thresh);
 
-		zcopy(&size, x_sol, &ione, x_init, &ione);
-	}
+
+	ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);
+
+	printf("-----------\n");
+	printf("Residual in 3D with PML |A * x_sol - f| = %e\n", RelRes);
+	printf("-----------\n");
+
+	reducePML3D(x, y, z, size, f_rsd, size_nopml, f_rsd_nopml);
+
+	RelRes = dznrm2(&size_nopml, f_rsd_nopml, &ione);
+
+	printf("-----------\n");
+	printf("Residual in 3D phys domain |A * x_sol - f| = %e\n", RelRes);
+	printf("-----------\n");
+
+	free_arr(f_rsd);
+	free_arr(f_rsd_nopml);
 
 	free_arr(H);
 	free_arr(Hgels);
@@ -3027,7 +3035,7 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 
 	int* freqs = alloc_arr<int>(size);
 
-	printf("Generating maxtrix for 2D problems...\n");
+	printf("Generating matrix for 2D problems...\n");
 	time = omp_get_wtime();
 	GenSparseMatrixOnline2DwithPML(-1, x, y, z, D2csr, 0, freqs);
 	time = omp_get_wtime() - time;
@@ -3064,8 +3072,12 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 		kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (z.l * z.l);
 #endif
 		double kwave2 = k2 - kww;
+		int ratio = 0;
+	
+		if (nu == 2) ratio = 15;
+		else ratio = 3;
 
-		if (kww > 15 * k2)
+		if (kww > ratio * k2)
 		{
 			count++;
 //			printf("missed freq: %lf\n", kwave2);

@@ -135,10 +135,11 @@ typedef struct list qlist;
 #define LENGTH_X 5120
 #define LENGTH_Y 5120
 #define LENGTH_Z 2560
-#endif
+#else
 #define LENGTH_X LENGTH
 #define LENGTH_Y LENGTH
 #define LENGTH_Z LENGTH
+#endif
 
 #if 0
 #define LENGTH_X 3200
@@ -164,12 +165,12 @@ typedef struct list qlist;
 //#define TEST_HELM_1D
 
 #ifdef HELMHOLTZ
-#define nu 2.0
-#define c_z 1280
+#define nu 4
+#define c_z 1280.0
 /*--------------*/
 #define ky 1.8
 //#define beta_eq 0.005
-#define beta_eq 0.2
+#define beta_eq 0.5
 
 #define omega 2.0 * (PI) * (nu)
 #define kk ((omega) / (c_z))
@@ -200,12 +201,13 @@ typedef struct list qlist;
 // Функция выделения памяти под массив
 
 template<typename T>
-T* alloc_arr(int n)
+T* alloc_arr(long long int n)
 {
+//	printf("%lli\n", n);
 	T *f = (T*)malloc(n * sizeof(T));
 
 #pragma omp parallel for schedule(static)
-	for (int i = 0; i < n; i++)
+	for (long long int i = 0; i < n; i++)
 		f[i] = 0.0;
 
 	return f;
