@@ -204,16 +204,19 @@ int main()
 //	system("pause");
 //	return 0;
 #if 1
-
-#ifdef PML
+						
+#ifdef PML			   // 50 pts   - 7 % and 8 % if beta = 0.3 (ppw = 26)
+					  //			- 5 % and 6 % if beta = 0.25
 	int pml_pts = 20; // 100 pts  - 10 % and 9 % if beta = 0.1
 					   //		      6 % and 7 % if beta = 0.2
 					   // 150 pts  - 20 % and 10 % if beta = 0.05;
 					   //          - 6 % and 3 % if beta = 0.1
-					   // 200 pts  - 4 % and 4 % if beta = 0.1
-	int spg_pts = 400;  // 250 pts  - 3 % and 3 % if beta = 0.1
+					   // 200 pts  - 4 % and 4 % if beta = 0.1, 6 % and ? if beta = 0.2
+	int spg_pts = 50; // 250 pts  - 3 % and 3 % if beta = 0.1
 
 	// 3D
+	// 100 pt - 19 % if beta = 0.05
+	//			15 % if beta = 0.005
 	// 200 pt - 33 % if beta = 0.1
 	//		  - 20 % if beta = 0.05
 	//		  - 12 % if beta = 0.01
@@ -313,11 +316,13 @@ int main()
 	system("pause");
 #endif
 
-	double lambda = (double)(c_z) / omega;
+	double lambda = (double)(c_z) / nu;
 	double ppw = lambda / x.h;
+	int niter = 12;
 
 	printf("The length of the wave: %lf\n", lambda);
 	printf("ppw: %lf\n", ppw);
+	printf("FGMRES number of iterations: %d\n", niter + 1);
 
 	int n_nopml = x.n_nopml * y.n_nopml;
 	int size_nopml = n_nopml * z.n_nopml;
@@ -326,7 +331,7 @@ int main()
 	printf("-----Memory required:-----\n");
 	double total = 0;
 	total = double(size) / (1024 * 1024 * 1024);
-	total *= 4;
+	total *= 4 + 2; // 2 for 2D problems - FFT + PARDISO
 	total += double(size2D) / (1024 * 1024 * 1024);
 	total += double(4 * size_nopml) / (1024 * 1024 * 1024);
 	total *= 8;
@@ -334,13 +339,31 @@ int main()
 
 	printf("Initial = %lf GB\n", total);
 
-	total = (double)size / (1024 * 1024 * 1024);
-	total *= 9;
+	total = double(size) / (1024 * 1024 * 1024);
+	total *= (niter + 1) + 4;
 	total *= 8;
 	total *= 2;
 
 	printf("FGMRES = %lf GB\n", total);
 
+
+	system("pause");
+
+//#define TEST1D
+
+#ifdef TEST1D
+	dtype *f1D = alloc_arr<dtype>(x.n);
+	dtype *x_sol1D = alloc_arr<dtype>(x.n);
+	Solve1DSparseHelmholtz(x, y, z, f1D, x_sol1D, thresh);
+#endif
+
+//#define TEST2D
+
+#ifdef TEST2D
+	dtype *f2D = alloc_arr<dtype>(x.n * y.n);
+	dtype *x_sol2D = alloc_arr<dtype>(x.n * y.n);
+	Solve2DSparseHelmholtz(x, y, z, f2D, x_sol2D, thresh);
+#endif
 
 	system("pause");
 
@@ -360,7 +383,7 @@ int main()
 	x_nopml.h = x_nopml.l / (double)(x_nopml.n + 1);  // x.n + 1 grid points of the whole domain
 	y_nopml.h = y_nopml.l / (double)(y_nopml.n + 1);  // x.n - 1 - inner points
 	z_nopml.h = z_nopml.l / (double)(z_nopml.n + 1);  // 2 points - for the boundaries
-	
+
 #ifndef PERF
 	system("pause");
 #endif
@@ -561,22 +584,6 @@ int main()
 
 #endif
 
-	//#define TEST1D
-
-#ifdef TEST1D
-	dtype *f1D = alloc_arr<dtype>(x.n);
-	dtype *x_sol1D = alloc_arr<dtype>(x.n);
-	Solve1DSparseHelmholtz(x, y, z, f1D, x_sol1D, thresh);
-#endif
-
-	//#define TEST2D
-
-#ifdef TEST2D
-	dtype *f2D = alloc_arr<dtype>(x.n * y.n);
-	dtype *x_sol2D = alloc_arr<dtype>(x.n * y.n);
-	Solve2DSparseHelmholtz(x, y, z, f2D, x_sol2D, thresh);
-#endif
-
 //#define TEST3D
 
 #ifdef TEST3D
@@ -584,14 +591,14 @@ int main()
 #endif
 
 	printf("---Residual exact solution---\n");
-	ComputeResidual(x, y, z, (double)kk, x_orig, f, g, RelRes);
+//	ComputeResidual(x, y, z, (double)kk, x_orig, f, g, RelRes);
 	printf("-----------\n");
 	printf("Residual in 3D with PML |A * x_sol - f| = %e\n", RelRes);
 	printf("-----------\n");
 
-	reducePML3D(x, y, z, size, g, size_nopml, g_nopml);
+//	reducePML3D(x, y, z, size, g, size_nopml, g_nopml);
 
-	RelRes = dznrm2(&size_nopml, g_nopml, &ione);
+//	RelRes = dznrm2(&size_nopml, g_nopml, &ione);
 	printf("-----------\n");
 	printf("Residual in 3D psys dom  |A * x_sol - f| = %e\n", RelRes);
 	printf("-----------\n");
@@ -610,10 +617,16 @@ int main()
 	fclose(out);
 #endif
 
+	printf("check right-hand-side f\n");
+	for (int i = 0; i < size; i++)
+		if (abs(f[i]) != 0) printf("f_FFT[%d] = %lf %lf\n", i, f[i].real(), f[i].imag());
+
+	system("pause");
+
 	// ------------ FGMRES-------------
 	all_time = omp_get_wtime();
 
-	FGMRES(x, y, z, source, x_sol, f, thresh);
+	FGMRES(x, y, z, niter, source, x_sol, f, thresh);
 
 	all_time = omp_get_wtime() - all_time;
 	printf("Time: %lf\n", all_time);
@@ -622,7 +635,7 @@ int main()
 
 	printf("size = %d size_no_pml = %d\n", size, size_nopml);
 
-#if 1
+#ifndef TEST_HELM_1D
 	for (int k = 0; k < z.n; k++)
 	{
 		int src = size2D / 2;
@@ -653,8 +666,9 @@ int main()
 #define GNUPLOT
 #endif
 
+#define OUTPUT
 #ifdef OUTPUT
-	output("Charts200v2/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+	output("ChartsFreq4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
 #endif
 
 	printf("----------------------------------------------\n");
@@ -670,8 +684,8 @@ int main()
 	double *x_sol_im = alloc_arr<double>(size_nopml);
 
 	printf("Computing error ||x_{exact}-x_{comp_fft}||/||x_{exact}||\n");
-
-	check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
+#ifndef TEST_HELM_1D
+	check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, niter, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
 	check_norm_circle(x_nopml, y_nopml, z_nopml, x_orig_nopml, x_sol_nopml, source, thresh);
 
 	norm_re = rel_error(dlange, size_nopml, 1, x_sol_re, x_orig_re, size_nopml, thresh);
@@ -681,7 +695,9 @@ int main()
 	printf("norm_re = %lf\n", norm_re, thresh);
 	printf("norm_im = %lf\n", norm_im, thresh);
 	printf("norm_full = %lf\n", norm, thresh);
-
+#else
+	check_test_3Dsolution_in1D(x.n_nopml, y.n_nopml, z.n_nopml, x_sol_nopml, x_orig_nopml, thresh);
+#endif
 
 
 //	printf("Computing error ||x_{comp_prd}-x_{comp_fft}||/||x_{comp_prd}||\n");
@@ -692,12 +708,14 @@ int main()
 
 	printf("----------------------------------------------\n");
 
+#define GNUPLOT
+
 #ifdef GNUPLOT
 	pml_flag = true;
-	gnuplot("Charts200v2/model_ft", "Charts200v2/real/ex_pard", pml_flag, 4, x, y, z);
-	gnuplot("Charts200v2/model_ft", "Charts200v2/imag/ex_pard", pml_flag, 5, x, y, z);
-	gnuplot("Charts200v2/model_ft", "Charts200v2/real/helm_ft", pml_flag, 6, x, y, z);
-	gnuplot("Charts200v2/model_ft", "Charts200v2/imag/helm_ft", pml_flag, 7, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/ex_pard", pml_flag, 4, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/imag/ex_pard", pml_flag, 5, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/helm_ft", pml_flag, 6, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/imag/helm_ft", pml_flag, 7, x, y, z);
 #else
 	printf("No printing results...\n");
 #endif

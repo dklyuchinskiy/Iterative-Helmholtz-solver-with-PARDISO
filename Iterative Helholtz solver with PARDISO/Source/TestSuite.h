@@ -56,6 +56,7 @@ void TestHankel();
 void TestOrtogonalizedVectors(int n, dtype* vect1, dtype* vect2, double eps);
 void TestNormalizedVector(int n, dtype* vect, double eps);
 void TestFGMRES();
+void Test1DHelmholtz(int n1, int n2, int n3, dtype* u_sol, double thresh, char *str);
 
 #if 0
 
