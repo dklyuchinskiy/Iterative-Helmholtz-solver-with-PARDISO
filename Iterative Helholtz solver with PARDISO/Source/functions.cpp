@@ -435,9 +435,9 @@ void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_
 	int size = size2D * n3;
 	
 	double x, y, z;
-	double r0 = 160;
+	double r0 = 5 * xx.h;
 	double r;
-	double r_max = xx.l - 5 * xx.h;
+	double r_max = xx.l - 10 * xx.h;
 	double norm;
 
 	dtype* x_sol_circ = alloc_arr<dtype>(size);
@@ -460,7 +460,8 @@ void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_
 
 	norm = RelError(zlange, size, 1, x_sol_circ, x_orig_circ, size, thresh);
 
-	printf("Norm in circle: r0 < r < r_max: %lf\n", norm);
+	printf("Square: 0 < x < %lf, 0 < y < %lf, 0 < z < %lf.\n", xx.l, yy.l, zz.l);
+	printf("Norm in circle: %lf < r < %lf: %lf\n", r0, r_max, norm);
 
 	free_arr(x_sol_circ);
 	free_arr(x_orig_circ);
@@ -1407,6 +1408,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	dtype *sound3D = alloc_arr<dtype>(size);
 	dtype *sound2D = alloc_arr<dtype>(size2D);
 	dtype* work;
+	dtype zdum;
 	double time;
 	double k2 = double(kk) * (kk);
 	double kww;
@@ -1422,12 +1424,12 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	//-------- PARDISO ----------
 	// Calling the solver
 	int mtype = 13;
-	int *iparm = alloc_arr<int>(64);
-	int *perm = alloc_arr<int>(size2D);
-	size_t *pt = alloc_arr<size_t>(64);
+	int *iparm = alloc_arr<int>(64 * z.n);
+	int *perm = alloc_arr<int>(size2D * z.n);
+	size_t *pt = alloc_arr<size_t>(64 * z.n);
 
-	//printf("pardisoinit...\n");
-	pardisoinit(pt, &mtype, iparm);
+	for(int i = 0; i < z.n; i++)
+		pardisoinit(&pt[i * 64], &mtype, &iparm[i * 64]);
 
 	int maxfct = 1;
 	int mnum = 1;
@@ -1514,7 +1516,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		if (nu == 2) ratio = 15;
 		else ratio = 3;
 
-		//if (kww < ratio * k2)
+	//	if (kww < ratio * k2)
 		if (1)
 		{
 		
@@ -1543,18 +1545,17 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 				D2csr[k]->values[freqs[i]] += kwave_beta2;
 #endif
 
-			dtype zdum;
-
+#if 1
 			// Factorization of matrices
 
 			phase = 11;
-			pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, perm, &rhs, iparm, &msglvl, &zdum, &zdum, &error);
+			pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &zdum, &zdum, &error);
 			if (error != 0) printf("!!! ANALYSIS ERROR: %d !!!\n", error);
 
 			phase = 22;
-			pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, perm, &rhs, iparm, &msglvl, &zdum, &zdum, &error);
+			pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &zdum, &zdum, &error);
 			if (error != 0) printf("!!! FACTORIZATION ERROR: %d !!!\n", error);
-
+#endif
 
 			count++;
 			continue;
@@ -1570,8 +1571,11 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 
 	double mem = 2.0 * non_zeros_in_2Dblock3diag / (1024 * 1024 * 1024);
 	mem += double(size2D + 1) / (1024 * 1024 * 1024);
+	mem *= count;
 
-	printf("Memory for %d 2D matrices: %lf Gb\n", count, mem * count);
+	mem += double(z.n * size2D) / (1024 * 1024 * 1024);
+
+	printf("Memory for %d 2D matrices: %lf Gb\n", count, mem);
 	
 	system("pause");
 	
@@ -1645,9 +1649,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		{
 			// Compute w[j] := A * v[j]
 			ApplyCoeffMatrixA(x, y, z, iparm, perm, pt, D2csr, &V[ldv * j], deltaL, w, thresh);
-
-			RelRes = dznrm2(&size, w, &ione);
-			printf("norm Av[%d] = %e\n", j, RelRes);
 
 			for (int i = 0; i <= j; i++)
 			{
@@ -1732,9 +1733,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			zgemv("no", &size, &col_min, &done, V, &ldv, eBeta, &ione, &done, x0, &ione);
 
 			// 5. Check |(I - deltaL * L^{-1}) * x_k - f|
-			RelRes = dznrm2(&size, x0, &ione);
-			printf("norm x[%d] = %e\n", j, RelRes);
-
 			ApplyCoeffMatrixA(x, y, z, iparm, perm, pt, D2csr, x0, deltaL, w, thresh);
 			zaxpy(&size, &mone, f, &ione, w, &ione); // Ax0: = Ax0 - f
 
@@ -3018,10 +3016,6 @@ void ApplyCoeffMatrixA(size_m x, size_m y, size_m z, int *iparm, int *perm, size
 {
 	// Function for applying (I - deltaL * L_0 ^{-1}) * w = g
 	int size = x.n * y.n * z.n;
-	int ione = 1;
-	int size_nopml = x.n_nopml * y.n_nopml * z.n_nopml;
-	dtype* g_nopml = alloc_arr<dtype>(size_nopml);
-	double RelRes;
 
 #if 0
 	printf("check right-hand-side f\n");
@@ -3034,21 +3028,12 @@ void ApplyCoeffMatrixA(size_m x, size_m y, size_m z, int *iparm, int *perm, size
 	// Solve the preconditioned system: L_0 ^ {-1} * w = g
 	Solve3DSparseUsingFT(x, y, z, iparm, perm, pt, D2csr, w, g, thresh);
 
-	reducePML3D(x, y, z, size, g, size_nopml, g_nopml);
-	RelRes = dznrm2(&size_nopml, g_nopml, &ione);
-	printf("norm g1 = %e\n", RelRes);
-
 	// Multiply point-to-point deltaL * g
 	OpTwoMatrices(size, 1, g, deltaL, g, size, '*');
-	reducePML3D(x, y, z, size, g, size_nopml, g_nopml);
-	RelRes = dznrm2(&size_nopml, g_nopml, &ione);
-	printf("norm g2 = %e\n", RelRes);
 
 	// g:= w - g
 	OpTwoMatrices(size, 1, w, g, g, size, '-');
-	reducePML3D(x, y, z, size, g, size_nopml, g_nopml);
-	RelRes = dznrm2(&size_nopml, g_nopml, &ione);
-	printf("norm g3 = %e\n", RelRes);
+
 }
 
 void print_2Dcsr_mat(size_m x, size_m y, ccsr* D2csr)
@@ -3152,23 +3137,14 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, int *iparm, int *perm, s
 	
 #undef PRINT
 
-
 	// Calling the solver
 	int mtype = 13;
-//	int *iparm = alloc_arr<int>(64);
-//	int *perm = alloc_arr<int>(size2D);
-//	size_t *pt = alloc_arr<size_t>(64);
-
-	//printf("pardisoinit...\n");
-	//pardisoinit(pt, &mtype, iparm);
-
 	int maxfct = 1;
 	int mnum = 1;
 	int phase = 33;
 	int rhs = 1;
 	int msglvl = 0;
 	int error = 0;
-	//iparm[7] = 2;
 
 	int n_nopml = x.n_nopml * y.n_nopml;
 	int size_nopml = n_nopml * z.n_nopml;
@@ -3187,12 +3163,6 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, int *iparm, int *perm, s
 	bool pml_flag = false;
 	double time;
 
-//	print_2Dcsr_mat(x, y, D2csr);
-//	printf("\n");
-//	print_2Dcsr_mat2(x, y, D2csr);
-
-//	system("pause");
-
 	printf("Solving set of 2D problems...\n");
 	int count = 0;
 
@@ -3200,15 +3170,11 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, int *iparm, int *perm, s
 
 	for (int k = 0; k < z.n; k++)
 	{
-		//printf("number: %d\n", k);
 		if (D2csr[k]->solve == 1)
 		{
 			count++;
-		//	printf("Solving number: %d. Count = %d. D2csr[k]->solve = %d\n", k, count, D2csr[k]->solve);
-			pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, perm, &rhs, iparm, &msglvl, &f_FFT[k * size2D], &x_sol_prd[k * size2D], &error);
+			pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &f_FFT[k * size2D], &x_sol_prd[k * size2D], &error);
 
-		//	for (int i = 0; i < size2D; i++)
-			//	if (abs(x_sol_prd[k * size2D + i]) > 0.01) printf("k = %d, Normal solution!\n", k);
 			if (error != 0) printf("!!!Error: PARDISO %d!!!\n", error);
 		}
 
@@ -3284,9 +3250,6 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, int *iparm, int *perm, s
 
 	free_arr(x_sol_prd);
 	free_arr(f_FFT);
-//	free_arr(iparm);
-//	free_arr(perm);
-//	free_arr(pt);
 }
 
 void GenRHSandSolution1D(size_m x, dtype* u_ex1D, dtype* f1D, double k, point sourcePML, int &src)

@@ -318,7 +318,7 @@ int main()
 
 	double lambda = (double)(c_z) / nu;
 	double ppw = lambda / x.h;
-	int niter = 12;
+	int niter = 30;
 
 	printf("The length of the wave: %lf\n", lambda);
 	printf("ppw: %lf\n", ppw);
