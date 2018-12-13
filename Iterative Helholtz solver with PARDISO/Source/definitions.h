@@ -59,6 +59,7 @@ struct MatrixCSRComplex {
 	int *ja = NULL;
 	dtype *values = NULL;
 	int non_zeros = 0;
+	int solve = 0;
 };
 
 typedef struct MatrixCSRComplex ccsr;
@@ -219,6 +220,13 @@ void free_arr(T* &arr)
 	free(arr);
 }
 
+template<typename T>
+void MultVectorConst(int n, T* v1, T alpha, T* v2)
+{
+#pragma omp parallel for simd schedule(simd:static)
+	for (int i = 0; i < n; i++)
+		v2[i] = v1[i] * alpha;
+}
 
 
 

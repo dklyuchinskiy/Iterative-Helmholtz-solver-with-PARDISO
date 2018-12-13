@@ -246,7 +246,7 @@ int main()
 
 	int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
 	int n2 = 99 + 2 * y.pml_pts;
-	int n3 = 99 + 2 * z.spg_pts;
+	int n3 = 99  + 2 * z.spg_pts;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 
@@ -346,8 +346,6 @@ int main()
 
 	printf("FGMRES = %lf GB\n", total);
 
-
-	system("pause");
 
 //#define TEST1D
 
@@ -621,8 +619,6 @@ int main()
 	for (int i = 0; i < size; i++)
 		if (abs(f[i]) != 0) printf("f_FFT[%d] = %lf %lf\n", i, f[i].real(), f[i].imag());
 
-	system("pause");
-
 	// ------------ FGMRES-------------
 	all_time = omp_get_wtime();
 
@@ -647,6 +643,9 @@ int main()
 	reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
 	reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 	reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
+
+	RelRes = dznrm2(&size_nopml, x_sol_nopml, &ione);
+	printf("norm x_sol = %lf\n", RelRes);
 
 //	for (int k = 0; k < z.n_nopml; k++)
 	//	x_orig_nopml[k * size2D_nopml + size2D_nopml / 2] = x_sol_nopml[k * size2D_nopml + size2D_nopml / 2] = 0;

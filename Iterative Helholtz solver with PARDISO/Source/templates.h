@@ -35,7 +35,6 @@ void op_mat(int n1, int n, double *Y11, double *Y12, int ldy, char sign);
 void Add_dense(int m, int n, dtype alpha, dtype *A, int lda, dtype beta, dtype *B, int ldb, dtype *C, int ldc);
 void AddDenseVectors(int n, double alpha, double *a, double beta, double *b, double *c);
 void AddDenseVectorsComplex(int n, dtype alpha, dtype *a, dtype beta, dtype *b, dtype *c);
-void MultVectorConst(int n, dtype* v1, dtype alpha, dtype* v2);
 void Resid(int n1, int n2, int n3, double *D, int ldd, double *B, double *x, double *f, double *g, double &RelRes);
 void print_map(const map<vector<int>, double>& SD);
 void Eye(int n, dtype *H, int ldh);
@@ -55,6 +54,7 @@ void print_2Dcsr_mat(size_m x, size_m y, ccsr* D2csr);
 void print_2Dcsr_mat2(size_m x, size_m y, ccsr* D2csr);
 void check_test_3Dsolution_in1D(int n1, int n2, int n3, dtype* u_sol, dtype *u_ex, double thresh);
 void SetRHS3DForTest(size_m xx, size_m yy, size_m zz, dtype* f, point source, int& l);
+void Copy2DCSRMatrix(int size2D, int nonzeros, ccsr* &A, ccsr* &B);
 
 void print_map(const map<vector<int>, dtype>& SD);
 void print_csr(int n, dcsr* A);
@@ -204,8 +204,8 @@ void GenRHSandSolution2D_Syntetic(size_m x, size_m y, ccsr *Dcsr, dtype *u, dtyp
 void GenExact1DHelmholtz(int n, size_m x, dtype *x_sol_ex, double k, point sourcePML);
 
 //
-void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x_sol, double thresh);
-void ApplyCoeffMatrixA(size_m x, size_m y, size_m z, const dtype *w, const dtype* deltaL, dtype* g, double thresh);
+void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, int *iparm, int *perm, size_t *pt, ccsr** &D2csr, const dtype *f, dtype* x_sol, double thresh);
+void ApplyCoeffMatrixA(size_m x, size_m y, size_m z, int *iparm, int *perm, size_t *pt, ccsr** &D2csr, const dtype *w, const dtype* deltaL, dtype* g, double thresh);
 void OpTwoMatrices(int m, int n, const dtype *Y1, const dtype *Y2, dtype *Yres, int ldy, char sign);
 void SetRHS1D(size_m xx, dtype* fD, point source, int& l);
 void SetRHS2D(size_m xx, size_m yy, dtype* fD, point source, int& l);
