@@ -1,4 +1,3 @@
-#include "definitions.h"
 #include "templates.h"
 #include "TestSuite.h"
 #include "TestFramework.h"
@@ -38,6 +37,103 @@ void Test_TransferBlock3Diag_to_CSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dt
 	else printf("A * u_ex = f. Norm %10.8lf > eps %10.8e : FAILED\n", RelRes, eps);
 
 	free_arr(g);
+}
+
+void TestSymmSparseMatrixOnline2DwithPML(size_m x, size_m y, size_m z, ccsr *Acsr)
+{
+	double size = x.n * y.n;
+	int count = 0;
+	int ione = 1;
+	int j1, k1;
+	int j2, k2;
+
+	//-----------------------//
+	int error;
+	sparse_struct* handle = (sparse_struct*)malloc(sizeof(sparse_struct));
+
+	sparse_matrix_checker_init(handle);
+
+	handle->n = size;
+	handle->csr_ia = Acsr->ia;
+	handle->csr_ja = Acsr->ja;
+	handle->indexing = MKL_ONE_BASED;
+	handle->matrix_structure = MKL_GENERAL_STRUCTURE;
+	handle->matrix_format = MKL_CSR;
+	handle->message_level = MKL_PRINT;
+	handle->print_style = MKL_C_STYLE;
+
+	error = sparse_matrix_checker(handle);
+
+	printf("Error of constructing: %d\n", error);
+
+	//------------------------------//
+
+	matrix *mat2D = (matrix*)malloc(Acsr->non_zeros * sizeof(matrix));
+	dtype *diff = (dtype*)malloc(Acsr->non_zeros * sizeof(dtype));
+
+#if 1
+	for (int l1 = 0; l1 < size; l1++)
+	{
+		for (int l2 = 0; l2 < size; l2++)
+		{
+			take_coord2D(x.n, y.n, l1, j1, k1);
+			take_coord2D(x.n, y.n, l2, j2, k2);
+
+			dtype alp = alpha(x, j1) * alpha(y, k1);
+
+			if (l1 == l2)
+			{
+				mat2D[count].val = Acsr->values[count] / alp;
+				mat2D[count].i = l1;
+				mat2D[count].j = l2;
+				count++;
+			}
+			else if (l1 == l2 - 1 && (l1 + 1) % x.n != 0)
+			{
+				mat2D[count].val = Acsr->values[count] / alp;
+				mat2D[count].i = l1;
+				mat2D[count].j = l2;
+				count++; 
+			}
+			else if (l1 == l2 + 1 && l1 % x.n != 0)
+			{
+				mat2D[count].val = Acsr->values[count] / alp;
+				mat2D[count].i = l1;
+				mat2D[count].j = l2;
+				count++;
+			}
+			else if (l1 == l2 - x.n)
+			{
+				mat2D[count].val = Acsr->values[count] / alp;
+				mat2D[count].i = l1;
+				mat2D[count].j = l2;
+				count++;
+			}
+			else if (l1 == l2 + x.n)
+			{
+				mat2D[count].val = Acsr->values[count] / alp;
+				mat2D[count].i = l1;
+				mat2D[count].j = l2;
+				count++;
+			}
+
+		}
+	}
+#endif
+
+	for (int k = 0; k < count; k++)
+		for(int l = 0; l < count; l++)
+			if (mat2D[l].i == mat2D[k].j && mat2D[l].j == mat2D[k].i)
+			{
+				diff[k] = mat2D[l].val - mat2D[k].val;
+				//printf("val[%d][%d] = %lf vs val[%d][%d] = %lf\n", mat2D[l].i, mat2D[l].j, mat2D[l].val.real(), mat2D[k].i, mat2D[k].j, mat2D[k].val.real());
+				break;
+			}
+
+	printf("Norm of SYMMETRY = %e\n", dznrm2(&Acsr->non_zeros, diff, &ione));
+
+	free(mat2D);
+	free(diff);
 }
 
 #if 0

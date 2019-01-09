@@ -7,7 +7,8 @@
 *                         C++ Release By J-P Moreau, Paris (07/01/2005). *
 *                                     (www.jpmoreau.fr)                  *
 *************************************************************************/
-#include "../definitions.h"
+#include "../source_bessel/basis.h"
+#include "../source_bessel/vmblock.h"
 
 
 #include "complex.h"
@@ -480,7 +481,7 @@ e30:  ZMLRI(ZNR, ZNI, FNU, KODE, NN, YR, YI, &NW, TOL);
 e40:  ZBKNU(ZNR, ZNI, FNU, KODE, 1, CYR, CYI, &NW, TOL, ELIM, ALIM);
       if (NW != 0) goto e80;
       FMR = 1.0*MR;
-      SGN = -SIGN(PI,FMR);
+      SGN = -SIGN(PI_LOC,FMR);
       CSGNR = 0.0;
       CSGNI = SGN;
       if (KODE == 1) goto e50;

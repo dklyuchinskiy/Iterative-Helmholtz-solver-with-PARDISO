@@ -3,6 +3,9 @@
 /****************************
 Prototypes for all functions.
 ****************************/
+#include "definitions.h"
+#include "source_bessel/basis.h"
+#include "source_bessel/vmblock.h"
 
 using namespace std;
 
@@ -48,13 +51,17 @@ void print_vec(int size, int *vec1, double *vec2, char *name);
 void NormalizeVector(int size, dtype* v, dtype* out, double& norm);
 void GenRHSandSolutionViaSound3D(size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f, point source);
 dtype u_ex_complex_sound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
-void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, const dtype *f, double thresh);
+void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh);
 void check_norm_circle(size_m x, size_m y, size_m z, dtype* x_orig_nopml, dtype* x_sol_nopml, point source, double thresh);
 void print_2Dcsr_mat(size_m x, size_m y, ccsr* D2csr);
 void print_2Dcsr_mat2(size_m x, size_m y, ccsr* D2csr);
+void print_2Dcsr_mat_to_file(size_m x, size_m y, ccsr* D2csr, char * s);
 void check_test_3Dsolution_in1D(int n1, int n2, int n3, dtype* u_sol, dtype *u_ex, double thresh);
 void SetRHS3DForTest(size_m xx, size_m yy, size_m zz, dtype* f, point source, int& l);
 void Copy2DCSRMatrix(int size2D, int nonzeros, ccsr* &A, ccsr* &B);
+void GenSparseMatrixOnline2DwithPMLand9Points(int w, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave_beta2, int* freqs, double sigma);
+dtype beta2D_pml(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, int j);
+dtype beta2D_pml_9pts(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, int j, double sigma);
 
 void print_map(const map<vector<int>, dtype>& SD);
 void print_csr(int n, dcsr* A);
@@ -125,7 +132,7 @@ map<vector<int>, dtype> Block1DRowMat_to_CSR(int blk, int n1, int n2, dtype *BL,
 void GenRhs2D(int w, size_m x, size_m y, size_m z, dtype* f, dtype* f2D);
 void Clear(int m, int n, dtype* A, int lda);
 void GenSol1DBackward(int w, size_m x, size_m y, size_m z, dtype* x_sol_prd, dtype *u1D);
-void reducePML3D(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2, dtype *vect_red);
+void reducePML3D(size_m x, size_m y, size_m z, int size1, const dtype *vect, int size2, dtype *vect_red);
 void reducePML2D(size_m x, size_m y, int size1, dtype *vect, int size2, dtype *vect_red);
 void reducePML1D(size_m x, int size1, dtype *vect, int size2, dtype *vect_red);
 void reducePML3D_FT(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2, dtype *vect_red);

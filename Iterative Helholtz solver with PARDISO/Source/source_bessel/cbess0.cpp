@@ -8,7 +8,8 @@
 *                                     (www.jpmoreau.fr)                  *
 *************************************************************************/
 // Functions using only module COMPLEX.cpp
-#include "../definitions.h"
+#include "../source_bessel/basis.h"
+#include "../source_bessel/vmblock.h"
 
 #include "complex.h"
 
@@ -1611,7 +1612,7 @@ e20:  FDN = 0.0;
 !     SIGNIFICANCE WHEN FNU OR N IS LARGE
 !---------------------------------------------------------------------*/
       INU = (int) floor(FNU);
-      ARG = (FNU-1.0*INU)*PI;
+      ARG = (FNU-1.0*INU)*PI_LOC;
       INU = INU + N - IL;
       AK = -SIN(ARG);
       BK = COS(ARG);

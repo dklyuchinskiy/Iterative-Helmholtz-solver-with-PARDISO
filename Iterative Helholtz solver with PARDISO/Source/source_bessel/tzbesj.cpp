@@ -27,7 +27,8 @@
 Note: Link with files: CBess0,CBess00,CBess1,CBess2,Complex,
                        Basis_r, Vmblock.
 ------------------------------------------------------------   */
-#include "../definitions.h"
+#include "../source_bessel/basis.h"
+#include "../source_bessel/vmblock.h"
 
 #include "complex.h"
 
@@ -193,7 +194,7 @@ void ZBESJ(REAL ZR, REAL ZI, REAL FNU, int KODE, int N, REAL *CYR, REAL *CYI,
 	  int I, INU, INUH, IR, K, K1, K2, NL;
 
 //***FIRST EXECUTABLE STATEMENT  ZBESJ
-	  HPI = PI/2.0;
+	  HPI = PI_LOC/2.0;
       *IERR = 0;
       *NZ=0;
       if (FNU < 0.0)  *IERR=1;

@@ -470,6 +470,8 @@ typedef REAL mat4x4[4][4];       /* type for bicubic splines          */
 #define FORMAT_2016LE  "% 20.16"LZP"e "    /* Format 20.16e for REAL  */
 /*.IX{FORMAT\unt 2016LE}*/
 
+#define PI_LOC 3.141592653589793238462643
+
 
 
 /***********************************************************************

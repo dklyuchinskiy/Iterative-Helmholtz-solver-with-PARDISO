@@ -1,4 +1,3 @@
-#include "definitions.h"
 #include "templates.h"
 #include "TestSuite.h"
 #include "TemplatesForMatrixConstruction.h"
@@ -246,7 +245,7 @@ int main()
 
 	int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
 	int n2 = 99 + 2 * y.pml_pts;
-	int n3 = 99  + 2 * z.spg_pts;
+	int n3 = 99 + 2 * z.spg_pts;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 
@@ -318,7 +317,7 @@ int main()
 
 	double lambda = (double)(c_z) / nu;
 	double ppw = lambda / x.h;
-	int niter = 30;
+	int niter = 33;
 
 	printf("The length of the wave: %lf\n", lambda);
 	printf("ppw: %lf\n", ppw);
@@ -622,7 +621,7 @@ int main()
 	// ------------ FGMRES-------------
 	all_time = omp_get_wtime();
 
-	FGMRES(x, y, z, niter, source, x_sol, f, thresh);
+	FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh);
 
 	all_time = omp_get_wtime() - all_time;
 	printf("Time: %lf\n", all_time);
