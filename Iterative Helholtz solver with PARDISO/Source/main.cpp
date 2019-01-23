@@ -211,7 +211,7 @@ int main()
 					   // 150 pts  - 20 % and 10 % if beta = 0.05;
 					   //          - 6 % and 3 % if beta = 0.1
 					   // 200 pts  - 4 % and 4 % if beta = 0.1, 6 % and ? if beta = 0.2
-	int spg_pts = 50; // 250 pts  - 3 % and 3 % if beta = 0.1
+	int spg_pts = 25; // 250 pts  - 3 % and 3 % if beta = 0.1
 
 	// 3D
 	// 100 pt - 19 % if beta = 0.05
@@ -243,9 +243,9 @@ int main()
 
 	x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-	int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
-	int n2 = 99 + 2 * y.pml_pts;
-	int n3 = 99 + 2 * z.spg_pts;
+	int n1 = 49 + 2 * x.pml_pts;		    // number of point across the directions
+	int n2 = 49 + 2 * y.pml_pts;
+	int n3 = 49 + 2 * z.spg_pts;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 
@@ -317,7 +317,8 @@ int main()
 
 	double lambda = (double)(c_z) / nu;
 	double ppw = lambda / x.h;
-	int niter = 33;
+	int niter = 4;  // 4 iter for freq = 2
+					// 12 iter for freq = 4
 
 	printf("The length of the wave: %lf\n", lambda);
 	printf("ppw: %lf\n", ppw);
@@ -361,8 +362,6 @@ int main()
 	dtype *x_sol2D = alloc_arr<dtype>(x.n * y.n);
 	Solve2DSparseHelmholtz(x, y, z, f2D, x_sol2D, thresh);
 #endif
-
-	system("pause");
 
 	// Solution and right hand side
 	dtype *x_orig = alloc_arr<dtype>(size);
@@ -664,14 +663,14 @@ int main()
 #define GNUPLOT
 #endif
 
-#define OUTPUT
+//#define OUTPUT
 #ifdef OUTPUT
-	output("ChartsFreq4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+	output("ChartsFreq2/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
 #endif
 
 	printf("----------------------------------------------\n");
 
-	free_arr(f);
+//	free_arr(f);
 	free_arr(g);
 	free_arr(f_nopml);
 	free_arr(g_nopml);
@@ -704,16 +703,30 @@ int main()
 //	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 //	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
 
+	free_arr(x_orig_re);
+	free_arr(x_orig_im);
+	free_arr(x_sol_re);
+	free_arr(x_sol_im);
+
 	printf("----------------------------------------------\n");
 
-#define GNUPLOT
+	printf("Test of inverse traversal of the algorithm for NUMERICAL solution\n");
+	TestInverseTraversal(x, y, z, source, x_sol, f, thresh);
+	printf("Test of inverse traversal of the algorithm for DIRECT solution\n");
+	TestInverseTraversal(x, y, z, source, x_orig, f, thresh);
+
+	printf("----------------------------------------------\n");
+
+//#define GNUPLOT
 
 #ifdef GNUPLOT
 	pml_flag = true;
-	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/ex_pard", pml_flag, 4, x, y, z);
-	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/imag/ex_pard", pml_flag, 5, x, y, z);
-	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/helm_ft", pml_flag, 6, x, y, z);
-	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/imag/helm_ft", pml_flag, 7, x, y, z);
+	gnuplot("ChartsFreq2/model_ft", "ChartsFreq2/real/ex_pard", pml_flag, 4, x, y, z);
+	gnuplot("ChartsFreq2/model_ft", "ChartsFreq2/imag/ex_pard", pml_flag, 5, x, y, z);
+	gnuplot("ChartsFreq2/model_ft", "ChartsFreq2/real/helm_ft", pml_flag, 6, x, y, z);
+	gnuplot("ChartsFreq2/model_ft", "ChartsFreq2/imag/helm_ft", pml_flag, 7, x, y, z);
+	gnuplot("ChartsFreq2/model_ft", "ChartsFreq2/real/diff", pml_flag, 8, x, y, z);
+	gnuplot("ChartsFreq2/model_ft", "ChartsFreq2/imag/diff", pml_flag, 9, x, y, z);
 #else
 	printf("No printing results...\n");
 #endif
@@ -722,6 +735,7 @@ int main()
 	free_arr(D);
 	free_arr(B);
 #endif
+
 	free_arr(x_orig);
 	free_arr(x_sol);
 

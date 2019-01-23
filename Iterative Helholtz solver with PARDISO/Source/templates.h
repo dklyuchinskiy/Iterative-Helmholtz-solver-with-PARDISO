@@ -60,8 +60,10 @@ void check_test_3Dsolution_in1D(int n1, int n2, int n3, dtype* u_sol, dtype *u_e
 void SetRHS3DForTest(size_m xx, size_m yy, size_m zz, dtype* f, point source, int& l);
 void Copy2DCSRMatrix(int size2D, int nonzeros, ccsr* &A, ccsr* &B);
 void GenSparseMatrixOnline2DwithPMLand9Points(int w, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave_beta2, int* freqs, double sigma);
+void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave_beta2, int* freqs);
 dtype beta2D_pml(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, int j);
 dtype beta2D_pml_9pts(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, int j, double sigma);
+dtype beta2D_pml_13pts(size_m x, size_m y, DIAG13 diag_case, dtype kwave_beta2, int i, int j);
 
 void print_map(const map<vector<int>, dtype>& SD);
 void print_csr(int n, dcsr* A);
@@ -217,6 +219,7 @@ void OpTwoMatrices(int m, int n, const dtype *Y1, const dtype *Y2, dtype *Yres, 
 void SetRHS1D(size_m xx, dtype* fD, point source, int& l);
 void SetRHS2D(size_m xx, size_m yy, dtype* fD, point source, int& l);
 void SetRHS3D(size_m xx, size_m yy, size_m zz, dtype* fD, point source, int& l);
+void Multiply3DSparseUsingFT(size_m x, size_m y, size_m z, int *iparm, int *perm, size_t *pt, ccsr** &D2csr, const dtype *u, dtype* f_sol, double thresh);
 
 
 

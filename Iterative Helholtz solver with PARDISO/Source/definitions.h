@@ -106,6 +106,23 @@ struct matrix
 	dtype val;
 };
 
+enum class DIAG13
+{	
+	m_six = 1,
+	m_five,
+	m_four,
+	m_three,
+	m_two,
+	m_one,
+	zero,
+	one,
+	two,
+	three,
+	four,
+	five,
+	six
+};
+
 #define PI 3.141592653589793238462643
 
 #define HELMHOLTZ
@@ -116,11 +133,10 @@ struct matrix
 #ifdef PML
 //#define LENGTH 900
 //#define LENGTH 1200
-//#define LENGTH 3200
+#define LENGTH 3200
 
-#define LENGTH 1200
-
-//#define LENGTH 6
+//#define LENGTH 8
+#define PERF
 
 
 #if 0
@@ -157,12 +173,12 @@ struct matrix
 //#define TEST_HELM_1D
 
 #ifdef HELMHOLTZ
-#define nu 4
+#define nu 2
 #define c_z 1280.0
 /*--------------*/
 #define ky 1.8
 //#define beta_eq 0.005
-#define beta_eq 0.5
+#define beta_eq 0.2
 
 #define omega 2.0 * (PI) * (nu)
 #define kk ((omega) / (c_z))
