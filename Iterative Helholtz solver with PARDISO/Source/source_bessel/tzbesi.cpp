@@ -27,7 +27,8 @@
 Note: Link with files: CBess0,CBess00,CBess1,CBess2,Complex,
                        Basis_r, Vmblock.
 ------------------------------------------------------------   */
-#include "../definitions.h"
+#include "../source_bessel/basis.h"
+#include "../source_bessel/vmblock.h"
 
 #include "complex.h"
 
@@ -253,7 +254,7 @@ Note: Link with files: CBess0,CBess00,CBess1,CBess2,Complex,
 	  !     WHEN FNU IS LARGE
 	  !---------------------------------------------------------------------*/
 	  INU = (int)floor(FNU);
-	  ARG = (FNU - 1.0*INU)*PI;
+	  ARG = (FNU - 1.0*INU)*PI_LOC;
 	  if (ZI < ZERO)  ARG = -ARG;
 	  CSGNR = COS(ARG);
 	  CSGNI = SIN(ARG);

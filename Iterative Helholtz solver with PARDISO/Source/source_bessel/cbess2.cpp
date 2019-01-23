@@ -7,7 +7,8 @@
 *                         C++ Release By J-P Moreau, Paris (07/05/2005). *
 *                                     (www.jpmoreau.fr)                  *
 *************************************************************************/
-#include "../definitions.h"
+#include "../source_bessel/basis.h"
+#include "../source_bessel/vmblock.h"
 
 #include "complex.h"
 

@@ -4,24 +4,7 @@
 Preprocessor definitions and
 declaration of used structures
 *****************************/
-
-// C
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <omp.h>
-#include <time.h>
-
-// C++
-#include <iostream>
-#include <map>
-#include <queue>
-#include <set>
-#include <sstream>
-#include <stdexcept>
-#include <string>
-#include <vector>
-#include <complex>
+#include "libraries.h"
 
 typedef double rtype;
 typedef std::complex<double> dtype;
@@ -37,9 +20,6 @@ typedef std::complex<double> dtype;
 #include "mkl_rci.h"
 #endif
 
-#include "source_bessel/basis.h"
-#include "source_bessel/vmblock.h"
-
 //#define DEBUG
 
 #define EPS 0.00001
@@ -53,18 +33,20 @@ struct MatrixCSRReal {
 
 typedef struct MatrixCSRReal dcsr;
 
-struct MatrixCSRComplex {
-
+struct MatrixCSRComplex 
+{
 	int *ia = NULL;
 	int *ja = NULL;
 	dtype *values = NULL;
 	int non_zeros = 0;
+	int solve = 0;
 };
 
 typedef struct MatrixCSRComplex ccsr;
 
 
-struct size_m {
+struct size_m 
+{
 	double l;
 	int n;
 	double h;
@@ -73,14 +55,15 @@ struct size_m {
 	int n_nopml;
 };
 
-struct point {
+struct point 
+{
 	double x;
 	double y;
 	double z;
 };
 
-struct BinaryMatrixTreeNode {
-
+struct BinaryMatrixTreeNode 
+{
 	int p = 0;
 	double *U = NULL;
 	double *VT = NULL;
@@ -91,8 +74,8 @@ struct BinaryMatrixTreeNode {
 
 typedef struct BinaryMatrixTreeNode mnode;
 
-struct ComplexBinaryMatrixTreeNode {
-
+struct ComplexBinaryMatrixTreeNode 
+{
 	int p = 0;
 	dtype *U = NULL;
 	dtype *VT = NULL;
@@ -103,16 +86,42 @@ struct ComplexBinaryMatrixTreeNode {
 
 typedef struct ComplexBinaryMatrixTreeNode cmnode;
 
-struct list {
+struct list 
+{
 	mnode* node;
 	struct list* next;
 };
 
-struct my_queue {
+struct my_queue 
+{
 	struct list *first, *last;
 };
 
 typedef struct list qlist;
+
+struct matrix
+{
+	int i;
+	int j;
+	dtype val;
+};
+
+enum class DIAG13
+{	
+	m_six = 1,
+	m_five,
+	m_four,
+	m_three,
+	m_two,
+	m_one,
+	zero,
+	one,
+	two,
+	three,
+	four,
+	five,
+	six
+};
 
 #define PI 3.141592653589793238462643
 
@@ -126,9 +135,8 @@ typedef struct list qlist;
 //#define LENGTH 1200
 #define LENGTH 3200
 
-//#define LENGTH 1200
-
-//#define LENGTH 5
+//#define LENGTH 8
+#define PERF
 
 
 #if 0
@@ -165,12 +173,12 @@ typedef struct list qlist;
 //#define TEST_HELM_1D
 
 #ifdef HELMHOLTZ
-#define nu 4
+#define nu 2
 #define c_z 1280.0
 /*--------------*/
 #define ky 1.8
 //#define beta_eq 0.005
-#define beta_eq 0.5
+#define beta_eq 0.2
 
 #define omega 2.0 * (PI) * (nu)
 #define kk ((omega) / (c_z))
@@ -219,6 +227,13 @@ void free_arr(T* &arr)
 	free(arr);
 }
 
+template<typename T>
+void MultVectorConst(int n, T* v1, T alpha, T* v2)
+{
+#pragma omp parallel for simd schedule(simd:static)
+	for (int i = 0; i < n; i++)
+		v2[i] = v1[i] * alpha;
+}
 
 
 

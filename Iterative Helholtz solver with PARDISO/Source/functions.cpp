@@ -1,4 +1,3 @@
-#include "definitions.h"
 #include "templates.h"
 #include "TemplatesForMatrixConstruction.h"
 #include "TestSuite.h"
@@ -38,7 +37,7 @@ void print(int m, int n, dtype *u, int ldu, char *mess)
 		printf("%d ", i);
 		for (int j = 0; j < n; j++)
 		{
-			printf("%5.3lf ", u[i + ldu*j].imag());
+			printf("%5.3lf ", u[i + ldu*j].real());
 		}
 		printf("\n");
 	}
@@ -211,7 +210,7 @@ void take_coord2D(int n1, int n2, int l, int& i, int& j)
 	i = l - n1 * j;
 }
 
-void reducePML3D(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2, dtype *vect_red)
+void reducePML3D(size_m x, size_m y, size_m z, int size1, const dtype *vect, int size2, dtype *vect_red)
 {
 	int i = 0, j = 0, k = 0;
 	int numb = 0;
@@ -435,9 +434,9 @@ void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_
 	int size = size2D * n3;
 	
 	double x, y, z;
-	double r0 = 160;
+	double r0 = 5 * xx.h;
 	double r;
-	double r_max = xx.l - 5 * xx.h;
+	double r_max = xx.l - 10 * xx.h;
 	double norm;
 
 	dtype* x_sol_circ = alloc_arr<dtype>(size);
@@ -460,7 +459,8 @@ void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_
 
 	norm = RelError(zlange, size, 1, x_sol_circ, x_orig_circ, size, thresh);
 
-	printf("Norm in circle: r0 < r < r_max: %lf\n", norm);
+	printf("Square: 0 < x < %lf, 0 < y < %lf, 0 < z < %lf.\n", xx.l, yy.l, zz.l);
+	printf("Norm in circle: %lf < r < %lf: %lf\n", r0, r_max, norm);
 
 	free_arr(x_sol_circ);
 	free_arr(x_orig_circ);
@@ -787,27 +787,34 @@ dtype alpha(size_m xyz, double i)
 	if (xyz.pml_pts == 0) return 1.0;
 	else h = 1.0 / xyz.pml_pts;
 
-	if (i < 0 || i > xyz.n - 1)
-	{
-		// bound case
-		x = 1.0 - h / 2.0;
-		return dtype{ 0, -omega } / dtype{ d(x), -omega };
-		//return 1.0;
-	}
-	else if (i < xyz.pml_pts || i >= (xyz.n - xyz.pml_pts))
+	if (i < 0 || i > xyz.n - 1) return 0;
+
+	if (i < xyz.pml_pts || i >= (xyz.n - xyz.pml_pts))
 	{
 		if (i < xyz.pml_pts)
 		{
-			x = (double)(xyz.pml_pts - i) * h;
+			//x = (double)(xyz.pml_pts - i) * h;
+			x = 1.0 - i * h;
 
-		//	if ((abs(x - 0) < EPS_ZERO) || (abs(x - 1) < EPS_ZERO)) printf("left: i = %d x = %lf\n", i, x);
+			// i = 0 ,       x = 1.0
+			// i = pml - 1 , x = h 
+
+			if (x < 0 || x > 1)  printf("left: i = %lf x = %lf\n", i, x);
+
+			//if ((abs(x - 0) < EPS_ZERO) || (abs(x - 1) < EPS_ZERO)) printf("left: i = %lf x = %lf\n", i, x);
 		}
 		else if (i >= (xyz.n - xyz.pml_pts))
 		{
-			//x = (double)(i - xyz.n + xyz.pml_pts + 1) / (xyz.pml_pts);
-			x = (double)(i - xyz.n + xyz.pml_pts + 1) * h;
-			
-			//if ((abs(x - 0) < EPS_ZERO) || (abs(x - 1) < EPS_ZERO)) printf("right: i = %d x = %lf\n", i, x);
+			//x = (double)(i - xyz.n + 1 + xyz.pml_pts) * h;
+
+			x = 1.0 + (i - xyz.n + 1) * h;
+
+
+			// i = n - pml , x = h
+			// i = n - 1   , x = 1.0
+
+			if (x < 0 || x > 1)  printf("right: i = %lf x = %lf\n", i, x);
+			//if ((abs(x - 0) < EPS_ZERO) || (abs(x - 1) < EPS_ZERO)) printf("right: i = %lf x = %lf\n", i, x);
 		}
 
 		return dtype{ 0, -omega } / dtype{ d(x), -omega };
@@ -1281,8 +1288,11 @@ dtype beta2D_pml(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, in
 	//	value = -alpha(x, i) * (alpha(x, i + 1) + 2.0 * alpha(x, i) + alpha(x, i - 1)) / (2.0 * x.h * x.h)
 	//		    -alpha(y, j) * (alpha(y, j + 1) + 2.0 * alpha(y, j) + alpha(y, j - 1)) / (2.0 * y.h * y.h);
 
-		value = -alpha(x, i) * (alpha(x, i + 0.5) + alpha(x, i - 0.5)) / (x.h * x.h)
-				-alpha(y, j) * (alpha(y, j + 0.5) + alpha(y, j - 0.5)) / (y.h * y.h);
+	//	value = -alpha(x, i + 1) * (alpha(x, i + 1.5) + alpha(x, i + 0.5)) / (x.h * x.h)
+	//			-alpha(y, j + 1) * (alpha(y, j + 1.5) + alpha(y, j + 0.5)) / (y.h * y.h);
+
+	 value = -alpha(x, i) * (alpha(x, i + 0.5) + alpha(x, i - 0.5)) / (x.h * x.h)
+	   		 -alpha(y, j) * (alpha(y, j + 0.5) + alpha(y, j - 0.5)) / (y.h * y.h);
 
 		value += kwave_beta2;
 
@@ -1325,6 +1335,133 @@ dtype beta2D_pml(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, in
 	return 0;
 }
 
+dtype beta2D_pml_9pts(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, int j, double sigma)
+{
+	if (diag_case == 0)
+	{
+		dtype value;
+
+#ifdef PML
+		value = -alpha(y, j) * (alpha(y, j + 0.5) + alpha(y, j - 0.5)) / (y.h * y.h)
+				-(1 - 2.0 * sigma) * alpha(x, i) * (alpha(x, i + 0.5) + alpha(x, i - 0.5)) / (x.h * x.h);
+
+		value += kwave_beta2;
+
+#else 
+		dtype c1 = -2.0 / (x.h * x.h);
+		dtype c2 = -2.0 / (y.h * y.h);
+		if (i == 0 || i == x.n - 1) c1 = dtype{ -1.0 / (x.h * x.h), -(double)kk / x.h };
+		if (j == 0 || j == y.n - 1) c2 = dtype{ -1.0 / (y.h * y.h), -(double)kk / y.h };
+
+		value = c1 + c2;
+#endif
+
+		int l = j * x.n + i;
+
+		return value;
+	}
+	else if (diag_case == 1)
+	{
+		return (1 - 2.0 * sigma) * alpha(x, i) * alpha(x, i + 0.5) / (x.h * x.h);
+	}
+	else if (diag_case == -1)
+	{
+		return (1 - 2.0 * sigma) * alpha(x, i) * alpha(x, i - 0.5) / (x.h * x.h);
+	}
+	else if (diag_case == 3)
+	{
+		return -sigma * alpha(x, i) * (alpha(x, i + 0.5) + alpha(x, i - 0.5)) / (x.h * x.h)
+			+ alpha(y, j) * alpha(y, j + 0.5) / (y.h * y.h);
+	}
+	else if (diag_case == -3)
+	{
+		return -sigma * alpha(x, i) * (alpha(x, i + 0.5) + alpha(x, i - 0.5)) / (x.h * x.h)
+			+ alpha(y, j) * alpha(y, j - 0.5) / (y.h * y.h);
+	}
+	else if (diag_case == 2)
+	{
+		return sigma * alpha(x, i) * alpha(x, i + 0.5) / (x.h * x.h);
+	}
+	else if (diag_case == -2)
+	{
+		return sigma * alpha(x, i) * alpha(x, i - 0.5) / (x.h * x.h);
+	}
+	else if (diag_case == 4)
+	{
+		return sigma * alpha(x, i) * alpha(x, i + 0.5) / (x.h * x.h);
+	}
+	else if (diag_case == -4)
+	{
+		return sigma * alpha(x, i) * alpha(x, i - 0.5) / (x.h * x.h);
+	}
+
+	return 0;
+}
+
+dtype beta2D_pml_13pts(size_m x, size_m y, DIAG13 diag_case, dtype kwave_beta2, int i, int j)
+{
+	double g1 = 9.0 / 8;
+	double g2 = -1.0 / 24;
+
+	dtype value;
+	int l;
+
+	switch (diag_case)
+	{
+	case DIAG13::zero:
+
+		value = -alpha(x, i + 0.5) * (g1 * g1 * (alpha(x, i + 0.5) + alpha(x, i - 0.5)) + g2 * g2 * (alpha(x, i + 1.5) + alpha(x, i - 1.5))) / (x.h * x.h)
+			    -alpha(x, j - 0.5) * (g1 * g1 * (alpha(y, j + 0.5) + alpha(y, j - 0.5)) + g2 * g2 * (alpha(y, j + 1.5) + alpha(y, j - 1.5))) / (y.h * y.h);
+		value += kwave_beta2;
+
+
+		l = j * x.n + i;
+
+		return value;
+
+	case DIAG13::one:
+		return alpha(x, i + 0.5) * (g1 * g1 * alpha(x, i + 0.5) - g1 * g2 * (alpha(x, i - 0.5) + alpha(x, i + 1.5))) / (x.h * x.h);
+
+	case DIAG13::m_one:
+		return alpha(x, i + 0.5) * (g1 * g1 * alpha(x, i - 0.5) - g1 * g2 * (alpha(x, i + 0.5) + alpha(x, i - 1.5))) / (x.h * x.h);
+
+	case DIAG13::two:
+		return alpha(x, i + 0.5) * g1 * g2 * (alpha(x, i + 0.5) + alpha(x, i + 1.5)) / (x.h * x.h);
+
+	case DIAG13::m_two:
+		return alpha(x, i + 0.5) * g1 * g2 * (alpha(x, i - 0.5) + alpha(x, i - 1.5)) / (x.h * x.h);
+
+	case DIAG13::three:
+		return alpha(x, i + 0.5) * g2 * g2 * alpha(x, i + 1.5) / (x.h * x.h);
+
+	case DIAG13::m_three:
+		return alpha(x, i + 0.5) * g2 * g2 * alpha(x, i - 1.5) / (x.h * x.h);
+
+	case DIAG13::four:
+		return alpha(y, j - 0.5) * (g1 * g1 * alpha(y, j + 0.5) - g1 * g2 * (alpha(y, j - 0.5) + alpha(y, j + 1.5))) / (y.h * y.h);
+
+	case DIAG13::m_four:
+		return alpha(y, j - 0.5) * (g1 * g1 * alpha(y, j - 0.5) - g1 * g2 * (alpha(y, j + 0.5) + alpha(y, j - 1.5))) / (y.h * y.h);
+
+	case DIAG13::five:
+		return alpha(y, j - 0.5) * g1 * g2 * (alpha(y, j + 0.5) + alpha(y, j + 1.5)) / (y.h * y.h);
+
+	case DIAG13::m_five:
+		return alpha(y, j - 0.5) * g1 * g2 * (alpha(y, j - 0.5) + alpha(y, j - 1.5)) / (y.h * y.h);
+
+	case DIAG13::six:
+		return alpha(y, j - 0.5) * g2 * g2 * alpha(y, j + 1.5) / (y.h * y.h);
+
+	case DIAG13::m_six:
+		return alpha(y, j - 0.5) * g2 * g2 * alpha(y, j - 1.5) / (y.h * y.h);
+
+	default:
+		return 0;
+	}
+	return 0;
+}
+
+
 dtype beta2D_spg(size_m x, size_m y, int diag_case, double k2, int i, int j)
 {
 	if (diag_case == 0)
@@ -1363,7 +1500,19 @@ dtype beta2D_spg(size_m x, size_m y, int diag_case, double k2, int i, int j)
 	return 0;
 }
 
-void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, const dtype *f, double thresh)
+void Copy2DCSRMatrix(int size2D, int nonzeros, ccsr* &A, ccsr* &B)
+{
+	size2D++;
+	
+	MultVectorConst<int>(size2D, A->ia, 1, B->ia);
+	MultVectorConst<int>(nonzeros, A->ja, 1, B->ja);
+	MultVectorConst<dtype>(nonzeros, A->values, 1.0, B->values);
+
+	B->non_zeros = A->non_zeros;
+	B->solve = A->solve;
+}
+
+void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh)
 {
 	printf("-------------FGMRES-----------\n");
 
@@ -1372,6 +1521,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	int size = x.n * y.n * z.n;
 	int size2D = x.n * y.n;
 	int size_nopml = x.n_nopml * y.n_nopml * z.n_nopml;
+	int size2D_nopml = x.n_nopml * y.n_nopml;
 	int iterCount = m;
 	int iter = 0;
 	int ione = 1;
@@ -1390,15 +1540,41 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	dtype done = { 1.0, 0.0 };
 	dtype mone = { -1.0, 0.0 };
 
+	int* freqs = alloc_arr<int>(size);
 	dtype *deltaL = alloc_arr<dtype>(size);
 	dtype *sound3D = alloc_arr<dtype>(size);
 	dtype *sound2D = alloc_arr<dtype>(size2D);
 	dtype* work;
-	
+	dtype zdum;
+	double time;
+	double k2 = double(kk) * (kk);
+	double kww;
+	int count = 0;
+	int ratio = 0;
+
 	FILE *output;
 	char str0[255];
 	sprintf(str0, "convergence_N%d_Lx%d_FREQ%d_SPG%6.lf_BETA%5.3lf.dat", x.n_nopml, (int)LENGTH_X, (int)nu, z.h * 2 * z.spg_pts, beta_eq);
 	output = fopen(str0, "w");
+
+
+	//-------- PARDISO ----------
+	// Calling the solver
+	int mtype = 13;
+	int *iparm = alloc_arr<int>(64 * z.n);
+	int *perm = alloc_arr<int>(size2D * z.n);
+	size_t *pt = alloc_arr<size_t>(64 * z.n);
+
+	for(int i = 0; i < z.n; i++)
+		pardisoinit(&pt[i * 64], &mtype, &iparm[i * 64]);
+
+	int maxfct = 1;
+	int mnum = 1;
+	int rhs = 1;
+	int msglvl = 0;
+	int error = 0;
+	int phase; // analisys + factorization
+	//--------------------------
 
 	printf("-----Step 0. Set sound speed and deltaL-----\n");
 	//	SetSoundSpeed3D(x, y, z, sound3D, source);
@@ -1411,18 +1587,165 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
 
 	char str1[255] = "sound_speed2D";
-//	output(str1, false, x, y, z, sound3D, deltaL);
-//	output2D(str1, false, x, y, sound2D, sound2D);
+	//	output(str1, false, x, y, z, sound3D, deltaL);
+	//	output2D(str1, false, x, y, sound2D, sound2D);
 
-	// Gen DeltaL function
+		// Gen DeltaL function
 	GenerateDeltaL(x, y, z, sound3D, sound2D, deltaL);
 
 	char str2[255] = "sound_speed_deltaL";
-//	output(str2, false, x, y, z, sound3D, deltaL);
+	//	output(str2, false, x, y, z, sound3D, deltaL);
 
 	free_arr(sound2D);
 	free_arr(sound3D);
+
+	printf("-----Step 1. Memory allocation for 2D problems\n");
+
+	ccsr *D2csr_zero;
+	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
+	int non_zeros_in_2Dblock9diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n) + 4 * (x.n - 1) * (y.n - 1);
+	int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
+
+#ifdef TEST_HELM_1D
+	non_zeros_in_2Dblock3diag += y.n * 2;
+	non_zeros_in_2Dblock3diag += x.n * 2;
+#endif
+
+	int non_zeros;
+
+#if 0
+	D2csr_zero = (ccsr*)malloc(sizeof(ccsr));
+	D2csr_zero->values = alloc_arr<dtype>(non_zeros_in_2Dblock3diag);
+	D2csr_zero->ia = alloc_arr<int>(size2D + 1);
+	D2csr_zero->ja = alloc_arr<int>(non_zeros_in_2Dblock3diag);
+	D2csr_zero->ia[size2D] = non_zeros_in_2Dblock3diag + 1;
+	D2csr_zero->non_zeros = non_zeros_in_2Dblock3diag;
 	
+	non_zeros = non_zeros_in_2Dblock3diag;
+#else
+	D2csr_zero = (ccsr*)malloc(sizeof(ccsr));
+	D2csr_zero->values = alloc_arr<dtype>(non_zeros_in_2Dblock13diag);
+	D2csr_zero->ia = alloc_arr<int>(size2D + 1);
+	D2csr_zero->ja = alloc_arr<int>(non_zeros_in_2Dblock13diag);
+	D2csr_zero->ia[size2D] = non_zeros_in_2Dblock13diag + 1;
+	D2csr_zero->non_zeros = non_zeros_in_2Dblock13diag;
+
+	printf("Non_zeros: %d\n", D2csr_zero->non_zeros);
+
+	non_zeros = non_zeros_in_2Dblock13diag;
+#endif
+
+	point sourcePML = { x.l / 2.0, y.l / 2 };
+	printf("SOURCE in 2D WITH PML AT: (%lf, %lf)\n", sourcePML.x, sourcePML.y);
+
+	double sigma = 0.25;
+
+	time = omp_get_wtime();
+	//GenSparseMatrixOnline2DwithPMLand9Points(-1, x, y, z, D2csr_zero, 0, freqs, sigma);
+	//GenSparseMatrixOnline2DwithPML(-1, x, y, z, D2csr_zero, 0, freqs);
+	GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, z, D2csr_zero, 0, freqs);  // does not work now
+	time = omp_get_wtime() - time;
+	printf("time for constructing = %lf sec\n", time);
+
+	time = omp_get_wtime();
+//	TestSymmSparseMatrixOnline2DwithPML(x, y, z, D2csr_zero);
+	time = omp_get_wtime() - time;
+
+	// Memory for 2D CSR matrix
+	ccsr **D2csr;
+	D2csr = (ccsr**)malloc(z.n * sizeof(ccsr*));
+
+	printf("Generating and factorizing matrices for 2D problems...\n");
+
+	for (int k = 0; k < z.n; k++)
+	{
+#define MKL_FFT
+
+#ifdef MKL_FFT
+		if (k < z.n / 2 - 1)
+		{
+			kww = 4.0 * PI * PI * k * k / (z.l * z.l);
+		}
+		else
+		{
+			kww = 4.0 * PI * PI * (z.n - k) * (z.n - k) / (z.l * z.l);
+		}
+#else
+		kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (z.l * z.l);
+#endif
+
+		D2csr[k] = (ccsr*)malloc(sizeof(ccsr));
+		dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } - kww;
+
+
+		if (nu == 2) ratio = 15;
+		else ratio = 3;
+
+	//	if (kww < ratio * k2)
+		if (1)
+		{
+		
+#ifdef TEST_HELM_1D
+			non_zeros_in_2Dblock3diag += y.n * 2;
+			non_zeros_in_2Dblock3diag += x.n * 2;
+#endif
+			D2csr[k]->values = alloc_arr<dtype>(non_zeros);
+			D2csr[k]->ia = alloc_arr<int>(size2D + 1);
+			D2csr[k]->ja = alloc_arr<int>(non_zeros);
+
+#if 0
+			D2csr[k]->ia[size2D] = non_zeros_in_2Dblock3diag + 1;
+			D2csr[k]->non_zeros = non_zeros_in_2Dblock3diag;
+
+			GenSparseMatrixOnline2DwithPML(-1, x, y, z, D2csr[k], kwave_beta2, freqs);
+			D2csr[k]->solve = 1;
+
+#else
+			Copy2DCSRMatrix(size2D, non_zeros, D2csr_zero, D2csr[k]);
+
+			D2csr[k]->solve = 1;
+
+#pragma omp parallel for simd schedule(simd:static)
+			for (int i = 0; i < size; i++)
+				D2csr[k]->values[freqs[i]] += kwave_beta2;
+#endif
+
+#if 1
+			// Factorization of matrices
+
+			phase = 11;
+			pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &zdum, &zdum, &error);
+			if (error != 0) printf("!!! ANALYSIS ERROR: %d !!!\n", error);
+
+			phase = 22;
+			pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &zdum, &zdum, &error);
+			if (error != 0) printf("!!! FACTORIZATION ERROR: %d !!!\n", error);
+#endif
+
+			count++;
+			continue;
+
+			// источник в каждой задаче в середине 
+			//GenSparseMatrixOnline2D("FT", i, x, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
+		}
+		else
+		{
+			D2csr[k]->solve = 0;
+		}
+	}
+
+	double mem = 2.0 * non_zeros_in_2Dblock3diag / (1024 * 1024 * 1024);
+	mem += double(size2D + 1) / (1024 * 1024 * 1024);
+	mem *= count;
+
+	mem += double(z.n * size2D) / (1024 * 1024 * 1024);
+
+	printf("Memory for %d 2D matrices: %lf Gb\n", count, mem);
+	
+#ifndef PERF
+	system("pause");
+#endif
+
 	printf("-----Step 1. Memory allocation-----\n");
 	// init cond
 	dtype *x0 = alloc_arr<dtype>(size);
@@ -1448,6 +1771,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	// resid
 	dtype *f_rsd = alloc_arr<dtype>(size);
 	dtype *f_rsd_nopml = alloc_arr<dtype>(size_nopml);
+	dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
+	dtype *x_orig_nopml = alloc_arr<dtype>(size_nopml);
 
 	// vars
 	dtype calpha;
@@ -1465,7 +1790,10 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		zcopy(&size, x_init, &ione, x0, &ione);
 
 		// Multiply matrix A in CSR format by vector x_0 to obtain f1
-		ApplyCoeffMatrixA(x, y, z, x0, deltaL, w, thresh);
+		ApplyCoeffMatrixA(x, y, z, iparm, perm, pt, D2csr, x0, deltaL, w, thresh);
+
+		norm = dznrm2(&size, w, &ione);
+		printf("norm ||Ax0|| = %lf\n", norm);
 
 		norm = dznrm2(&size, f, &ione);
 		printf("norm ||f|| = %lf\n", norm);
@@ -1489,7 +1817,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		for (int j = 0; j < m; j++)
 		{
 			// Compute w[j] := A * v[j]
-			ApplyCoeffMatrixA(x, y, z, &V[ldv * j], deltaL, w, thresh);
+			ApplyCoeffMatrixA(x, y, z, iparm, perm, pt, D2csr, &V[ldv * j], deltaL, w, thresh);
 
 			for (int i = 0; i <= j; i++)
 			{
@@ -1564,30 +1892,49 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, work, &lwork, &info);
 			free_arr(work);
 
+			RelRes = dznrm2(&col_min, eBeta, &ione);
+			printf("norm y_k[%d] = %e\n", j, RelRes);
+
+
 			// 4. Multiplication x_k = x_0 + V_k * y_k
 			printf("-----Step 4. Computing x_k-----\n");
 
 			zgemv("no", &size, &col_min, &done, V, &ldv, eBeta, &ione, &done, x0, &ione);
 
 			// 5. Check |(I - deltaL * L^{-1}) * x_k - f|
-
-			ApplyCoeffMatrixA(x, y, z, x0, deltaL, w, thresh);
+			ApplyCoeffMatrixA(x, y, z, iparm, perm, pt, D2csr, x0, deltaL, w, thresh);
 			zaxpy(&size, &mone, f, &ione, w, &ione); // Ax0: = Ax0 - f
 
-			RelRes = dznrm2(&size, w, &ione);
-			printf("-----------\n");
-			printf("Residual in 3D with PML |(I - deltaL * L^{-1}) * x_sol - f| = %lf\n", RelRes);
-			printf("-----------\n");
+		//	RelRes = dznrm2(&size, w, &ione);
+		//	printf("-----------\n");
+		//	printf("Residual in 3D with PML |(I - deltaL * L^{-1}) * x_sol - f| = %lf\n", RelRes);
+		//	printf("-----------\n");
 
 			reducePML3D(x, y, z, size, w, size_nopml, Ax0_nopml);
-
 			RelRes = dznrm2(&size_nopml, Ax0_nopml, &ione);
 
 			printf("-----------\n");
 			printf("Residual in 3D phys domain |(I - deltaL * L^{-1}) * x_sol - f| = %e\n", RelRes);
+
+			// 6. Solve L_0 * x_sol = x_gmres
+			printf("-----Step 5. Solve the last system-----\n");
+			Solve3DSparseUsingFT(x, y, z, iparm, perm, pt, D2csr, x0, x_sol, thresh);
+
+			for (int k = 0; k < z.n; k++)
+			{
+				int src = size2D / 2;
+				NullifySource2D(x, y, &x_sol[k * size2D], src, 5);
+				NullifySource2D(x, y, &x_orig[k * size2D], src, 5);
+			}
+
+			reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
+			reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
+
+			norm = RelError(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
+			printf("Residual in 3D phys domain |x_sol - x_orig| / |x_orig| = %lf\n", norm);
 			printf("-----------\n");
 
-			fprintf(output, "%d %e\n", j, RelRes);
+			fprintf(output, "%d %e %lf\n", j, RelRes, norm);
 		}
 		
 			// For the next step
@@ -1608,11 +1955,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 #endif
 	} // End of iterations
 
-	// 6. Solve L_0 * x_sol = x_gmres
-	printf("-----Step 5. Solve the last system-----\n");
-	Solve3DSparseUsingFT(x, y, z, x0, x_sol, thresh);
-
-
+#if 0
 	ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);
 
 	printf("-----------\n");
@@ -1626,10 +1969,10 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	printf("-----------\n");
 	printf("Residual in 3D phys domain |A * x_sol - f| = %e\n", RelRes);
 	printf("-----------\n");
+#endif
 
 	free_arr(f_rsd);
 	free_arr(f_rsd_nopml);
-
 	free_arr(H);
 	free_arr(Hgels);
 	free_arr(w);
@@ -1960,6 +2303,323 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, size_m z, ccsr* A
 		//printf("SUCCESSED 2D generation for frequency %d!\n", w);
 	}
 
+	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat.dat");
+}
+
+void GenSparseMatrixOnline2DwithPMLand9Points(int w, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave_beta2, int* freqs, double sigma)
+{
+	int size = x.n * y.n;
+	int size2 = size - y.n;
+	int size3 = size - y.n;
+	int size4 = size - x.n - y.n + 1;
+	int non_zeros_in_2Dblock9diag = size + 2 * size2 * 2 + size4 * 4;
+	double RelRes = 0;
+	int j1, k1;
+	int j2, k2;
+
+	int count = 0;
+	int count2 = 0;
+
+#ifdef TEST_HELM_1D
+	non_zeros_in_2Dblock3diag += y.n * 2;
+	non_zeros_in_2Dblock3diag += x.n * 2;
+#endif
+
+	//double k = (double)kk;
+	//double kww = 4.0 * PI * PI * (w - n2) * (w - n2) / (y.l * y.l);
+	//double kww = 4 * PI * PI * (w - n2) * (w - n2);
+
+	//printf("Number k = %lf\n", k);
+
+	//printf("analytic non_zeros in PML function: %d\n", non_zeros_in_2Dblock3diag);
+
+
+	if (non_zeros_in_2Dblock9diag != Acsr->non_zeros) printf("ERROR! Uncorrect value of non_zeros inside 2D 9diag: %d != %d\n", non_zeros_in_2Dblock9diag, Acsr->non_zeros);
+	//	else printf("Gen 2D matrix for frequency w = %d, k^2 - ky^2 = (%lf %lf)\n", w, kwave_beta2.real(), kwave_beta2.imag());
+
+	if (w == -1)
+	{
+
+		for (int l1 = 0; l1 < size; l1++)
+		{
+			Acsr->ia[l1] = count + 1;
+			for (int l2 = 0; l2 < size; l2++)
+			{
+				take_coord2D(x.n, y.n, l1, j1, k1);
+				take_coord2D(x.n, y.n, l2, j2, k2);
+
+				if (l1 == l2)
+				{
+					Acsr->ja[count] = l2 + 1;
+					freqs[count2++] = count;
+
+					Acsr->values[count++] = beta2D_pml_9pts(x, y, 0, kwave_beta2, j1, k1, sigma);
+
+				}
+				else if (l1 == l2 - 1 && (l1 + 1) % x.n != 0)
+				{
+					Acsr->ja[count] = l2 + 1;
+					Acsr->values[count++] = beta2D_pml_9pts(x, y, 1, kwave_beta2, j1, k1, sigma); // right
+				}
+				else if (l1 == l2 + 1 && l1 % x.n != 0)
+				{
+					Acsr->ja[count] = l2 + 1;
+					Acsr->values[count++] = beta2D_pml_9pts(x, y, -1, kwave_beta2, j1, k1, sigma); // left
+				}
+				else if (l1 == l2 - x.n)
+				{
+					Acsr->ja[count] = l2 + 1;
+					Acsr->values[count++] = beta2D_pml_9pts(x, y, 3, kwave_beta2, j1, k1, sigma); // right
+				}
+				else if (l1 == l2 - x.n - 1 && (l1 + 1) % x.n != 0)
+				{
+					Acsr->ja[count] = l2 + 1;
+					Acsr->values[count++] = beta2D_pml_9pts(x, y, 4, kwave_beta2, j1, k1, sigma); // right
+				}
+				else if (l1 == l2 - x.n + 1 && l1 % x.n != 0)
+				{
+					Acsr->ja[count] = l2 + 1;
+					Acsr->values[count++] = beta2D_pml_9pts(x, y, 2, kwave_beta2, j1, k1, sigma); // right
+				}
+				else if (l1 == l2 + x.n)
+				{
+					Acsr->ja[count] = l2 + 1;
+					Acsr->values[count++] = beta2D_pml_9pts(x, y, -3, kwave_beta2, j1, k1, sigma); // left
+				}
+				else if (l1 == l2 + x.n + 1 && l1 % x.n != 0)
+				{
+					Acsr->ja[count] = l2 + 1;
+					Acsr->values[count++] = beta2D_pml_9pts(x, y, -4, kwave_beta2, j1, k1, sigma); // left
+				}
+				else if (l1 == l2 + x.n - 1 && (l1 + 1) % x.n != 0)
+				{
+					Acsr->ja[count] = l2 + 1;
+					Acsr->values[count++] = beta2D_pml_9pts(x, y, -2, kwave_beta2, j1, k1, sigma); // left
+				}
+			}
+
+	//		printf("l1 = %d\n", l1);
+	//		print_2Dcsr_mat(x, y, Acsr);
+
+	//		system("pause");
+		}
+
+		if (non_zeros_in_2Dblock9diag != count || size != count2) printf("FAILED generation!!! %d != %d\n", non_zeros_in_2Dblock9diag, count);
+		else
+		{
+			printf("SUCCESSED BASIC 2D generation!\n");
+			printf("Non_zeros inside generating PML function: %d\n", count);
+		}
+	}
+	else
+	{
+#pragma omp parallel for simd schedule(simd:static)
+		for (int i = 0; i < size; i++)
+			Acsr->values[freqs[i]] += kwave_beta2;
+
+		//printf("SUCCESSED 2D generation for frequency %d!\n", w);
+	}
+
+	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat.dat");
+}
+
+void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave_beta2, int* freqs)
+{
+	int size = x.n * y.n;
+	int size2 = size - 1 * y.n;
+	int size3 = size - 2 * y.n;
+	int size4 = size - 3 * y.n;
+	int size5 = size - 1 * x.n;
+	int size6 = size - 2 * x.n;
+	int size7 = size - 3 * x.n;
+	int non_zeros_in_2Dblock13diag = size + 2 * size2 + 2 * size3 + 2 * size4 + 2 * size5 + 2 * size6 + 2 * size7;
+	double RelRes = 0;
+	int j1, k1;
+	int j2, k2;
+
+	int count = 0;
+	int count2 = 0;
+
+#ifdef TEST_HELM_1D
+	non_zeros_in_2Dblock3diag += y.n * 2;
+	non_zeros_in_2Dblock3diag += x.n * 2;
+#endif
+
+	//double k = (double)kk;
+	//double kww = 4.0 * PI * PI * (w - n2) * (w - n2) / (y.l * y.l);
+	//double kww = 4 * PI * PI * (w - n2) * (w - n2);
+
+	//printf("Number k = %lf\n", k);
+
+	//printf("analytic non_zeros in PML function: %d\n", non_zeros_in_2Dblock3diag);
+
+
+	if (non_zeros_in_2Dblock13diag != Acsr->non_zeros) printf("ERROR! Uncorrect value of non_zeros inside 2D 13diag: %d != %d\n", non_zeros_in_2Dblock13diag, Acsr->non_zeros);
+	//	else printf("Gen 2D matrix for frequency w = %d, k^2 - ky^2 = (%lf %lf)\n", w, kwave_beta2.real(), kwave_beta2.imag());
+
+
+//#define DEBUG
+
+	if (w == -1)
+	{
+		// строки
+		for (int l1 = 0; l1 < size; l1++)
+		{
+			Acsr->ia[l1] = count + 1;
+			// столбцы
+			for (int l2 = 0; l2 < size; l2++)
+			{
+				take_coord2D(x.n, y.n, l1, j1, k1);
+				take_coord2D(x.n, y.n, l2, j2, k2);
+
+				if (l1 == l2)
+				{
+					Acsr->ja[count] = l2 + 1;
+					freqs[count2++] = count;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::zero);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::zero, kwave_beta2, j1, k1);
+#endif
+
+				}
+				else if (l1 == l2 - 1 && (l1 + 1) % x.n != 0)
+				{
+					Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::one);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::one, kwave_beta2, j1, k1); // right
+#endif
+				}
+				else if (l1 == l2 + 1 && l1 % x.n != 0)
+				{
+					Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::m_one);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::m_one, kwave_beta2, j1, k1); // left
+#endif
+				}
+				else if (l1 == l2 - 2 && (l1 + 1) % x.n != 0 && (l1 + 2) % x.n != 0)
+				{
+					// не пишем, если номер строки + 1, 2, 3 строки кратен Nx
+					Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::two);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::two, kwave_beta2, j1, k1); // right
+#endif
+				}
+				else if (l1 == l2 + 2 && l1 % x.n != 0 && (l1 - 1) % x.n != 0)
+				{
+					Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::m_two);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::m_two, kwave_beta2, j1, k1); // left
+#endif
+				}
+				else if (l1 == l2 - 3 && (l1 + 1) % x.n != 0 && (l1 + 2) % x.n != 0 && (l1 + 3) % x.n != 0)
+				{
+					Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::three);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::three, kwave_beta2, j1, k1); // right
+#endif
+				}
+				else if (l1 == l2 + 3 && l1 % x.n != 0 && (l1 - 1) % x.n != 0 && (l1 - 2) % x.n != 0)
+				{
+					// не пишем, если номер строки -1, 2 строки кратен Nx
+					Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::m_three);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::m_three, kwave_beta2, j1, k1); // left
+#endif
+				}
+				else if (l1 == l2 - x.n)
+				{
+					Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::four);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::four, kwave_beta2, j1, k1); // right
+#endif
+				}
+				else if (l1 == l2 + x.n)
+				{
+					Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::m_four);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::m_four, kwave_beta2, j1, k1); // left
+#endif
+				}
+				else if (l1 == l2 - 2 * x.n)
+				{
+					Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::five);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::five, kwave_beta2, j1, k1); // right
+#endif
+				}
+				else if (l1 == l2 + 2 * x.n)
+				{
+					Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::m_five);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::m_five, kwave_beta2, j1, k1); // left
+#endif
+				}
+				else if (l1 == l2 - 3 * x.n)
+				{
+					Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::six);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::six, kwave_beta2, j1, k1); // right
+#endif
+				}
+				else if (l1 == l2 + 3 * x.n)
+				{
+					Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+					Acsr->values[count++] = static_cast<int>(DIAG13::m_six);
+#else
+					Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::m_six, kwave_beta2, j1, k1); // left
+#endif	
+				}
+			}
+#ifdef DEBUG
+					printf("l1 = %d\n", l1);
+					print_2Dcsr_mat(x, y, Acsr);
+
+					system("pause");
+#endif
+		}
+
+		if (non_zeros_in_2Dblock13diag != count || size != count2) printf("FAILED generation!!! %d != %d\n", non_zeros_in_2Dblock13diag, count);
+		else
+		{
+			printf("SUCCESSED BASIC 2D generation!\n");
+			printf("Non_zeros inside generating PML function: %d\n", count);
+		}
+	}
+	else
+	{
+#pragma omp parallel for simd schedule(simd:static)
+		for (int i = 0; i < size; i++)
+			Acsr->values[freqs[i]] += kwave_beta2;
+
+	//	printf("SUCCESSED 2D generation for frequency %d!\n", w);
+	}
+
+	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat13pts.dat");
+#undef DEBUG
 }
 
 void GenSparseMatrixOnline2DwithSPONGE(int w, size_m x, size_m y, size_m z, ccsr* Acsr, double kwave2)
@@ -2651,16 +3311,27 @@ void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_ori
 		Nz = z.n;
 	}
 
+
+	double rel_real, rel_imag;
+
 	for (int k = 0; k < Nz; k++)
 	{
 		sprintf(name, "%s_%02d.dat", str, k);
 		FILE *file = fopen(name, "w");
 		for (int j = 0; j < Ny; j++)
 			for (int i = 0; i < Nx; i++)
-				fprintf(file, "%lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf\n", i * x.h, j * y.h, k * z.h,
-					x_orig[i + j * Nx + k * Nx * Ny].real(), x_orig[i + j * Nx + k * Nx * Ny].imag(),
-					x_pard[i + j * Nx + k * Nx * Ny].real(), x_pard[i + j * Nx + k * Nx * Ny].imag(),
-					x_orig[i + j * Nx + k * Nx * Ny].real() / x_pard[i + j * Nx + k * Nx * Ny].real());
+			{
+				rel_real = (x_pard[i + j * Nx + k * Nx * Ny].real() - x_orig[i + j * Nx + k * Nx * Ny].real()) / x_orig[i + j * Nx + k * Nx * Ny].real();
+				rel_imag = (x_pard[i + j * Nx + k * Nx * Ny].imag() - x_orig[i + j * Nx + k * Nx * Ny].imag()) / x_orig[i + j * Nx + k * Nx * Ny].imag();
+
+//				if (fabs(rel_real) > 2)
+				{
+					fprintf(file, "%lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf\n", i * x.h, j * y.h, k * z.h,
+						x_orig[i + j * Nx + k * Nx * Ny].real(), x_orig[i + j * Nx + k * Nx * Ny].imag(),
+						x_pard[i + j * Nx + k * Nx * Ny].real(), x_pard[i + j * Nx + k * Nx * Ny].imag(),
+						fabs(rel_real), fabs(rel_imag));
+				}
+			}
 		fclose(file);
 	}
 }
@@ -2747,6 +3418,7 @@ void gnuplot(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m y
 	fprintf(file1, "set term png font \"Times-Roman, 16\"\n");
 	//fprintf(file, "set view map\n");
 	fprintf(file1, "set xrange[0:%d]\nset yrange[0:%d]\n", (int)LENGTH_X, (int)LENGTH_Y);
+	//fprintf(file1, "set zrange[0:2]\n");
 	fprintf(file1, "set pm3d\n");
 	fprintf(file1, "set palette\n");
 
@@ -2850,7 +3522,7 @@ void gnuplot1D(char *splot, char *sout, bool pml_flag, int col, size_m x)
 	system(str);
 }
 
-void ApplyCoeffMatrixA(size_m x, size_m y, size_m z, const dtype *w, const dtype* deltaL, dtype* g, double thresh)
+void ApplyCoeffMatrixA(size_m x, size_m y, size_m z, int *iparm, int *perm, size_t *pt, ccsr** &D2csr, const dtype *w, const dtype* deltaL, dtype* g, double thresh)
 {
 	// Function for applying (I - deltaL * L_0 ^{-1}) * w = g
 	int size = x.n * y.n * z.n;
@@ -2864,13 +3536,14 @@ void ApplyCoeffMatrixA(size_m x, size_m y, size_m z, const dtype *w, const dtype
 #endif
 
 	// Solve the preconditioned system: L_0 ^ {-1} * w = g
-	Solve3DSparseUsingFT(x, y, z, w, g, thresh);
+	Solve3DSparseUsingFT(x, y, z, iparm, perm, pt, D2csr, w, g, thresh);
 
 	// Multiply point-to-point deltaL * g
 	OpTwoMatrices(size, 1, g, deltaL, g, size, '*');
 
 	// g:= w - g
 	OpTwoMatrices(size, 1, w, g, g, size, '-');
+
 }
 
 void print_2Dcsr_mat(size_m x, size_m y, ccsr* D2csr)
@@ -2885,16 +3558,46 @@ void print_2Dcsr_mat(size_m x, size_m y, ccsr* D2csr)
 			if (j == D2csr->ja[count1] - 1)
 			{
 				count1++;
-				printf("%5.2lf ", D2csr->values[count2++].real());
+				printf("%2.0lf ", D2csr->values[count2++].real());
 			}
 			else
 			{
-				printf("%5.2lf ", 0);
+				printf("%2.0lf ", 0);
 			}
 		printf("\n");
 	}
 	
 	printf("count1 = %d count2 = %d valuesN = %d\n", count1, count2, D2csr->non_zeros);
+}
+
+
+void print_2Dcsr_mat_to_file(size_m x, size_m y, ccsr* D2csr, char * s)
+{
+	int count1 = 0;
+	int count2 = 0;
+	int size = x.n * y.n;
+
+	FILE* fout;
+	fout = fopen(s, "w");
+
+	for (int i = 0; i < size; i++)
+	{
+		for (int j = 0; j < size; j++)
+			if (j == D2csr->ja[count1] - 1)
+			{
+				count1++;
+				fprintf(fout, "%5.2lf ", D2csr->values[count2++].real());
+			}
+			else
+			{
+				//fprintf(fout, "%5.2lf ", 0);
+			}
+		fprintf(fout, "          elems: %d\n", count2);
+	}
+
+	fprintf(fout, "count1 = %d count2 = %d valuesN = %d\n", count1, count2, D2csr->non_zeros);
+
+	fclose(fout);
 }
 
 void print_2Dcsr_mat2(size_m x, size_m y, ccsr* D2csr)
@@ -2917,7 +3620,7 @@ void print_2Dcsr_mat2(size_m x, size_m y, ccsr* D2csr)
 	printf("count1 = %d count2 = %d valuesN = %d\n", count1, count2, D2csr->non_zeros);
 }
 
-void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x_sol, double thresh)
+void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, int *iparm, int *perm, size_t *pt, ccsr** &D2csr, const dtype *f, dtype* x_sol, double thresh)
 {
 
 //#define PRINT
@@ -2974,19 +3677,11 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 	
 #undef PRINT
 
-
 	// Calling the solver
 	int mtype = 13;
-	int *iparm = alloc_arr<int>(64);
-	int *perm = alloc_arr<int>(size2D);
-	size_t *pt = alloc_arr<size_t>(64);
-
-	//printf("pardisoinit...\n");
-	pardisoinit(pt, &mtype, iparm);
-
 	int maxfct = 1;
 	int mnum = 1;
-	int phase = 13;
+	int phase = 33;
 	int rhs = 1;
 	int msglvl = 0;
 	int error = 0;
@@ -2995,36 +3690,11 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 	int size_nopml = n_nopml * z.n_nopml;
 	int size2D_nopml = x.n_nopml * y.n_nopml;
 
-	// Memory for 2D CSR matrix
-	ccsr *D2csr;
-	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
-
-#ifdef TEST_HELM_1D
-	non_zeros_in_2Dblock3diag += y.n * 2;
-	non_zeros_in_2Dblock3diag += x.n * 2;
-#endif
-
-	D2csr = (ccsr*)malloc(sizeof(ccsr));
-	D2csr->values = alloc_arr<dtype>(non_zeros_in_2Dblock3diag);
-	D2csr->ia = alloc_arr<int>(size2D + 1);
-	D2csr->ja = alloc_arr<int>(non_zeros_in_2Dblock3diag);
-	D2csr->ia[size2D] = non_zeros_in_2Dblock3diag + 1;
-	D2csr->non_zeros = non_zeros_in_2Dblock3diag;
-
 #ifdef PRINT
 	printf("Non-zeros in 2D block-diagonal: %d\n", non_zeros_in_2Dblock3diag);
 	printf("----------Generating 2D matrix and rhs + solving by pardiso-------\n");
 	printf("Size of system: %d x %d with PML %d on each direction\n", x.n, y.n, 2 * x.pml_pts);
 #endif
-
-	point sourcePML = { x.l / 2.0, y.l / 2 };
-
-	printf("SOURCE in 2D WITH PML AT: (%lf, %lf)\n", sourcePML.x, sourcePML.y);
-	double k = (double)kk;
-	double k2 = k * k;
-	int nhalf = z.n / 2;
-	double kww;
-	int src;
 
 	char *str1, *str2, *str3;
 	str1 = alloc_arr<char>(255);
@@ -3033,20 +3703,6 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 	bool pml_flag = false;
 	double time;
 
-	int* freqs = alloc_arr<int>(size);
-
-	printf("Generating matrix for 2D problems...\n");
-	time = omp_get_wtime();
-	GenSparseMatrixOnline2DwithPML(-1, x, y, z, D2csr, 0, freqs);
-	time = omp_get_wtime() - time;
-	printf("time for constructing = %lf\n", time);
-
-//	print_2Dcsr_mat(x, y, D2csr);
-//	printf("\n");
-//	print_2Dcsr_mat2(x, y, D2csr);
-
-//	system("pause");
-
 	printf("Solving set of 2D problems...\n");
 	int count = 0;
 
@@ -3054,65 +3710,13 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 
 	for (int k = 0; k < z.n; k++)
 	{
-	
-//		printf("-------------Iter: %d------------------\n", i);
-
-#define MKL_FFT
-
-#ifdef MKL_FFT
-		if (k < z.n / 2 - 1)
-		{
-			kww = 4.0 * PI * PI * k * k / (z.l * z.l);
-		}
-		else
-		{
-			kww = 4.0 * PI * PI * (z.n - k) * (z.n - k) / (z.l * z.l);
-		}
-#else
-		kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (z.l * z.l);
-#endif
-		double kwave2 = k2 - kww;
-		int ratio = 0;
-	
-		if (nu == 2) ratio = 15;
-		else ratio = 3;
-
-		if (kww > ratio * k2)
+		if (D2csr[k]->solve == 1)
 		{
 			count++;
-//			printf("missed freq: %lf\n", kwave2);
-			continue;
+			pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &f_FFT[k * size2D], &x_sol_prd[k * size2D], &error);
+
+			if (error != 0) printf("!!!Error: PARDISO %d!!!\n", error);
 		}
-		else
-		{
-	//		printf("solved freq: %lf\n", kwave2);
-		}
-
-		dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } - kww;
-
-		dtype alpha_k;
-
-		double omega_loc = 2.0 * PI * nu;
-		double ppw = 1.0 / (sqrt(abs(kwave2)) / (2.0 * PI)) / z.h;
-
-#ifdef PRINT
-		printf("ppw: %lf\n", ppw);
-		printf("frequency: %lf\n", sqrt(abs(kwave2)) * c_z / (2.0 * PI));
-#endif
-
-
-		// источник в каждой задаче в середине 
-		//GenSparseMatrixOnline2D("FT", i, x, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
-
-		GenSparseMatrixOnline2DwithPML(k, x, y, z, D2csr, kwave_beta2, freqs);
-
-		//	GenRHSandSolution2D_Syntetic(y, z, D2csr, &u2Dsynt[i * size2D], f2D);
-		pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, &f_FFT[k * size2D], &x_sol_prd[k * size2D], &error);
-		if (error != 0) printf("Error: PARDISO!!!\n");
-
-#pragma omp parallel for simd schedule(simd:static)
-		for (int i = 0; i < size; i++)
-			D2csr->values[freqs[i]] -= kwave_beta2;
 
 #ifdef PRINT
 		double eps = 0.01; // 1 percent
@@ -3165,11 +3769,11 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 #endif
 	}
 
-	printf("Missed: %d of %d\nSolved: %d of %d\n", count, z.n, z.n - count, z.n);
+	printf("Solved: %d of %d\nMissed: %d of %d\n", count, z.n, z.n - count, z.n);
 
 	time = omp_get_wtime() - time;
 
-	printf("time elapsed for 2D problems: %lf\n", time);
+	printf("time elapsed for 2D problems: %lf sec\n", time);
 
 #ifdef PRINT
 	printf("Backward 1D FFT's of %d x %d times to each point of 2D solution\n", x.n_nopml, y.n_nopml);
@@ -3186,10 +3790,78 @@ void Solve3DSparseUsingFT(size_m x, size_m y, size_m z, const dtype *f, dtype* x
 
 	free_arr(x_sol_prd);
 	free_arr(f_FFT);
-	free_arr(iparm);
-	free_arr(perm);
-	free_arr(pt);
-	free_arr(freqs);
+}
+
+
+void Multiply3DSparseUsingFT(size_m x, size_m y, size_m z, int *iparm, int *perm, size_t *pt, ccsr** &D2csr, const dtype *u, dtype* f_sol, double thresh)
+{
+	int size = x.n * y.n * z.n;
+	int size2D = x.n * y.n;
+	MKL_LONG status;
+	int error = 0;
+	double norm = 0;
+	int count = 0;
+	double time = 0;
+
+	DFTI_DESCRIPTOR_HANDLE my_desc_handle;
+
+	MKL_LONG strides_in[2] = { 0, size2D };
+	MKL_LONG strides_out[2] = { 0, size2D };
+
+	// Create 1D FFT of COMPLEX DOUBLE case
+	status = DftiCreateDescriptor(&my_desc_handle, DFTI_DOUBLE, DFTI_COMPLEX, 1, z.n);
+	status = DftiSetValue(my_desc_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
+	status = DftiSetValue(my_desc_handle, DFTI_BACKWARD_SCALE, 1.0 / z.n);
+	status = DftiSetValue(my_desc_handle, DFTI_INPUT_STRIDES, strides_in);
+	status = DftiSetValue(my_desc_handle, DFTI_OUTPUT_STRIDES, strides_out);
+	status = DftiCommitDescriptor(my_desc_handle);
+
+
+	dtype *f_sol_gemv = alloc_arr<dtype>(size);
+	dtype *u_FFT = alloc_arr<dtype>(size);
+
+	// Direct Fourier to right-hand side
+	for (int w = 0; w < size2D; w++)
+	{
+		status = DftiComputeForward(my_desc_handle, (void*)&u[w], &u_FFT[w]);
+
+		//status = DftiComputeForward(my_desc_handle, f_FFT_in, &f_FFT_out[z.n * w]);
+	}
+
+	time = omp_get_wtime();
+
+	for (int k = 0; k < z.n; k++)
+	{
+		if (D2csr[k]->solve == 1)
+		{
+			count++;
+			//pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &f_FFT[k * size2D], &x_sol_prd[k * size2D], &error);
+			mkl_zcsrgemv("no", &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &u_FFT[k * size2D], &f_sol_gemv[k * size2D]);
+		}
+
+
+	}
+	time = omp_get_wtime() - time;
+
+	printf("Solved: %d of %d\nMissed: %d of %d\n", count, z.n, z.n - count, z.n);
+
+	printf("time elapsed for multiplication of 2D problems: %lf sec\n", time);
+
+#ifdef PRINT
+	printf("Backward 1D FFT's of %d x %d times to each point of 2D solution\n", x.n_nopml, y.n_nopml);
+#endif
+	for (int w = 0; w < size2D; w++)
+	{
+		status = DftiComputeBackward(my_desc_handle, &f_sol_gemv[w], &f_sol[w]);
+
+		// status = DftiComputeBackward(my_desc_handle, u1D, u1D_BFFT);
+	}
+
+	status = DftiFreeDescriptor(&my_desc_handle);
+	printf("------------- The end of algorithm ----------------------\n");
+
+	free_arr(f_sol_gemv);
+	free_arr(u_FFT);
 }
 
 void GenRHSandSolution1D(size_m x, dtype* u_ex1D, dtype* f1D, double k, point sourcePML, int &src)
@@ -3629,13 +4301,6 @@ void AddDenseVectorsComplex(int n, dtype alpha, dtype *a, dtype beta, dtype *b, 
 #pragma omp parallel for simd schedule(simd:static)
 	for (int i = 0; i < n; i++)
 		c[i] = alpha * a[i] + beta * b[i];
-}
-
-void MultVectorConst(int n, dtype* v1, dtype alpha, dtype* v2)
-{
-#pragma omp parallel for simd schedule(simd:static)
-	for (int i = 0; i < n; i++)
-		v2[i] = v1[i] * alpha;
 }
 
 #if 0

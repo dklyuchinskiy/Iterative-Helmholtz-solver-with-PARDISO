@@ -57,6 +57,8 @@ void TestOrtogonalizedVectors(int n, dtype* vect1, dtype* vect2, double eps);
 void TestNormalizedVector(int n, dtype* vect, double eps);
 void TestFGMRES();
 void Test1DHelmholtz(int n1, int n2, int n3, dtype* u_sol, double thresh, char *str);
+void TestSymmSparseMatrixOnline2DwithPML(size_m x, size_m y, size_m z, ccsr *D2csr_zero);
+void TestInverseTraversal(size_m x, size_m y, size_m z, const point source, const dtype *x_sol, const dtype *f_orig, double thresh);
 
 #if 0
 

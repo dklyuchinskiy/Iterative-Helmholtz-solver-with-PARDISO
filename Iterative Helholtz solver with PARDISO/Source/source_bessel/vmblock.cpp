@@ -7,7 +7,9 @@
  **********************************************************/
 #include <malloc.h>
 
-#include "../definitions.h"
+#include "../source_bessel/basis.h"
+#include "../source_bessel/vmblock.h"
+
 /***********************************************************************
 *                                                                      *
 * Management of a set of dynamically allocated vectors and matrices    *

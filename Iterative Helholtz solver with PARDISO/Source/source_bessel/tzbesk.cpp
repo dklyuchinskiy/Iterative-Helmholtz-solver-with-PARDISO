@@ -27,7 +27,8 @@
 Note: To link with: CBess0,CBess00,CBess1,CBess2,CBess3,Complex,
                     Basis_r, Vmblock.
 --------------------------------------------------------------- */ 
-#include "../definitions.h"
+#include "../source_bessel/basis.h"
+#include "../source_bessel/vmblock.h"
 
 #include "complex.h"
 

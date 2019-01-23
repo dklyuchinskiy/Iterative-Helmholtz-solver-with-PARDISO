@@ -7,7 +7,8 @@
 *                         C++ Release By J-P Moreau, Paris (07/10/2005). *
 *                                     (www.jpmoreau.fr)                  *
 *************************************************************************/
-#include "../definitions.h"
+#include "../source_bessel/basis.h"
+#include "../source_bessel/vmblock.h"
 
 #include "complex.h"
 
@@ -352,7 +353,7 @@ e160: if (MR == 0) {
 !---------------------------------------------------------------------*/
       *NZ = 0;
       FMR = 1.0*MR;
-      SGN = -SIGN(PI,FMR);
+      SGN = -SIGN(PI_LOC,FMR);
 /*----------------------------------------------------------------------
 !     CSPN AND CSGN ARE COEFF OF K AND I FUNCTIONS RESP.
 !---------------------------------------------------------------------*/
@@ -856,7 +857,7 @@ e180: if (MR == 0) {
 !---------------------------------------------------------------------*/
       *NZ = 0;
       FMR = 1.0*MR;
-      SGN = -SIGN(PI,FMR);
+      SGN = -SIGN(PI_LOC,FMR);
 /*----------------------------------------------------------------------
 !     CSPN AND CSGN ARE COEFF OF K AND I FUNCIONS RESP.
 !---------------------------------------------------------------------*/
@@ -1119,7 +1120,7 @@ void ZACON(REAL ZR, REAL ZI, REAL FNU, int KODE, int MR, int N, REAL *YR, REAL *
       S1R = CYR[1];
       S1I = CYI[1];
       FMR = 1.0*MR;
-      SGN = -SIGN(PI,FMR);
+      SGN = -SIGN(PI_LOC,FMR);
       CSGNR = ZEROR;
       CSGNI = SGN;
       if (KODE == 1) goto e10;
