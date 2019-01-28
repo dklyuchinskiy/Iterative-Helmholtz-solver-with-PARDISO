@@ -211,7 +211,7 @@ int main()
 					   // 150 pts  - 20 % and 10 % if beta = 0.05;
 					   //          - 6 % and 3 % if beta = 0.1
 					   // 200 pts  - 4 % and 4 % if beta = 0.1, 6 % and ? if beta = 0.2
-	int spg_pts = 25; // 250 pts  - 3 % and 3 % if beta = 0.1
+	int spg_pts = 50; // 250 pts  - 3 % and 3 % if beta = 0.1
 
 	// 3D
 	// 100 pt - 19 % if beta = 0.05
@@ -317,7 +317,7 @@ int main()
 
 	double lambda = (double)(c_z) / nu;
 	double ppw = lambda / x.h;
-	int niter = 4;  // 4 iter for freq = 2
+	int niter = 25;  // 4 iter for freq = 2
 					// 12 iter for freq = 4
 
 	printf("The length of the wave: %lf\n", lambda);
@@ -663,9 +663,9 @@ int main()
 #define GNUPLOT
 #endif
 
-//#define OUTPUT
+#define OUTPUT
 #ifdef OUTPUT
-	output("ChartsFreq2/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+	output("ChartsFreq4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
 #endif
 
 	printf("----------------------------------------------\n");
@@ -721,12 +721,12 @@ int main()
 
 #ifdef GNUPLOT
 	pml_flag = true;
-	gnuplot("ChartsFreq2/model_ft", "ChartsFreq2/real/ex_pard", pml_flag, 4, x, y, z);
-	gnuplot("ChartsFreq2/model_ft", "ChartsFreq2/imag/ex_pard", pml_flag, 5, x, y, z);
-	gnuplot("ChartsFreq2/model_ft", "ChartsFreq2/real/helm_ft", pml_flag, 6, x, y, z);
-	gnuplot("ChartsFreq2/model_ft", "ChartsFreq2/imag/helm_ft", pml_flag, 7, x, y, z);
-	gnuplot("ChartsFreq2/model_ft", "ChartsFreq2/real/diff", pml_flag, 8, x, y, z);
-	gnuplot("ChartsFreq2/model_ft", "ChartsFreq2/imag/diff", pml_flag, 9, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/ex_pard", pml_flag, 4, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/imag/ex_pard", pml_flag, 5, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/helm_ft", pml_flag, 6, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/imag/helm_ft", pml_flag, 7, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/diff", pml_flag, 8, x, y, z);
+	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/imag/diff", pml_flag, 9, x, y, z);
 #else
 	printf("No printing results...\n");
 #endif

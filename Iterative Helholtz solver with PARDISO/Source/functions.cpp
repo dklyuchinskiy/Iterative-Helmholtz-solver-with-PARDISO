@@ -410,9 +410,10 @@ void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double sp
 		double norm = RelError(zlange, size2D, 1, &x_sol_nopml[k * size2D], &x_orig_nopml[k * size2D], size, 0.001);
 		norms_re[k] = RelError(dlange, size2D, 1, &x_sol_re[k * size2D], &x_orig_re[k * size2D], size, eps1p);
 		norms_im[k] = RelError(dlange, size2D, 1, &x_sol_im[k * size2D], &x_orig_im[k * size2D], size, eps1p);
-		printf("i = %d norm = %lf norm_re = %lf norm_im = %lf\n", k, norm, norms_re[k], norms_im[k]);
+		if (niter == 25) printf("i = %d norm = %lf norm_re = %lf norm_im = %lf\n", k, norm, norms_re[k], norms_im[k]);
 	}
 
+#if 0
 	FILE* fout;
 	char str[255];
 	sprintf(str, "Nit%d_N%d_Lx%d_FREQ%d_PPW%4.2lf_SPG%6.lf_BETA%5.3lf.dat", niter, n1, (int)LENGTH_X, (int)nu, ppw, spg, beta_eq);
@@ -422,6 +423,7 @@ void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double sp
 		fprintf(fout, "%d %lf %lf\n", k, norms_re[k], norms_im[k]);
 
 	fclose(fout);
+#endif
 }
 
 void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_sol, point source, double thresh)
@@ -1410,8 +1412,8 @@ dtype beta2D_pml_13pts(size_m x, size_m y, DIAG13 diag_case, dtype kwave_beta2, 
 	{
 	case DIAG13::zero:
 
-		value = -alpha(x, i + 0.5) * (g1 * g1 * (alpha(x, i + 0.5) + alpha(x, i - 0.5)) + g2 * g2 * (alpha(x, i + 1.5) + alpha(x, i - 1.5))) / (x.h * x.h)
-			    -alpha(x, j - 0.5) * (g1 * g1 * (alpha(y, j + 0.5) + alpha(y, j - 0.5)) + g2 * g2 * (alpha(y, j + 1.5) + alpha(y, j - 1.5))) / (y.h * y.h);
+		value = -alpha(x, i) * (g1 * g1 * (alpha(x, i + 0.5) + alpha(x, i - 0.5)) + g2 * g2 * (alpha(x, i + 1.5) + alpha(x, i - 1.5))) / (x.h * x.h)
+			    -alpha(y, j) * (g1 * g1 * (alpha(y, j + 0.5) + alpha(y, j - 0.5)) + g2 * g2 * (alpha(y, j + 1.5) + alpha(y, j - 1.5))) / (y.h * y.h);
 		value += kwave_beta2;
 
 
@@ -1420,40 +1422,40 @@ dtype beta2D_pml_13pts(size_m x, size_m y, DIAG13 diag_case, dtype kwave_beta2, 
 		return value;
 
 	case DIAG13::one:
-		return alpha(x, i + 0.5) * (g1 * g1 * alpha(x, i + 0.5) - g1 * g2 * (alpha(x, i - 0.5) + alpha(x, i + 1.5))) / (x.h * x.h);
+		return alpha(x, i) * (g1 * g1 * alpha(x, i + 0.5) - g1 * g2 * (alpha(x, i - 0.5) + alpha(x, i + 1.5))) / (x.h * x.h);
 
 	case DIAG13::m_one:
-		return alpha(x, i + 0.5) * (g1 * g1 * alpha(x, i - 0.5) - g1 * g2 * (alpha(x, i + 0.5) + alpha(x, i - 1.5))) / (x.h * x.h);
+		return alpha(x, i) * (g1 * g1 * alpha(x, i - 0.5) - g1 * g2 * (alpha(x, i + 0.5) + alpha(x, i - 1.5))) / (x.h * x.h);
 
 	case DIAG13::two:
-		return alpha(x, i + 0.5) * g1 * g2 * (alpha(x, i + 0.5) + alpha(x, i + 1.5)) / (x.h * x.h);
+		return alpha(x, i) * g1 * g2 * (alpha(x, i + 0.5) + alpha(x, i + 1.5)) / (x.h * x.h);
 
 	case DIAG13::m_two:
-		return alpha(x, i + 0.5) * g1 * g2 * (alpha(x, i - 0.5) + alpha(x, i - 1.5)) / (x.h * x.h);
+		return alpha(x, i) * g1 * g2 * (alpha(x, i - 0.5) + alpha(x, i - 1.5)) / (x.h * x.h);
 
 	case DIAG13::three:
-		return alpha(x, i + 0.5) * g2 * g2 * alpha(x, i + 1.5) / (x.h * x.h);
+		return alpha(x, i) * g2 * g2 * alpha(x, i + 1.5) / (x.h * x.h);
 
 	case DIAG13::m_three:
-		return alpha(x, i + 0.5) * g2 * g2 * alpha(x, i - 1.5) / (x.h * x.h);
+		return alpha(x, i) * g2 * g2 * alpha(x, i - 1.5) / (x.h * x.h);
 
 	case DIAG13::four:
-		return alpha(y, j - 0.5) * (g1 * g1 * alpha(y, j + 0.5) - g1 * g2 * (alpha(y, j - 0.5) + alpha(y, j + 1.5))) / (y.h * y.h);
+		return alpha(y, j) * (g1 * g1 * alpha(y, j + 0.5) - g1 * g2 * (alpha(y, j - 0.5) + alpha(y, j + 1.5))) / (y.h * y.h);
 
 	case DIAG13::m_four:
-		return alpha(y, j - 0.5) * (g1 * g1 * alpha(y, j - 0.5) - g1 * g2 * (alpha(y, j + 0.5) + alpha(y, j - 1.5))) / (y.h * y.h);
+		return alpha(y, j) * (g1 * g1 * alpha(y, j - 0.5) - g1 * g2 * (alpha(y, j + 0.5) + alpha(y, j - 1.5))) / (y.h * y.h);
 
 	case DIAG13::five:
-		return alpha(y, j - 0.5) * g1 * g2 * (alpha(y, j + 0.5) + alpha(y, j + 1.5)) / (y.h * y.h);
+		return alpha(y, j) * g1 * g2 * (alpha(y, j + 0.5) + alpha(y, j + 1.5)) / (y.h * y.h);
 
 	case DIAG13::m_five:
-		return alpha(y, j - 0.5) * g1 * g2 * (alpha(y, j - 0.5) + alpha(y, j - 1.5)) / (y.h * y.h);
+		return alpha(y, j) * g1 * g2 * (alpha(y, j - 0.5) + alpha(y, j - 1.5)) / (y.h * y.h);
 
 	case DIAG13::six:
-		return alpha(y, j - 0.5) * g2 * g2 * alpha(y, j + 1.5) / (y.h * y.h);
+		return alpha(y, j) * g2 * g2 * alpha(y, j + 1.5) / (y.h * y.h);
 
 	case DIAG13::m_six:
-		return alpha(y, j - 0.5) * g2 * g2 * alpha(y, j - 1.5) / (y.h * y.h);
+		return alpha(y, j) * g2 * g2 * alpha(y, j - 1.5) / (y.h * y.h);
 
 	default:
 		return 0;
@@ -1681,8 +1683,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		if (nu == 2) ratio = 15;
 		else ratio = 3;
 
-	//	if (kww < ratio * k2)
-		if (1)
+		if (kww < ratio * k2)
+	//	if (1)
 		{
 		
 #ifdef TEST_HELM_1D
@@ -1774,9 +1776,22 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *x_orig_nopml = alloc_arr<dtype>(size_nopml);
 
+	// test
+	dtype *f_sol = alloc_arr<dtype>(size);
+	dtype *x_gmres_nopml = alloc_arr<dtype>(size_nopml);
+	dtype *f_sol_nopml = alloc_arr<dtype>(size_nopml);
+
+	// test2
+	double *x_orig_re = alloc_arr<double>(size_nopml);
+	double *x_sol_re = alloc_arr<double>(size_nopml);
+	double *x_orig_im = alloc_arr<double>(size_nopml);
+	double *x_sol_im = alloc_arr<double>(size_nopml);
+
 	// vars
 	dtype calpha;
 	double dalpha;
+	double norm_re;
+	double norm_im;
 
 #pragma omp parallel for simd schedule(simd:static)
 	for (int i = 0; i < size; i++)
@@ -1916,10 +1931,22 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			printf("-----------\n");
 			printf("Residual in 3D phys domain |(I - deltaL * L^{-1}) * x_sol - f| = %e\n", RelRes);
 
-			// 6. Solve L_0 * x_sol = x_gmres
+			// 6. Solve L_0 ^(-1) * x_gmres = x_sol
 			printf("-----Step 5. Solve the last system-----\n");
 			Solve3DSparseUsingFT(x, y, z, iparm, perm, pt, D2csr, x0, x_sol, thresh);
 
+			// 7. Test ||L0 * u_sol - w|| / ||w||
+			Multiply3DSparseUsingFT(x, y, z, iparm, perm, pt, D2csr, x_sol, f_sol, thresh);
+
+			reducePML3D(x, y, z, size, f_sol, size_nopml, f_sol_nopml);
+			reducePML3D(x, y, z, size, x0, size_nopml, x_gmres_nopml);
+
+			norm = RelError(zlange, size_nopml, 1, f_sol_nopml, x_gmres_nopml, size_nopml, thresh);
+
+			printf("Residual in 3D phys domain |L0 * u_sol - x_gmres| / |x_gmres| = %e\n", norm);
+			printf("-----------\n");
+
+			// 8. Reduce pml
 			for (int k = 0; k < z.n; k++)
 			{
 				int src = size2D / 2;
@@ -1935,6 +1962,17 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			printf("-----------\n");
 
 			fprintf(output, "%d %e %lf\n", j, RelRes, norm);
+
+			check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, j, 0, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
+
+			norm_re = rel_error(dlange, size_nopml, 1, x_sol_re, x_orig_re, size_nopml, thresh);
+			norm_im = rel_error(dlange, size_nopml, 1, x_sol_im, x_orig_im, size_nopml, thresh);
+			norm = rel_error(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
+
+			printf("norm_re = %lf\n", norm_re, thresh);
+			printf("norm_im = %lf\n", norm_im, thresh);
+			printf("norm = %lf\n", norm, thresh);
+			printf("--------------------------------------------------------------------------------\n");
 		}
 		
 			// For the next step
@@ -1981,6 +2019,13 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	free_arr(x0);
 	free_arr(x_init);
 	free_arr(Ax0_nopml);
+	free_arr(x_orig_re);
+	free_arr(x_orig_im);
+	free_arr(x_sol_re);
+	free_arr(x_sol_im);
+	free_arr(f_sol_nopml);
+	free_arr(f_sol);
+	free_arr(x_gmres_nopml);
 }
 
 void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, double eps)

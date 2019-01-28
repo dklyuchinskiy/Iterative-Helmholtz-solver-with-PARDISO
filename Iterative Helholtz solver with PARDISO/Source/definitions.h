@@ -173,12 +173,12 @@ enum class DIAG13
 //#define TEST_HELM_1D
 
 #ifdef HELMHOLTZ
-#define nu 2
+#define nu 4
 #define c_z 1280.0
 /*--------------*/
 #define ky 1.8
 //#define beta_eq 0.005
-#define beta_eq 0.2
+#define beta_eq 0.5
 
 #define omega 2.0 * (PI) * (nu)
 #define kk ((omega) / (c_z))
