@@ -1641,6 +1641,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	printf("SOURCE in 2D WITH PML AT: (%lf, %lf)\n", sourcePML.x, sourcePML.y);
 
 	double sigma = 0.25;
+	double mem_pard = 0;
 
 	time = omp_get_wtime();
 	//GenSparseMatrixOnline2DwithPMLand9Points(-1, x, y, z, D2csr_zero, 0, freqs, sigma);
@@ -1686,7 +1687,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		if (kww < ratio * k2)
 	//	if (1)
 		{
-		
+			printf("Solved k = %d beta2 = (%lf, %lf)\n", k, kwave_beta2.real(), kwave_beta2.imag());
 #ifdef TEST_HELM_1D
 			non_zeros_in_2Dblock3diag += y.n * 2;
 			non_zeros_in_2Dblock3diag += x.n * 2;
@@ -1719,6 +1720,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &zdum, &zdum, &error);
 			if (error != 0) printf("!!! ANALYSIS ERROR: %d !!!\n", error);
 
+			mem_pard = max(iparm[14], iparm[15] + iparm[16]);
+
 			phase = 22;
 			pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &zdum, &zdum, &error);
 			if (error != 0) printf("!!! FACTORIZATION ERROR: %d !!!\n", error);
@@ -1736,13 +1739,19 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		}
 	}
 
-	double mem = 2.0 * non_zeros_in_2Dblock3diag / (1024 * 1024 * 1024);
+	double mem = 2.0 * non_zeros_in_2Dblock9diag / (1024 * 1024 * 1024);
 	mem += double(size2D + 1) / (1024 * 1024 * 1024);
 	mem *= count;
-
 	mem += double(z.n * size2D) / (1024 * 1024 * 1024);
 
+	mem *= 8; // bytes
+	mem *= 2;
+
 	printf("Memory for %d 2D matrices: %lf Gb\n", count, mem);
+	
+	mem_pard /= (1024 * 1024);
+	mem_pard *= count;
+	printf("Memory for %d PARDISO factor + analysis 2D matrices: %lf Gb\n", count, mem_pard);
 	
 #ifndef PERF
 	system("pause");
@@ -3883,8 +3892,6 @@ void Multiply3DSparseUsingFT(size_m x, size_m y, size_m z, int *iparm, int *perm
 			//pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &f_FFT[k * size2D], &x_sol_prd[k * size2D], &error);
 			mkl_zcsrgemv("no", &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &u_FFT[k * size2D], &f_sol_gemv[k * size2D]);
 		}
-
-
 	}
 	time = omp_get_wtime() - time;
 
