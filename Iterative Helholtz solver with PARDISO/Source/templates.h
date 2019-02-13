@@ -60,7 +60,7 @@ void check_test_3Dsolution_in1D(int n1, int n2, int n3, dtype* u_sol, dtype *u_e
 void SetRHS3DForTest(size_m xx, size_m yy, size_m zz, dtype* f, point source, int& l);
 void Copy2DCSRMatrix(int size2D, int nonzeros, ccsr* &A, ccsr* &B);
 void GenSparseMatrixOnline2DwithPMLand9Points(int w, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave_beta2, int* freqs, double sigma);
-void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave_beta2, int* freqs);
+void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acsr, dtype kwave_beta2, int* freqs);
 dtype beta2D_pml(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, int j);
 dtype beta2D_pml_9pts(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, int j, double sigma);
 dtype beta2D_pml_13pts(size_m x, size_m y, DIAG13 diag_case, dtype kwave_beta2, int i, int j);
@@ -123,12 +123,14 @@ void DirFactFastDiagStruct(int n1, int n2, int n3, double *D, int ldd, double *B
 
 
 void ResidCSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, double &RelRes);
+void ResidCSR2D(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, double &RelRes);
 void GenSparseMatrix(size_m x, size_m y, size_m z, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, dcsr* Acsr);
 
 void GenRHSandSolution(size_m x, size_m y, size_m z, dtype *u, dtype *f, point source, int &l);
+void GenRHSandSolution2D(size_m x, size_m y, ccsr* D2csr, dtype* u_ex2D, dtype* f2D, double kwave2, point sourcePML, int &src);
 void GenSparseMatrixOnline2D(char *str, int w, size_m x, size_m y, size_m z, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
 void GenSparseMatrixOnline3D(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr);
-void GenSparseMatrixOnline2DwithPML(int i, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave2, int* freqs);
+void GenSparseMatrixOnline2DwithPML(int i, size_m x, size_m y, ccsr* Acsr, dtype kwave2, int* freqs);
 void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, double eps);
 map<vector<int>, dtype> Block1DRowMat_to_CSR(int blk, int n1, int n2, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, int& non_zeros_on_prev_level);
 void GenRhs2D(int w, size_m x, size_m y, size_m z, dtype* f, dtype* f2D);
@@ -143,6 +145,7 @@ void reducePML3D_FT(size_m x, size_m y, size_m z, int size1, dtype *vect, int si
 map<vector<int>, dtype> BlockRowMat_to_CSR(int blk, int n1, int n2, int n3, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, int& non_zeros_on_prev_level);
 //void construct_block_row(int m, int n, dtype* BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, dtype* AR, int ldar);
 void shift_values(int rows, int *ia, int shift_non_zeros, int non_zeros, int *ja, int shift_columns);
+void GenRHSandSolution2DComplexWaveNumber(size_m x, size_m y, ccsr* D2csr, dtype* u_ex2D, dtype* f2D, dtype kwave2, point sourcePML, int &src);
 
 void count_dense_elements(int m, int n, double *A, int lda, int& non_zeros);
 void SolvePardiso3D(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_pard, dtype* f, double thresh);
@@ -164,7 +167,7 @@ dtype Hankel(double x);
 dtype Hankel(dtype z);
 void get_exact_2D_Hankel(int Nx, int Ny, size_m x, size_m y, dtype* x_sol_ex, dtype k, point source);
 double resid_2D_Hankel(size_m y, size_m z, ccsr* D2csr, dtype* x_sol_ex, dtype* f2D, point source);
-void ResidCSR2D(size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, point source, double &RelRes);
+void ResidCSR2DHelm(size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, point source, double &RelRes);
 void normalization_of_exact_sol(int n1, int n2, size_m x, size_m y, dtype *x_sol_ex, dtype alpha_k);
 void check_norm_result(int n1, int n2, int n3, dtype* x_orig_no_pml, dtype* x_sol);
 dtype set_exact_2D_Hankel(double x, double y, dtype k, point source);

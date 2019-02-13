@@ -200,7 +200,9 @@ int main()
 #ifndef PERF
 	TestAll();
 #endif
-//	system("pause");
+	Test2DLaplaceLevander4th();
+	//Test2DHelmholtzLevander4th();
+	system("pause");
 //	return 0;
 #if 1
 						

@@ -97,7 +97,7 @@ void NormalizeVector(int size, dtype* v, dtype* out, double &norm)
 	norm = dznrm2(&size, v, &ione);
 
 	// Compute 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < size; i++)
 		out[i] = v[i] / norm;
 }
@@ -362,7 +362,7 @@ void check_norm_result(int n1, int n2, int n3, dtype* x_orig_nopml, dtype* x_sol
 
 	for (int k = 0; k < n3; k++)
 	{
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < size2D; i++)
 		{
 			x_orig_re[i] = x_orig_nopml[i + k * size2D].real();
@@ -396,7 +396,7 @@ void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double sp
 	double *norms_re = alloc_arr<double>(n3);
 	double *norms_im = alloc_arr<double>(n3);
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < size; i++)
 	{
 		x_orig_re[i] = x_orig_nopml[i].real();
@@ -1070,7 +1070,7 @@ double resid_2D_Hankel(size_m x, size_m y, ccsr* D2csr, dtype* x_sol_ex, dtype* 
 	double RelRes = 0;
 	dtype *g = alloc_arr<dtype>(size);
 
-	ResidCSR2D(x, y, D2csr, x_sol_ex, f2D, g, source, RelRes);
+	ResidCSR2DHelm(x, y, D2csr, x_sol_ex, f2D, g, source, RelRes);
 
 	free_arr(g);
 	return RelRes;
@@ -1083,7 +1083,7 @@ void GenerateDiagonal2DBlock(char* problem, int blk3D, size_m x, size_m y, size_
 	double k = (double)kk;
 
 	// diagonal blocks in dense format
-	//#pragma omp parallel for simd schedule(simd:static)
+	//#pragma omp parallel for simd schedule(static)
 	for (int blk2D = 0; blk2D < y.n; blk2D++)
 	{
 		SetPml2D(blk3D, blk2D, x, y, z, n, alpX, alpY, alpZ);
@@ -1402,8 +1402,13 @@ dtype beta2D_pml_9pts(size_m x, size_m y, int diag_case, dtype kwave_beta2, int 
 
 dtype beta2D_pml_13pts(size_m x, size_m y, DIAG13 diag_case, dtype kwave_beta2, int i, int j)
 {
+#ifdef ORDER4
 	double g1 = 9.0 / 8;
 	double g2 = -1.0 / 24;
+#else
+	double g1 = 1.0;
+	double g2 = 0.0;
+#endif
 
 	dtype value;
 	int l;
@@ -1646,7 +1651,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	time = omp_get_wtime();
 	//GenSparseMatrixOnline2DwithPMLand9Points(-1, x, y, z, D2csr_zero, 0, freqs, sigma);
 	//GenSparseMatrixOnline2DwithPML(-1, x, y, z, D2csr_zero, 0, freqs);
-	GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, z, D2csr_zero, 0, freqs);  // does not work now
+	GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, D2csr_zero, 0, freqs);  // does not work now
 	time = omp_get_wtime() - time;
 	printf("time for constructing = %lf sec\n", time);
 
@@ -1708,7 +1713,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 
 			D2csr[k]->solve = 1;
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 			for (int i = 0; i < size; i++)
 				D2csr[k]->values[freqs[i]] += kwave_beta2;
 #endif
@@ -1802,7 +1807,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	double norm_re;
 	double norm_im;
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < size; i++)
 		x_init[i] = 0;
 
@@ -1890,7 +1895,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			zcopy(&size, x_init, &ione, x0, &ione);
 
 			// Set eBeta
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 			for (int i = 0; i < m + 1; i++)
 				eBeta[i] = 0;
 
@@ -2239,7 +2244,7 @@ void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtyp
 
 }
 
-void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave_beta2, int* freqs)
+void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, ccsr* Acsr, dtype kwave_beta2, int* freqs)
 {
 	int size = x.n * y.n;
 	int size2 = size - y.n;
@@ -2251,11 +2256,6 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, size_m z, ccsr* A
 
 	int count = 0;
 	int count2 = 0;
-
-#ifdef TEST_HELM_1D
-	non_zeros_in_2Dblock3diag += y.n * 2;
-	non_zeros_in_2Dblock3diag += x.n * 2;
-#endif
 
 	//double k = (double)kk;
 	//double kww = 4.0 * PI * PI * (w - n2) * (w - n2) / (y.l * y.l);
@@ -2271,7 +2271,7 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, size_m z, ccsr* A
 
 	if (w == -1)
 	{
-
+#if 0
 		for (int l1 = 0; l1 < size; l1++)
 		{
 			Acsr->ia[l1] = count + 1;
@@ -2284,15 +2284,12 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, size_m z, ccsr* A
 				{
 					Acsr->ja[count] = l2 + 1;
 					freqs[count2++] = count;
-#ifdef HELMHOLTZ
+
 					//Acsr->values[count] = dtype{ kwave2, 0 };
 					//Acsr->values[count] += dtype{ 0, k * k * beta_eq };
 					//Acsr->values[count] = dtype{ k * k, 0 };
 					//Acsr->values[count] -= dtype{ kww, 0 };
 					Acsr->values[count++] = beta2D_pml(x, y, 0, kwave_beta2, j1, k1);
-#else
-					Acsr->values[count++] = beta2D(x, y, 0, j1, k1);
-#endif
 
 				}
 				else if (l1 == l2 - 1 && (l1 + 1) % x.n != 0)
@@ -2315,31 +2312,58 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, size_m z, ccsr* A
 					Acsr->ja[count] = l2 + 1;
 					Acsr->values[count++] = beta2D_pml(x, y, -2, kwave_beta2, j1, k1); // left
 				}
-#ifdef TEST_HELM_1D
-				else if (l1 == l2 - x.n + 1 && l1 % x.n == 0)
-				{
-					Acsr->ja[count] = l2 + 1;
-					Acsr->values[count++] = 1.0 / (x.h * x.h);
-				}
-				else if (l1 == l2 + x.n - 1 && (l1 + 1) % x.n == 0)
-				{
-					Acsr->ja[count] = l2 + 1;
-					Acsr->values[count++] = 1.0 / (x.h * x.h);
-				}
-				else if (l1 == l2 - size + x.n && l1 < x.n)
-				{
-					Acsr->ja[count] = l2 + 1;
-					Acsr->values[count++] = 1.0 / (y.h * y.h);
-				}
-				else if (l1 == l2 + size - x.n && l1 >= (size - x.n))
-				{
-					Acsr->ja[count] = l2 + 1;
-					Acsr->values[count++] = 1.0 / (y.h * y.h);
-				}
-#endif
 
 			}
 		}
+#else
+		int l2;
+		for (int l1 = 0; l1 < size; l1++)
+		{
+			Acsr->ia[l1] = count + 1;
+
+			l2 = l1 - x.n;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 >= 0)
+			{
+				Acsr->ja[count] = l2 + 1;
+				Acsr->values[count++] = beta2D_pml(x, y, -2, kwave_beta2, j1, k1);
+			}
+
+			l2 = l1 - 1;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 >= 0 && l1 % x.n != 0)
+			{
+				Acsr->ja[count] = l2 + 1;
+				Acsr->values[count++] = beta2D_pml(x, y, -1, kwave_beta2, j1, k1);
+			}
+
+			l2 = l1;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (1)
+			{
+				Acsr->ja[count] = l2 + 1;
+				freqs[count2++] = count;
+				Acsr->values[count++] = beta2D_pml(x, y, 0, kwave_beta2, j1, k1);
+			}
+
+			l2 = l1 + 1;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 < size && l2 % x.n != 0)
+			{
+				Acsr->ja[count] = l2 + 1;
+				Acsr->values[count++] = beta2D_pml(x, y, 1, kwave_beta2, j1, k1);
+			}
+
+
+			l2 = l1 + x.n;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 < size)
+			{
+				Acsr->ja[count] = l2 + 1;
+				Acsr->values[count++] = beta2D_pml(x, y, 2, kwave_beta2, j1, k1);
+			}
+		}
+#endif
 
 		if (non_zeros_in_2Dblock3diag != count || size != count2) printf("FAILED generation!!! %d != %d\n", non_zeros_in_2Dblock3diag, count);
 		else
@@ -2350,14 +2374,14 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, size_m z, ccsr* A
 	}
 	else
 	{
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < size; i++)
 			Acsr->values[freqs[i]] += kwave_beta2;
 	
 		//printf("SUCCESSED 2D generation for frequency %d!\n", w);
 	}
 
-	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat.dat");
+	//print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat.dat");
 }
 
 void GenSparseMatrixOnline2DwithPMLand9Points(int w, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave_beta2, int* freqs, double sigma)
@@ -2467,7 +2491,7 @@ void GenSparseMatrixOnline2DwithPMLand9Points(int w, size_m x, size_m y, size_m 
 	}
 	else
 	{
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < size; i++)
 			Acsr->values[freqs[i]] += kwave_beta2;
 
@@ -2476,8 +2500,8 @@ void GenSparseMatrixOnline2DwithPMLand9Points(int w, size_m x, size_m y, size_m 
 
 	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat.dat");
 }
-
-void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, size_m z, ccsr* Acsr, dtype kwave_beta2, int* freqs)
+#if 0
+void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acsr, dtype kwave_beta2, int* freqs)
 {
 	int size = x.n * y.n;
 	int size2 = size - 1 * y.n;
@@ -2498,14 +2522,6 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, size_m z,
 	non_zeros_in_2Dblock3diag += y.n * 2;
 	non_zeros_in_2Dblock3diag += x.n * 2;
 #endif
-
-	//double k = (double)kk;
-	//double kww = 4.0 * PI * PI * (w - n2) * (w - n2) / (y.l * y.l);
-	//double kww = 4 * PI * PI * (w - n2) * (w - n2);
-
-	//printf("Number k = %lf\n", k);
-
-	//printf("analytic non_zeros in PML function: %d\n", non_zeros_in_2Dblock3diag);
 
 
 	if (non_zeros_in_2Dblock13diag != Acsr->non_zeros) printf("ERROR! Uncorrect value of non_zeros inside 2D 13diag: %d != %d\n", non_zeros_in_2Dblock13diag, Acsr->non_zeros);
@@ -2649,10 +2665,10 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, size_m z,
 				}
 			}
 #ifdef DEBUG
-					printf("l1 = %d\n", l1);
-					print_2Dcsr_mat(x, y, Acsr);
+			//		printf("l1 = %d\n", l1);
+			//		print_2Dcsr_mat(x, y, Acsr);
 
-					system("pause");
+			//		system("pause");
 #endif
 		}
 
@@ -2665,7 +2681,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, size_m z,
 	}
 	else
 	{
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < size; i++)
 			Acsr->values[freqs[i]] += kwave_beta2;
 
@@ -2675,6 +2691,227 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, size_m z,
 	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat13pts.dat");
 #undef DEBUG
 }
+#else
+void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acsr, dtype kwave_beta2, int* freqs)
+{
+	int size = x.n * y.n;
+	int size2 = size - 1 * y.n;
+	int size3 = size - 2 * y.n;
+	int size4 = size - 3 * y.n;
+	int size5 = size - 1 * x.n;
+	int size6 = size - 2 * x.n;
+	int size7 = size - 3 * x.n;
+	int non_zeros_in_2Dblock13diag = size + 2 * size2 + 2 * size3 + 2 * size4 + 2 * size5 + 2 * size6 + 2 * size7;
+	double RelRes = 0;
+	int j1, k1;
+
+	int count = 0;
+	int count2 = 0;
+	int l2;
+
+
+	if (non_zeros_in_2Dblock13diag != Acsr->non_zeros) printf("!!!ERROR!!! Uncorrect value of non_zeros inside 2D 13diag: %d != %d\n", non_zeros_in_2Dblock13diag, Acsr->non_zeros);
+	//	else printf("Gen 2D matrix for frequency w = %d, k^2 - ky^2 = (%lf %lf)\n", w, kwave_beta2.real(), kwave_beta2.imag());
+
+
+//#define DEBUG
+
+	if (w == -1)
+	{
+		// строки
+		for (int l1 = 0; l1 < size; l1++)
+		{
+			Acsr->ia[l1] = count + 1;
+			// столбцы
+
+			l2 = l1 - 3 * x.n;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 >= 0)
+			{
+				Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::m_six);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::m_six, kwave_beta2, j1, k1); // left
+#endif	
+			}
+
+			l2 = l1 - 2 * x.n;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 >= 0)
+			{
+				Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::m_five);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::m_five, kwave_beta2, j1, k1); // left
+#endif
+			}
+
+			l2 = l1 - x.n;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 >= 0)
+			{
+				Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::m_four);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::m_four, kwave_beta2, j1, k1); // left
+#endif
+			}
+
+			l2 = l1 - 3;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 >= 0 && (l2 + 1) % x.n != 0 && (l2 + 2) % x.n != 0 && (l2 + 3) % x.n != 0)
+			{
+				// не пишем, если номер строки -1, 2 строки кратен Nx
+				Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::m_three);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::m_three, kwave_beta2, j1, k1); // left
+#endif
+			}
+
+			l2 = l1 - 2;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 >= 0 && (l1 - 1) % x.n != 0 && l1 % x.n != 0)
+			{
+				Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::m_two);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::m_two, kwave_beta2, j1, k1); // left
+#endif
+			}
+
+			l2 = l1 - 1;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 >= 0 && l1 % x.n != 0)
+			{
+				Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::m_one);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::m_one, kwave_beta2, j1, k1); // left
+#endif
+			}
+
+			l2 = l1;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (1)
+			{
+				Acsr->ja[count] = l2 + 1;
+				freqs[count2++] = count;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::zero);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::zero, kwave_beta2, j1, k1);
+#endif
+
+			}
+
+			l2 = l1 + 1;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 < size && l2 % x.n != 0)
+			{
+				Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::one);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::one, kwave_beta2, j1, k1); // right
+#endif
+			}
+
+			l2 = l1 + 2;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 < size && (l2 - 1) % x.n != 0 && l2 % x.n != 0)
+			{
+				// не пишем, если номер строки + 1, 2, 3 строки кратен Nx
+				Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::two);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::two, kwave_beta2, j1, k1); // right
+#endif
+			}
+
+			l2 = l1 + 3;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l1 == l2 - 3 && (l1 + 1) % x.n != 0 && (l1 + 2) % x.n != 0 && (l1 + 3) % x.n != 0)
+			{
+				Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::three);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::three, kwave_beta2, j1, k1); // right
+#endif
+			}
+
+			l2 = l1 + x.n;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 < size)
+			{
+				Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::four);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::four, kwave_beta2, j1, k1); // right
+#endif
+			}
+
+			l2 = l1 + 2 * x.n;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 < size)
+			{
+				Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::five);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::five, kwave_beta2, j1, k1); // right
+#endif
+			}
+
+			l2 = l1 + 3 * x.n;
+			take_coord2D(x.n, y.n, l2, j1, k1);
+			if (l2 < size)
+			{
+				Acsr->ja[count] = l2 + 1;
+#ifdef DEBUG
+				Acsr->values[count++] = static_cast<int>(DIAG13::six);
+#else
+				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::six, kwave_beta2, j1, k1); // right
+#endif
+			}
+
+#ifdef DEBUG
+			//		printf("l1 = %d\n", l1);
+			//		print_2Dcsr_mat(x, y, Acsr);
+
+			//		system("pause");
+#endif
+		}
+
+		if (non_zeros_in_2Dblock13diag != count || size != count2) printf("FAILED generation!!! %d != %d\n", non_zeros_in_2Dblock13diag, count);
+		else
+		{
+			printf("SUCCESSED BASIC 2D generation!\n");
+			printf("Non_zeros inside generating PML function: %d\n", count);
+		}
+	}
+	else
+	{
+#pragma omp parallel for simd schedule(static)
+		for (int i = 0; i < size; i++)
+			Acsr->values[freqs[i]] += kwave_beta2;
+
+		//	printf("SUCCESSED 2D generation for frequency %d!\n", w);
+	}
+
+	//print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat13pts.dat");
+#undef DEBUG
+}
+#endif
 
 void GenSparseMatrixOnline2DwithSPONGE(int w, size_m x, size_m y, size_m z, ccsr* Acsr, double kwave2)
 {
@@ -3127,9 +3364,9 @@ dtype F2D_ex_complex(size_m xx, size_m yy, double x, double y, point source, int
 {
 	if (x == source.x && y == source.y)
 	{
-		printf("SOURCE AT x = %lf, y = %lf\n", x, y);
+		printf("SET SOURCE AT x = %lf, y = %lf\n", x, y);
 		l = x / xx.h - 1 + xx.n * (y / yy.h - 1);
-		return 1.0 / (xx.h * yy.h);
+		return 2.0 / (xx.h * yy.h);
 	}
 	else
 	{
@@ -3230,7 +3467,7 @@ void ResidCSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, 
 	// Multiply matrix A in CSR format by vector x_sol to obtain f1
 	mkl_zcsrgemv("No", &size, Dcsr->values, Dcsr->ia, Dcsr->ja, x_sol, f1);
 
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < size; i++)
 		g[i] = f[i] - f1[i];
 
@@ -3257,7 +3494,7 @@ void ResidCSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_sol, dtype *f, 
 	free_arr(f_nopml);
 }
 
-void ResidCSR2D(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, point source, double &RelRes)
+void ResidCSR2DHelm(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, point source, double &RelRes)
 {
 	int n = x.n;
 	int size = n * y.n;
@@ -3271,11 +3508,9 @@ void ResidCSR2D(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g
 		dtype val;
 	} p1;
 
-
 	// Multiply matrix A in CSR format by vector x_sol to obtain f1
 	mkl_zcsrgemv("No", &size, Dcsr->values, Dcsr->ia, Dcsr->ja, x_sol, f1);
 
-//#pragma omp parallel for schedule(static)
 	for (int i = 0; i < size; i++)
 	{
 		g[i] = f[i] - f1[i];
@@ -3290,8 +3525,6 @@ void ResidCSR2D(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g
 		}
 	}
 
-	//	for (int i = 0; i < size; i++)
-	//		printf("%lf %lf\n", f[i], f1[i]);
 
 #ifdef DEBUG
 	print_vec(size, f, g, "f and g");
@@ -3303,12 +3536,57 @@ void ResidCSR2D(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g
 	reducePML2D(x, y, size, f, size_nopml, f_nopml);
 
 	RelRes = zlange("Frob", &size_nopml, &ione, g_nopml, &size_nopml, NULL);
+	//RelRes /= p1.val.real();
 
 	f[p1.i] = p1.val;
 
 	printf("End resid\n");
 
 	free_arr(f1);
+	free_arr(g_nopml);
+	free_arr(f_nopml);
+}
+
+void ResidCSR2D(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, double &RelRes)
+{
+	int size = x.n * y.n;
+	int size_nopml = x.n_nopml * y.n_nopml;
+	dtype *f1 = alloc_arr<dtype>(size);
+	dtype *g_nopml = alloc_arr<dtype>(size_nopml);
+	dtype *f_nopml = alloc_arr<dtype>(size_nopml);
+	int ione = 1;
+
+	FILE *out = fopen("ResidTestCSR2D.dat", "w");
+
+	// Multiply matrix A in CSR format by vector x_sol to obtain f1
+	mkl_zcsrgemv("No", &size, Dcsr->values, Dcsr->ia, Dcsr->ja, x_sol, f1);
+
+#pragma omp parallel for schedule(static)
+	for (int i = 0; i < size; i++)
+		g[i] = f[i] - f1[i];
+
+	for (int i = 0; i < size; i++)
+	fprintf(out, "%d %lf %lf\n", i, f[i].real(), f1[i].real());
+
+#ifdef DEBUG
+	print_vec(size, f, g, "f and g");
+#endif
+
+	reducePML2D(x, y, size, g, size_nopml, g_nopml);
+	reducePML2D(x, y, size, f, size_nopml, f_nopml);
+
+	//RelRes = zlange("Frob", &size, &ione, g, &size, NULL);
+	//RelRes = RelRes / zlange("Frob", &size, &ione, f, &size, NULL);
+
+	RelRes = zlange("Frob", &size_nopml, &ione, g_nopml, &size_nopml, NULL);
+	RelRes = RelRes / zlange("Frob", &size_nopml, &ione, f_nopml, &size_nopml, NULL);
+
+	printf("End resid\n");
+	fclose(out);
+
+	free_arr(f1);
+	free_arr(g_nopml);
+	free_arr(f_nopml);
 }
 
 
@@ -3640,11 +3918,11 @@ void print_2Dcsr_mat_to_file(size_m x, size_m y, ccsr* D2csr, char * s)
 			if (j == D2csr->ja[count1] - 1)
 			{
 				count1++;
-				fprintf(fout, "%5.2lf ", D2csr->values[count2++].real());
+				fprintf(fout, "%6.3lf ", D2csr->values[count2++].real());
 			}
 			else
 			{
-				//fprintf(fout, "%5.2lf ", 0);
+				//fprintf(fout, "%6.3lf ", 0);
 			}
 		fprintf(fout, "          elems: %d\n", count2);
 	}
@@ -3927,6 +4205,33 @@ void GenRHSandSolution1D(size_m x, dtype* u_ex1D, dtype* f1D, double k, point so
 	GenExact1DHelmholtz(x.n, x, u_ex1D, k, sourcePML);
 }
 
+void GenRHSandSolution2DComplexWaveNumber(size_m x, size_m y, ccsr* D2csr, dtype* u_ex2D, dtype* f2D, dtype kwave2, point sourcePML, int &src)
+{
+	double norm = 0;
+
+	// Set RHS
+	SetRHS2D(x, y, f2D, sourcePML, src);
+
+	printf("src 2D = %d\n", src);
+
+	dtype alpha_k = f2D[src] / (1.0 / (x.h * y.h));
+
+	printf("alpha_k = (%lf, %lf)\n", alpha_k.real(), alpha_k.imag());
+	printf("kwave2 = (%lf, %lf)\n", kwave2.real(), kwave2.imag());
+
+	// exact 1D Helmholtz
+	{
+		//H(sqrt(a + ib))
+		get_exact_2D_Hankel(x.n, y.n, x, y, u_ex2D, sqrt(kwave2), sourcePML);
+
+		normalization_of_exact_sol(x.n, y.n, x, y, u_ex2D, alpha_k);
+
+		norm = resid_2D_Hankel(x, y, D2csr, u_ex2D, f2D, sourcePML);
+		printf("resid ||A * x_sol - kf|| 2D Hankel: %lf\n", norm);
+
+	}
+}
+
 void GenRHSandSolution2D(size_m x, size_m y, ccsr* D2csr, dtype* u_ex2D, dtype* f2D, double kwave2, point sourcePML, int &src)
 {
 	double norm = 0;
@@ -3938,10 +4243,13 @@ void GenRHSandSolution2D(size_m x, size_m y, ccsr* D2csr, dtype* u_ex2D, dtype* 
 
 	dtype alpha_k = f2D[src] / (1.0 / (x.h * y.h));
 
+	printf("alpha_k = (%lf, %lf)\n", alpha_k.real(), alpha_k.imag());
+
 	// exact 1D Helmholtz
 
 	if (kwave2 > 0)
 	{
+		// H(k)
 		get_exact_2D_Hankel(x.n, y.n, x, y, u_ex2D, sqrt(kwave2), sourcePML);
 
 		normalization_of_exact_sol(x.n, y.n, x, y, u_ex2D, alpha_k);
@@ -3952,6 +4260,7 @@ void GenRHSandSolution2D(size_m x, size_m y, ccsr* D2csr, dtype* u_ex2D, dtype* 
 	}
 	else // kwave2 < 0
 	{
+		// H(ik)
 		get_exact_2D_Hankel(x.n, y.n, x, y, u_ex2D, { 0, sqrt(abs(kwave2)) }, sourcePML);
 
 		normalization_of_exact_sol(x.n, y.n, x, y, u_ex2D, alpha_k);
@@ -4008,7 +4317,7 @@ void ComputeResidual(size_m x, size_m y, size_m z, double kw, const dtype* u, co
 	if (count != size) printf("FAIL!!! Uncorrect multiplication f: = A * u\n");
 	else printf("Successed residual\n");
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < size; i++)
 		f_res[i] = f_res[i] - f[i];
 
@@ -4343,14 +4652,14 @@ dtype zdot(int size, dtype* v1, dtype* v2)
 
 void AddDenseVectors(int n, double alpha, double *a, double beta, double *b, double *c)
 {
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < n; i++)
 		c[i] = alpha * a[i] + beta * b[i];
 }
 
 void AddDenseVectorsComplex(int n, dtype alpha, dtype *a, dtype beta, dtype *b, dtype *c)
 {
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < n; i++)
 		c[i] = alpha * a[i] + beta * b[i];
 }
@@ -4796,7 +5105,7 @@ void Block3DSPDSolveFast(int n1, int n2, int n3, double *D, int ldd, double *B, 
 				tt = omp_get_wtime();
 				DirSolveFastDiag(n1, n2, n3, G, ldg, B, g, x1, thresh, smallsize);
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 				for (int i = 0; i < size; i++)
 					x_sol[i] = x_sol[i] + x1[i];
 
@@ -4830,7 +5139,7 @@ void Resid(int n1, int n2, int n3, double *D, int ldd, double *B, double *x_sol,
 
 	Mult_Au(n1, n2, n3, D, ldd, B, x_sol, f1);
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < size; i++)
 		g[i] = f[i] - f1[i];
 
@@ -4919,7 +5228,7 @@ void DirSolveFastDiag(int n1, int n2, int n3, double *G, int ldg, double *B, dou
 	double *tb = alloc_arr(size);
 	double *y = alloc_arr(n);
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < n; i++)
 		tb[i] = f[i];
 
@@ -4928,7 +5237,7 @@ void DirSolveFastDiag(int n1, int n2, int n3, double *G, int ldg, double *B, dou
 		RecMultL(n, 1, &G[ind(k - 1, n) + ldg * 0], ldg, &tb[ind(k - 1, n)], size, y, n, smallsize);	
 		DenseDiagMult(n, &B[ind(k - 1, n)], y, y);
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < n; i++)
 			tb[ind(k, n) + i] = f[ind(k, n) + i] - y[i];
 
@@ -4940,7 +5249,7 @@ void DirSolveFastDiag(int n1, int n2, int n3, double *G, int ldg, double *B, dou
 	{
 		DenseDiagMult(n, &B[ind(k, n)], &x[ind(k + 1, n)], y);
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < n; i++)
 			y[i] = tb[ind(k, n) + i] - y[i];
 
@@ -4958,7 +5267,7 @@ void DiagMult(int n, double *A, int lda, double *d, int small_size)
 
 	if (n <= small_size)     // error 4 - не копировалась матрица в этом случае
 	{
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int j = 0; j < n; j++)
 			for (int i = 0; i < n; i++)
 			{
@@ -4976,13 +5285,13 @@ void DiagMult(int n, double *A, int lda, double *d, int small_size)
 		DiagMult(n2, &A[n1 + lda * n1], lda, &d[n1], small_size);
 
 		// D * U - каждая i-ая строка U умножается на элемент вектора d[i]
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int j = 0; j < n1; j++)
 			for (int i = 0; i < n2; i++)
 				A[i + n1 + lda * (0 + j)] *= d[n1 + i]; // вторая часть массива D
 
 		// VT * D - каждый j-ый столбец умножается на элемент вектора d[j]
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int j = 0; j < n2; j++)
 			for (int i = 0; i < n1; i++)
 				A[i + 0 + lda * (n1 + j)] *= d[j];
