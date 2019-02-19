@@ -155,7 +155,7 @@ void TestInverseTraversal(size_m x, size_m y, size_m z, const point source, cons
 
 	time = omp_get_wtime();
 	//GenSparseMatrixOnline2DwithPMLand9Points(-1, x, y, z, D2csr_zero, 0, freqs, sigma);
-	GenSparseMatrixOnline2DwithPML(-1, x, y, z, D2csr_zero, 0, freqs);
+	GenSparseMatrixOnline2DwithPML(-1, x, y, D2csr_zero, 0, freqs);
 	time = omp_get_wtime() - time;
 	printf("time for constructing = %lf sec\n", time);
 
@@ -214,7 +214,7 @@ void TestInverseTraversal(size_m x, size_m y, size_m z, const point source, cons
 
 			D2csr[k]->solve = 1;
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 			for (int i = 0; i < size; i++)
 				D2csr[k]->values[freqs[i]] += kwave_beta2;
 #endif
@@ -377,6 +377,514 @@ void TestSymmSparseMatrixOnline2DwithPML(size_m x, size_m y, size_m z, ccsr *Acs
 
 	free(mat2D);
 	free(diff);
+}
+
+
+void Test2DLaplaceLevander4th()
+{
+	printf("------------------\n--------Test Laplace--------\n---------------\n");
+	size_m x, y;
+
+	x.pml_pts = y.pml_pts = 4;
+	x.spg_pts = y.spg_pts = 0;
+
+	double norm, prev = 1;
+	int dist = 1;
+
+	for (int n = 7; n <= 7; n *= 2)
+	{
+		x.n = n - 1 + 2 * x.pml_pts;
+		y.n = n - 1 + 2 * y.pml_pts;
+
+		x.n_nopml = x.n - 2 * x.pml_pts;
+		y.n_nopml = y.n - 2 * y.pml_pts;
+
+		x.l = dist + (double)(2 * x.pml_pts * dist) / (x.n_nopml + 1);
+		y.l = dist + (double)(2 * y.pml_pts * dist) / (y.n_nopml + 1);
+
+		x.h = x.l / (x.n + 1);
+		y.h = y.l / (y.n + 1);
+
+		norm = Test2DLaplaceLevander4thKernel(x, y);
+		printf("Size = %d, norm = %e, scale = %lf\n", n, norm, prev / norm);
+		prev = norm;
+
+		x.pml_pts *= 2;
+		y.pml_pts *= 2;
+	}
+}
+
+dtype Test2DLaplaceExact(size_m xx, size_m yy, double x, double y, point src)
+{
+	//return x * x - y * y;
+	//return sin(2 * PI * x) * sin(2 * PI * y);
+#if 0
+	double sigma = 10;
+	return exp(-((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / (sigma * sigma));
+#else
+	// Helmholtz + correct PML
+	//return dtype{ x,  100.0 * x * x * x / (3.0 * double(omega)) } * dtype{ y, 100.0 * y * y * y / (3.0 * double(omega)) } ;
+#endif
+	// zero boundary
+	return x * (x - xx.l) * y * (y - yy.l) ;
+}
+
+#if 0
+dtype Test2DLaplaceRHS(size_m xx, size_m yy, double x, double y, point src, dtype k2)
+{
+	//return 0;
+	//return -8.0 * PI * PI * sin(2 * PI * x) * sin(2 * PI * y);
+	double sigma = 10;
+
+	// Laplace
+	//return Test2DLaplaceExact(x, y, src) * 4.0 * 
+		//(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2));
+
+#if 0
+	// Helmholtz
+//	return Test2DLaplaceExact(x, y, src) * 4.0 *
+//		(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2))
+//		+ k2 * Test2DLaplaceExact(x, y, src);
+#else
+	// Helmholtz + correct PML
+	if ((x < xx.h * xx.pml_pts && y < yy.h * yy.pml_pts) || (x < xx.h * xx.pml_pts && y >= yy.l - yy.h * yy.pml_pts) ||
+		(x >= xx.l - xx.h * xx.pml_pts && y < yy.h * yy.pml_pts) || (x >= xx.l - xx.h * xx.pml_pts && y >= yy.l - yy.h * yy.pml_pts))
+	{
+		// 4 corners
+		return k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+	else if (x < xx.h * xx.pml_pts || x >= xx.l - xx.h * xx.pml_pts)
+	{
+		return dtype{ 0, 200.0 * y / double(omega) } * dtype{ x, 100.0 * x * x * x / (3.0 * double(omega)) } + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+	else if (y < yy.h * yy.pml_pts || y >= yy.l - yy.h * yy.pml_pts)
+	{
+	    return dtype{ 0, 200.0 * x / double(omega) } * dtype{ y, 100.0 * y * y * y / (3.0 * double(omega)) } + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+	else
+	{
+		return dtype{ 0,  200.0 * x / double(omega) } * (dtype{ y, 100.0 * y * y * y / (3.0 * double(omega)) } ) +
+			   dtype{ 0,  200.0 * y / double(omega) } * (dtype{ x, 100.0 * x * x * x / (3.0 * double(omega)) } )
+			  + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+
+	//	return dtype{ 0, 400.0 * x * y  } * dtype{ 3.0 * omega, 50.0 * (x * x + y * y) } / (3.0 * omega * omega) +
+	//		k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+
+	//	return dtype{ 0, 3 * omega * 400.0 * x * y / (3.0 * omega * omega) } - (double)20000 * x * y * y * y / (3.0 * omega * omega) - (double)20000 * y * x * x * x / (3.0 * omega * omega);
+
+	}
+#endif
+}
+#else
+dtype Test2DLaplaceRHS(size_m xx, size_m yy, double x, double y, point src, dtype k2)
+{
+	//return 0;
+	//return -8.0 * PI * PI * sin(2 * PI * x) * sin(2 * PI * y);
+	double sigma = 10;
+
+	// Laplace
+	//return Test2DLaplaceExact(x, y, src) * 4.0 * 
+		//(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2));
+
+	// Helmholtz
+//	return Test2DLaplaceExact(x, y, src) * 4.0 *
+//		(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2))
+//		+ k2 * Test2DLaplaceExact(x, y, src);
+
+	// Helmholtz + correct PML
+	if ((x < xx.h * xx.pml_pts && y < yy.h * yy.pml_pts) || (x < xx.h * xx.pml_pts && y >= yy.l - yy.h * yy.pml_pts) ||
+		(x >= xx.l - xx.h * xx.pml_pts && y < yy.h * yy.pml_pts) || (x >= xx.l - xx.h * xx.pml_pts && y >= yy.l - yy.h * yy.pml_pts))
+	{
+		// 4 corners
+		return y * (y - yy.l) * alpha(xx, x / xx.h) * 2.0 * double(omega) * dtype { double(omega), 100.0 * x * (xx.l - x) } / (dtype{ double(omega), 100.0 * x * x } *dtype{ double(omega), 100.0 * x * x }) +
+			   x * (x - xx.l) * alpha(yy, y / yy.h) * 2.0 * double(omega) * dtype { double(omega), 100.0 * y * (yy.l - y) } / (dtype{ double(omega), 100.0 * y * y } *dtype{ double(omega), 100.0 * y * y }) +
+				 k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+	else if (x < xx.h * xx.pml_pts || x >= xx.l - xx.h * xx.pml_pts)
+	{
+		return  y * (y - yy.l) * alpha(xx, x / xx.h) * 2.0 * double(omega) * dtype { double(omega), 100.0 * x * (xx.l - x) } / (dtype{ double(omega), 100.0 * x * x } *dtype{ double(omega), 100.0 * x * x })
+					+ 2.0 * y * (y - yy.l) + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+	else if (y < yy.h * yy.pml_pts || y >= yy.l - yy.h * yy.pml_pts)
+	{
+		return  x * (x - xx.l) * alpha(yy, y / yy.h) * 2.0 * double(omega) * dtype { double(omega), 100.0 * y * (yy.l - y) } / (dtype{ double(omega), 100.0 * y * y } *dtype{ double(omega), 100.0 * y * y })
+					+ 2.0 * x * (x - xx.l) + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+	else
+	{
+		return 2.0 * x * (x - xx.l) + 2.0 * y * (y - yy.l) + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+}
+#endif
+
+
+double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
+{
+	// 2D test
+	printf("-----------------TEST FOR h = %lf----------------\n", x.h);
+	int size2D = x.n * y.n;
+	int size2D_nopml = x.n_nopml * y.n_nopml;
+	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
+	int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
+	//int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
+	int ione = 1;
+	int zero = 0;
+	int itwo = 2;
+
+	dtype *x_sol = alloc_arr<dtype>(size2D);
+	dtype *x_orig = alloc_arr<dtype>(size2D);
+	dtype *f = alloc_arr<dtype>(size2D);
+	dtype *g = alloc_arr<dtype>(size2D);
+
+	dtype *x_sol_ex_nopml = alloc_arr<dtype>(size2D_nopml);
+	dtype *x_sol_prd_nopml = alloc_arr<dtype>(size2D_nopml);
+
+
+	ccsr *Acsr = (ccsr*)malloc(sizeof(ccsr));
+	Acsr->values = alloc_arr<dtype>(non_zeros_in_2Dblock3diag);
+	Acsr->ia = alloc_arr<int>(size2D + 1);
+	Acsr->ja = alloc_arr<int>(non_zeros_in_2Dblock3diag);
+	Acsr->ia[size2D] = non_zeros_in_2Dblock3diag + 1;
+	Acsr->non_zeros = non_zeros_in_2Dblock3diag;
+
+	printf("Non_zeros = %d\n", Acsr->non_zeros);
+
+	int* freqs = alloc_arr<int>(size2D);
+
+	double norm;
+	double thresh = 10e-6;
+
+	//-------- PARDISO ----------
+	int mtype = 13;
+	int *iparm = alloc_arr<int>(64);
+	int *perm = alloc_arr<int>(size2D);
+	size_t *pt = alloc_arr<size_t>(64);
+
+	pardisoinit(pt, &mtype, iparm);
+
+	int maxfct = 1;
+	int mnum = 1;
+	int rhs = 1;
+	int msglvl = 0;
+	int error = 0;
+	int phase; // analisys + factorization + solution
+	int info;
+
+	point src = { x.l / 2, y.l / 2 };
+	//double k = 0.02;
+	double k = 0;
+	dtype k_beta2 = k * k * dtype{ 1.0, beta_eq };
+
+	printf("Lx = %lf, Ly = %lf\n", x.l, y.l);
+	printf("Source point Laplace: x = %lf, y = %lf\n", src.x, src.y);
+
+	// Set original solution
+	for (int j = 0; j < y.n; j++)
+		for (int i = 0; i < x.n; i++)
+			x_orig[i + x.n * j] = Test2DLaplaceExact(x, y, x.h * (i + 1), y.h * (j + 1), src);
+
+	// Set right-hand-side
+	for (int j = 0; j < y.n; j++)
+		for (int i = 0; i < x.n; i++)
+			f[i + x.n * j] = Test2DLaplaceRHS(x, y, x.h * (i + 1), y.h * (j + 1), src, k_beta2);
+
+	FILE* out = fopen("RHStest.dat", "w+");
+	for (int i = 0; i < size2D; i++)
+		fprintf(out, "%d %lf %lf\n", i, f[i].real(), f[i].imag());
+
+	fclose(out);
+
+#if 1
+    // для 5-ти точечного шаблона с ненулевыми граничными условиями
+	for (int j = 0; j < y.n; j++)
+	{
+		f[j * x.n + 0] -= Test2DLaplaceExact(x, y, 0, y.h * (j + 1), src) / (x.h * x.h);
+		f[j * x.n + x.n - 1] -= Test2DLaplaceExact(x, y, x.l, y.h * (j + 1), src) / (x.h * x.h);
+	}
+
+	for (int i = 0; i < x.n; i++)
+	{
+		f[0 * x.n + i] -= Test2DLaplaceExact(x, y, x.h * (i + 1), 0, src) / (y.h * y.h);
+		f[(y.n - 1) * x.n + i] -= Test2DLaplaceExact(x, y, x.h * (i + 1), y.l, src) / (y.h * y.h);
+	}
+#endif
+
+	FILE* out2 = fopen("RHStest_bound.dat", "w+");
+	for (int i = 0; i < size2D; i++)
+		fprintf(out2, "%d %lf %lf\n", i, f[i].real(), f[i].imag());
+
+	fclose(out2);
+
+	// Fill matrix
+	//GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, Acsr, k_beta2, freqs);
+	GenSparseMatrixOnline2DwithPML(-1, x, y, Acsr, k_beta2, freqs);
+
+	// Check residual norm
+	ResidCSR2D(x, y, Acsr, x_orig, f, g, norm);
+	printf("Resid norm |Au_ex - f| = %e\n", norm);
+
+	dtype* A = alloc_arr<dtype>(size2D * size2D); int lda = size2D;
+
+	system("pause");
+	// CSR to dense
+	printf("matrix gen\n");
+	int count1 = 0, count2 = 0;
+	int vals_count = 0;
+
+#if 1
+
+	for (int i = 0; i < size2D; i++)
+	{
+		int vals_in_row = Acsr->ia[i + 1] - Acsr->ia[i];
+		for (int j = 0; j < vals_in_row; j++)
+		{
+			A[i + lda * (Acsr->ja[vals_count + j] - 1)] = Acsr->values[vals_count + j];
+		}
+		vals_count += vals_in_row;
+	}
+
+	if (vals_count != Acsr->non_zeros) printf("!!!Error!!! CSR to DENSE!\n");
+
+#else
+	int inf[6] = { 1, 0, 1, 2, Acsr->non_zeros, 7 };
+	mkl_zdnscsr(inf, &size2D, &size2D, A, &lda, Acsr->values, Acsr->ja, Acsr->ia, &info);
+#endif
+
+	fprint(size2D, size2D, A, lda, "LaplacePML.dat");
+
+	// Solution by PARDISO
+	printf("pardiso solve\n");
+	phase = 13;
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, Acsr->values, Acsr->ia, Acsr->ja, perm, &rhs, iparm, &msglvl, f, x_sol, &error);
+	
+	if (error != 0) printf("pardiso error code = %d\n", error);
+
+	//norm = dznrm2(&size2D, x_sol, &ione);
+	norm = RelError(zlange, size2D, 1, x_sol, x_orig, size2D, thresh);
+	printf("Pardiso norm = %e\n", norm);
+
+	int* ipiv = alloc_arr<int>(size2D);
+	for (int i = 0; i < size2D; i++)
+		x_sol[i] = f[i];
+
+	zgetrf(&size2D, &size2D, A, &lda, ipiv, &info);
+	printf("getrf error code = %d\n", info);
+
+	dtype *work = alloc_arr<dtype>(2 * size2D);
+	double *rwork = alloc_arr<double>(2 * size2D);
+	double anorm = zlange("1", &size2D, &size2D, A, &lda, NULL);
+	double rcond = 0;
+	zgecon("1", &size2D, A, &lda, &anorm, &rcond, work, rwork, &info);
+	printf("cond number = %e\n", rcond);
+
+	zgetrs("no", &size2D, &ione, A, &lda, ipiv, x_sol, &lda, &info);
+	printf("getrs error code = %d\n", info);
+
+	norm = RelError(zlange, size2D, 1, x_sol, x_orig, size2D, thresh);
+	printf("LAPACK norm = %e\n", norm);
+
+	// Reduce PML
+//	reducePML2D(x, y, size2D, x_sol, size2D_nopml, x_sol_ex_nopml);
+//	reducePML2D(x, y, size2D, x_orig, size2D_nopml, x_sol_prd_nopml);
+
+	// Check accuracy
+	reducePML2D(x, y, size2D, x_orig, size2D_nopml, x_sol_ex_nopml);
+	reducePML2D(x, y, size2D, x_sol, size2D_nopml, x_sol_prd_nopml);
+
+	norm = RelError(zlange, size2D_nopml, 1, x_sol_prd_nopml, x_sol_ex_nopml, size2D_nopml, thresh);
+	//norm = RelError(zlange, size2D, 1, x_sol, x_orig, size2D, thresh);
+
+#if 1
+	// Output
+	char *str1, *str2, *str3;
+	str1 = alloc_arr<char>(255);
+	str2 = alloc_arr<char>(255);
+	str3 = alloc_arr<char>(255);
+	sprintf(str1, "Charts2D_v5/model_pml_%lf_%lf__%lf", k_beta2.real(), k_beta2.imag(), x.h);
+	sprintf(str2, "Charts2D_v5/model_pml_ex_%lf_%lf__%lf", k_beta2.real(), k_beta2.imag(), x.h);
+	sprintf(str3, "Charts2D_v5/model_pml_pard_%lf_%lf__%lf", k_beta2.real(), k_beta2.imag(), x.h);
+
+	bool pml_flag = 0;
+	output2D(str1, pml_flag, x, y, x_orig, x_sol);
+
+	gnuplot2D(str1, str2, pml_flag, 3, x, y);
+	gnuplot2D(str1, str3, pml_flag, 5, x, y);
+#endif
+
+	free_arr(x_sol);
+	free_arr(x_orig);
+	free_arr(f);
+	free_arr(g);
+
+	free_arr(x_sol_ex_nopml);
+	free_arr(x_sol_prd_nopml);
+	free_arr(Acsr->values);
+	free_arr(Acsr->ia);
+	free_arr(Acsr->ja);
+	free_arr(Acsr);
+	free_arr(A);
+
+	return norm;
+}
+
+
+void Test2DHelmholtzLevander4th()
+{
+	printf("------------------\n--------Test Hekmholtz-------\n---------------\n");
+	size_m x, y;
+
+	x.pml_pts = y.pml_pts = 20;
+	x.spg_pts = y.spg_pts = 0;
+
+	double norm, prev = 1;
+
+	for (int n = 50; n <= 400; n *= 2)
+	{
+		x.n = n - 1 + 2 * x.pml_pts;
+		y.n = n - 1 + 2 * y.pml_pts;
+
+		x.n_nopml = x.n - 2 * x.pml_pts;
+		y.n_nopml = y.n - 2 * y.pml_pts;
+
+		x.l = LENGTH_X + (double)(2 * x.pml_pts * LENGTH_X) / (x.n_nopml + 1);
+		y.l = LENGTH_Y + (double)(2 * y.pml_pts * LENGTH_Y) / (y.n_nopml + 1);
+
+		x.h = x.l / (x.n + 1);  // x.n + 1 grid points of the whole domain
+		y.h = y.l / (y.n + 1);  // x.n - 1 - inner points
+
+		norm = Test2DHelmholtzLevander4thKernel(x, y);
+		printf("Size = %d, norm = %e, scale = %lf\n", n, norm, prev / norm);
+		prev = norm;
+		x.pml_pts *= 2;
+		y.pml_pts *= 2;
+	}
+}
+
+
+double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
+{
+	printf("-----------Test 2D Helmholtz--------\n");
+	// Calling the solver
+	int size2D = x.n * y.n;
+	int size2D_nopml = x.n_nopml * y.n_nopml;
+	int mtype = 13;
+	int *iparm = alloc_arr<int>(64);
+	int *perm = alloc_arr<int>(size2D);
+	size_t *pt = alloc_arr<size_t>(64);
+
+	printf("pardisoinit...\n");
+	pardisoinit(pt, &mtype, iparm);
+
+	int maxfct = 1;
+	int mnum = 1;
+	int phase = 13;
+	int rhs = 1;
+	int msglvl = 0;
+	int error = 0;
+
+	// Memory for 2D CSR matrix
+	ccsr *D2csr;
+	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
+	int non_zeros_in_2Dblock9diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n) + 4 * (x.n - 1) * (y.n - 1);
+	int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
+
+	int non_zeros = non_zeros_in_2Dblock13diag;
+
+	D2csr = (ccsr*)malloc(sizeof(ccsr));
+	D2csr->values = alloc_arr<dtype>(non_zeros);
+	D2csr->ia = alloc_arr<int>(size2D + 1);
+	D2csr->ja = alloc_arr<int>(non_zeros);
+	D2csr->ia[size2D] = non_zeros + 1;
+	D2csr->non_zeros = non_zeros;
+
+	point sourcePML = { x.l / 2.0, y.l / 2.0 };
+
+	double lambda = (double)(c_z) / nu;
+	double ppw = lambda / x.h;
+
+	printf("ppw = %lf\n", ppw);
+	printf("Lx = %lf, Ly = %lf\n", x.l, y.l);
+	printf("PML_x = %lf, PML_y = %lf\n", x.pml_pts * x.h, y.pml_pts * y.h);
+	printf("Hx = %lf, Hy = %lf\n", x.h, y.h);
+	printf("SOURCE in 2D WITH PML AT: (%lf, %lf)\n", sourcePML.x, sourcePML.y);
+	double k = (double)kk;
+	int nhalf = y.n / 2;
+	int src = 0;
+
+	char *str1, *str2, *str3;
+	str1 = alloc_arr<char>(255);
+	str2 = alloc_arr<char>(255);
+	str3 = alloc_arr<char>(255);
+	bool pml_flag = false;
+
+
+	int count = 0;
+	int i = nhalf;
+
+	dtype alpha_k;
+	dtype *x_sol_ex = alloc_arr<dtype>(size2D);
+	dtype *x_sol_prd = alloc_arr<dtype>(size2D);
+	dtype *f2D = alloc_arr<dtype>(size2D);
+	int *freqs = alloc_arr<int>(size2D);
+
+	dtype *x_sol_ex_nopml = alloc_arr<dtype>(size2D_nopml);
+	dtype *x_sol_prd_nopml = alloc_arr<dtype>(size2D_nopml);
+
+
+	double norm = 0;
+	double thresh = 10e-6;
+
+	//double ppw = c / nu / x.h;
+
+	double kww = 4.0 * double(PI) * double(PI) * (i - nhalf) * (i - nhalf) / (y.l * y.l);
+	double kwave2 = k * k - kww;
+	dtype kwave_beta2 = dtype{ (k * k - kww), k * k * beta_eq };
+
+	// источник в каждой задаче в середине 
+	printf("Gen Matrix for kwave2 = (%lf, %lf)\n", kwave_beta2.real(), kwave_beta2.imag());
+	GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, D2csr, kwave_beta2, freqs);
+
+	// Gen RHS and exact solution; check residual |A * u - f|
+	printf("Gen RHS and check Residual\n");
+	GenRHSandSolution2DComplexWaveNumber(x, y, D2csr, x_sol_ex, f2D, kwave_beta2, sourcePML, src);
+
+	// normalization of rhs
+	printf("Pardiso solve\n");
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f2D, x_sol_prd, &error);
+
+	double eps = 0.01; // 1 percent
+
+	sprintf(str1, "Charts2D_v3/model_pml_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
+	sprintf(str2, "Charts2D_v3/model_pml_ex_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
+	sprintf(str3, "Charts2D_v3/model_pml_pard_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
+
+	pml_flag = false;
+
+#if 0
+	for (int j = 0; j < y.n; j++)
+		for (int i = 0; i < x.n; i++)
+			if (x_sol_ex[i + x.n * j].real() < -1.0) printf("i = %d j = %d, l = %d, lx = %lf, ly = %lf\n",
+				i, j, i + x.n * j, i * x.h, j * y.h);
+#endif
+
+	NullifySource2D(x, y, x_sol_ex, src, 5);
+	NullifySource2D(x, y, x_sol_prd, src, 5);
+	x_sol_ex[src] = x_sol_prd[src] = 0;
+
+	output2D(str1, pml_flag, x, y, x_sol_ex, x_sol_prd);
+
+	gnuplot2D(str1, str2, pml_flag, 3, x, y);
+	gnuplot2D(str1, str3, pml_flag, 5, x, y);
+
+	reducePML2D(x, y, size2D, x_sol_ex, size2D_nopml, x_sol_ex_nopml);
+	reducePML2D(x, y, size2D, x_sol_prd, size2D_nopml, x_sol_prd_nopml);
+
+	norm = RelError(zlange, size2D_nopml, 1, x_sol_prd_nopml, x_sol_ex_nopml, size2D_nopml, thresh);
+	printf("Norm 2D solution ||x_sol - x_ex|| / ||x_ex|| = %lf\n", norm);
+
+	//	check_exact_sol_Hankel(alpha_k, kwave2, x, y, x_sol_prd_nopml, thresh);
+
+	return norm;
 }
 
 #if 0
@@ -664,7 +1172,7 @@ void TestFGMRES()
 
 	// 1. First step. Compute r_0 and its norm
 	printf("-----Step 1-----\n");
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < size; i++)
 		x0[i] = 0.0;
 
@@ -742,7 +1250,7 @@ void TestFGMRES()
 		printf("size of basis: %d\n", iterCount);
 
 		// Set eBeta
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < m + 1; i++)
 			eBeta[i] = 0;
 
@@ -799,7 +1307,7 @@ void TestFGMRES()
 		printf("-----------\n");
 
 		// Set init cond for next step
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < size; i++)
 			x0[i] = 0.0;
 	}
@@ -2084,7 +2592,7 @@ void Test_AddStruct(int n, dtype alpha, dtype beta, double eps, char *method, in
 	int ldg = n;
 	double norm = 0;
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int j = 0; j < n; j++)
 		for (int i = 0; i < n; i++)
 		{
@@ -2161,11 +2669,11 @@ void Test_SymCompUpdate2Struct(int n, int k, dtype alpha, double eps, char* meth
 	Hilbert(n, HC, ldh);
 	Hilbert(n, H, ldh);
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < k; i++)
 		Y[i + ldy * i] = i + 1;
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int j = 0; j < k; j++)
 		for (int i = 0; i < n; i++)
 			V[i + ldv * j] = (i + j + 1);

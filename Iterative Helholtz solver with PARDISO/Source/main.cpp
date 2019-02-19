@@ -200,7 +200,10 @@ int main()
 #ifndef PERF
 	TestAll();
 #endif
-//	system("pause");
+
+	Test2DLaplaceLevander4th();
+	//Test2DHelmholtzLevander4th();
+	system("pause");
 //	return 0;
 #if 1
 						
@@ -315,9 +318,9 @@ int main()
 	system("pause");
 #endif
 
-	double lambda = (double)(c_z) / nu;
+	double lambda = double(c_z) / nu;
 	double ppw = lambda / x.h;
-	int niter = 25;  // 4 iter for freq = 2
+	int niter = 20;  // 4 iter for freq = 2
 					// 12 iter for freq = 4
 
 	printf("The length of the wave: %lf\n", lambda);
@@ -341,6 +344,7 @@ int main()
 
 	total = double(size) / (1024 * 1024 * 1024);
 	total *= (niter + 1) + 4;
+	total += double(6 * size_nopml) / (1024 * 1024 * 1024);
 	total *= 8;
 	total *= 2;
 
@@ -663,7 +667,7 @@ int main()
 #define GNUPLOT
 #endif
 
-#define OUTPUT
+//#define OUTPUT
 #ifdef OUTPUT
 	output("ChartsFreq4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
 #endif
@@ -710,10 +714,10 @@ int main()
 
 	printf("----------------------------------------------\n");
 
-	printf("Test of inverse traversal of the algorithm for NUMERICAL solution\n");
-	TestInverseTraversal(x, y, z, source, x_sol, f, thresh);
-	printf("Test of inverse traversal of the algorithm for DIRECT solution\n");
-	TestInverseTraversal(x, y, z, source, x_orig, f, thresh);
+//	printf("Test of inverse traversal of the algorithm for NUMERICAL solution\n");
+//	TestInverseTraversal(x, y, z, source, x_sol, f, thresh);
+//	printf("Test of inverse traversal of the algorithm for DIRECT solution\n");
+//	TestInverseTraversal(x, y, z, source, x_orig, f, thresh);
 
 	printf("----------------------------------------------\n");
 

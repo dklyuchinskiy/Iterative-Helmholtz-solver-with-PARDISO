@@ -108,7 +108,7 @@ struct matrix
 
 enum class DIAG13
 {	
-	m_six = 1,
+	m_six = -6,
 	m_five,
 	m_four,
 	m_three,
@@ -169,6 +169,7 @@ enum class DIAG13
 //#define GNUPLOT
 //#define GEN_3D_MATRIX
 
+#define ORDER4
 
 //#define TEST_HELM_1D
 
