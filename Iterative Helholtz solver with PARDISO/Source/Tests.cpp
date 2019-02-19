@@ -385,12 +385,13 @@ void Test2DLaplaceLevander4th()
 	printf("------------------\n--------Test Laplace--------\n---------------\n");
 	size_m x, y;
 
-	x.pml_pts = y.pml_pts = 20;
+	x.pml_pts = y.pml_pts = 4;
 	x.spg_pts = y.spg_pts = 0;
 
 	double norm, prev = 1;
+	int dist = 1;
 
-	for (int n = 50; n <= 800; n *= 2)
+	for (int n = 7; n <= 7; n *= 2)
 	{
 		x.n = n - 1 + 2 * x.pml_pts;
 		y.n = n - 1 + 2 * y.pml_pts;
@@ -398,8 +399,8 @@ void Test2DLaplaceLevander4th()
 		x.n_nopml = x.n - 2 * x.pml_pts;
 		y.n_nopml = y.n - 2 * y.pml_pts;
 
-		x.l = 140 + (double)(2 * x.pml_pts * 140) / (x.n_nopml + 1);
-		y.l = 140 + (double)(2 * y.pml_pts * 140) / (y.n_nopml + 1);
+		x.l = dist + (double)(2 * x.pml_pts * dist) / (x.n_nopml + 1);
+		y.l = dist + (double)(2 * y.pml_pts * dist) / (y.n_nopml + 1);
 
 		x.h = x.l / (x.n + 1);
 		y.h = y.l / (y.n + 1);
@@ -413,16 +414,69 @@ void Test2DLaplaceLevander4th()
 	}
 }
 
-dtype Test2DLaplaceExact(double x, double y, point src)
+dtype Test2DLaplaceExact(size_m xx, size_m yy, double x, double y, point src)
 {
 	//return x * x - y * y;
 	//return sin(2 * PI * x) * sin(2 * PI * y);
+#if 0
 	double sigma = 10;
 	return exp(-((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / (sigma * sigma));
+#else
+	// Helmholtz + correct PML
+	//return dtype{ x,  100.0 * x * x * x / (3.0 * double(omega)) } * dtype{ y, 100.0 * y * y * y / (3.0 * double(omega)) } ;
+#endif
+	// zero boundary
+	return x * (x - xx.l) * y * (y - yy.l) ;
 }
 
+#if 0
+dtype Test2DLaplaceRHS(size_m xx, size_m yy, double x, double y, point src, dtype k2)
+{
+	//return 0;
+	//return -8.0 * PI * PI * sin(2 * PI * x) * sin(2 * PI * y);
+	double sigma = 10;
 
-dtype Test2DLaplaceRHS(double x, double y, point src, dtype k2)
+	// Laplace
+	//return Test2DLaplaceExact(x, y, src) * 4.0 * 
+		//(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2));
+
+#if 0
+	// Helmholtz
+//	return Test2DLaplaceExact(x, y, src) * 4.0 *
+//		(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2))
+//		+ k2 * Test2DLaplaceExact(x, y, src);
+#else
+	// Helmholtz + correct PML
+	if ((x < xx.h * xx.pml_pts && y < yy.h * yy.pml_pts) || (x < xx.h * xx.pml_pts && y >= yy.l - yy.h * yy.pml_pts) ||
+		(x >= xx.l - xx.h * xx.pml_pts && y < yy.h * yy.pml_pts) || (x >= xx.l - xx.h * xx.pml_pts && y >= yy.l - yy.h * yy.pml_pts))
+	{
+		// 4 corners
+		return k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+	else if (x < xx.h * xx.pml_pts || x >= xx.l - xx.h * xx.pml_pts)
+	{
+		return dtype{ 0, 200.0 * y / double(omega) } * dtype{ x, 100.0 * x * x * x / (3.0 * double(omega)) } + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+	else if (y < yy.h * yy.pml_pts || y >= yy.l - yy.h * yy.pml_pts)
+	{
+	    return dtype{ 0, 200.0 * x / double(omega) } * dtype{ y, 100.0 * y * y * y / (3.0 * double(omega)) } + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+	else
+	{
+		return dtype{ 0,  200.0 * x / double(omega) } * (dtype{ y, 100.0 * y * y * y / (3.0 * double(omega)) } ) +
+			   dtype{ 0,  200.0 * y / double(omega) } * (dtype{ x, 100.0 * x * x * x / (3.0 * double(omega)) } )
+			  + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+
+	//	return dtype{ 0, 400.0 * x * y  } * dtype{ 3.0 * omega, 50.0 * (x * x + y * y) } / (3.0 * omega * omega) +
+	//		k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+
+	//	return dtype{ 0, 3 * omega * 400.0 * x * y / (3.0 * omega * omega) } - (double)20000 * x * y * y * y / (3.0 * omega * omega) - (double)20000 * y * x * x * x / (3.0 * omega * omega);
+
+	}
+#endif
+}
+#else
+dtype Test2DLaplaceRHS(size_m xx, size_m yy, double x, double y, point src, dtype k2)
 {
 	//return 0;
 	//return -8.0 * PI * PI * sin(2 * PI * x) * sin(2 * PI * y);
@@ -433,10 +487,35 @@ dtype Test2DLaplaceRHS(double x, double y, point src, dtype k2)
 		//(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2));
 
 	// Helmholtz
-	return Test2DLaplaceExact(x, y, src) * 4.0 *
-		(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2))
-		+ k2 * Test2DLaplaceExact(x, y, src);
+//	return Test2DLaplaceExact(x, y, src) * 4.0 *
+//		(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2))
+//		+ k2 * Test2DLaplaceExact(x, y, src);
+
+	// Helmholtz + correct PML
+	if ((x < xx.h * xx.pml_pts && y < yy.h * yy.pml_pts) || (x < xx.h * xx.pml_pts && y >= yy.l - yy.h * yy.pml_pts) ||
+		(x >= xx.l - xx.h * xx.pml_pts && y < yy.h * yy.pml_pts) || (x >= xx.l - xx.h * xx.pml_pts && y >= yy.l - yy.h * yy.pml_pts))
+	{
+		// 4 corners
+		return y * (y - yy.l) * alpha(xx, x / xx.h) * 2.0 * double(omega) * dtype { double(omega), 100.0 * x * (xx.l - x) } / (dtype{ double(omega), 100.0 * x * x } *dtype{ double(omega), 100.0 * x * x }) +
+			   x * (x - xx.l) * alpha(yy, y / yy.h) * 2.0 * double(omega) * dtype { double(omega), 100.0 * y * (yy.l - y) } / (dtype{ double(omega), 100.0 * y * y } *dtype{ double(omega), 100.0 * y * y }) +
+				 k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+	else if (x < xx.h * xx.pml_pts || x >= xx.l - xx.h * xx.pml_pts)
+	{
+		return  y * (y - yy.l) * alpha(xx, x / xx.h) * 2.0 * double(omega) * dtype { double(omega), 100.0 * x * (xx.l - x) } / (dtype{ double(omega), 100.0 * x * x } *dtype{ double(omega), 100.0 * x * x })
+					+ 2.0 * y * (y - yy.l) + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+	else if (y < yy.h * yy.pml_pts || y >= yy.l - yy.h * yy.pml_pts)
+	{
+		return  x * (x - xx.l) * alpha(yy, y / yy.h) * 2.0 * double(omega) * dtype { double(omega), 100.0 * y * (yy.l - y) } / (dtype{ double(omega), 100.0 * y * y } *dtype{ double(omega), 100.0 * y * y })
+					+ 2.0 * x * (x - xx.l) + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
+	else
+	{
+		return 2.0 * x * (x - xx.l) + 2.0 * y * (y - yy.l) + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
+	}
 }
+#endif
 
 
 double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
@@ -448,7 +527,9 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
 	int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
 	//int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
-	int ione = 1.0;
+	int ione = 1;
+	int zero = 0;
+	int itwo = 2;
 
 	dtype *x_sol = alloc_arr<dtype>(size2D);
 	dtype *x_orig = alloc_arr<dtype>(size2D);
@@ -460,11 +541,11 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 
 
 	ccsr *Acsr = (ccsr*)malloc(sizeof(ccsr));
-	Acsr->values = alloc_arr<dtype>(non_zeros_in_2Dblock13diag);
+	Acsr->values = alloc_arr<dtype>(non_zeros_in_2Dblock3diag);
 	Acsr->ia = alloc_arr<int>(size2D + 1);
-	Acsr->ja = alloc_arr<int>(non_zeros_in_2Dblock13diag);
-	Acsr->ia[size2D] = non_zeros_in_2Dblock13diag + 1;
-	Acsr->non_zeros = non_zeros_in_2Dblock13diag;
+	Acsr->ja = alloc_arr<int>(non_zeros_in_2Dblock3diag);
+	Acsr->ia[size2D] = non_zeros_in_2Dblock3diag + 1;
+	Acsr->non_zeros = non_zeros_in_2Dblock3diag;
 
 	printf("Non_zeros = %d\n", Acsr->non_zeros);
 
@@ -487,53 +568,120 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 	int msglvl = 0;
 	int error = 0;
 	int phase; // analisys + factorization + solution
+	int info;
 
 	point src = { x.l / 2, y.l / 2 };
-	double k = 0.02;
+	//double k = 0.02;
+	double k = 0;
 	dtype k_beta2 = k * k * dtype{ 1.0, beta_eq };
 
+	printf("Lx = %lf, Ly = %lf\n", x.l, y.l);
 	printf("Source point Laplace: x = %lf, y = %lf\n", src.x, src.y);
 
 	// Set original solution
 	for (int j = 0; j < y.n; j++)
 		for (int i = 0; i < x.n; i++)
-			x_orig[i + x.n * j] = Test2DLaplaceExact(x.h * (i + 1), y.h * (j + 1), src);
+			x_orig[i + x.n * j] = Test2DLaplaceExact(x, y, x.h * (i + 1), y.h * (j + 1), src);
 
 	// Set right-hand-side
 	for (int j = 0; j < y.n; j++)
 		for (int i = 0; i < x.n; i++)
-			f[i + x.n * j] = Test2DLaplaceRHS(x.h * (i + 1), y.h * (j + 1), src, k_beta2);
+			f[i + x.n * j] = Test2DLaplaceRHS(x, y, x.h * (i + 1), y.h * (j + 1), src, k_beta2);
 
-#if 0
+	FILE* out = fopen("RHStest.dat", "w+");
+	for (int i = 0; i < size2D; i++)
+		fprintf(out, "%d %lf %lf\n", i, f[i].real(), f[i].imag());
+
+	fclose(out);
+
+#if 1
     // для 5-ти точечного шаблона с ненулевыми граничными условиями
 	for (int j = 0; j < y.n; j++)
 	{
-		f[j * x.n + 0] -= Test2DLaplaceExact(0, y.h * (j + 1)) / (x.h * x.h);
-		f[j * x.n + x.n - 1] -= Test2DLaplaceExact(x.l, y.h * (j + 1)) / (x.h * x.h);
+		f[j * x.n + 0] -= Test2DLaplaceExact(x, y, 0, y.h * (j + 1), src) / (x.h * x.h);
+		f[j * x.n + x.n - 1] -= Test2DLaplaceExact(x, y, x.l, y.h * (j + 1), src) / (x.h * x.h);
 	}
 
 	for (int i = 0; i < x.n; i++)
 	{
-		f[0 * x.n + i] -= Test2DLaplaceExact(x.h * (i + 1), 0) / (y.h * y.h);
-		f[(y.n - 1) * x.n + i] -= Test2DLaplaceExact(x.h * (i + 1), y.l) / (y.h * y.h);
+		f[0 * x.n + i] -= Test2DLaplaceExact(x, y, x.h * (i + 1), 0, src) / (y.h * y.h);
+		f[(y.n - 1) * x.n + i] -= Test2DLaplaceExact(x, y, x.h * (i + 1), y.l, src) / (y.h * y.h);
 	}
 #endif
 
+	FILE* out2 = fopen("RHStest_bound.dat", "w+");
+	for (int i = 0; i < size2D; i++)
+		fprintf(out2, "%d %lf %lf\n", i, f[i].real(), f[i].imag());
+
+	fclose(out2);
+
 	// Fill matrix
-	GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, Acsr, k_beta2, freqs);
-	//GenSparseMatrixOnline2DwithPML(-1, x, y, Acsr, k_beta2, freqs);
+	//GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, Acsr, k_beta2, freqs);
+	GenSparseMatrixOnline2DwithPML(-1, x, y, Acsr, k_beta2, freqs);
 
 	// Check residual norm
 	ResidCSR2D(x, y, Acsr, x_orig, f, g, norm);
 	printf("Resid norm |Au_ex - f| = %e\n", norm);
 
+	dtype* A = alloc_arr<dtype>(size2D * size2D); int lda = size2D;
+
+	system("pause");
+	// CSR to dense
+	printf("matrix gen\n");
+	int count1 = 0, count2 = 0;
+	int vals_count = 0;
+
+#if 1
+
+	for (int i = 0; i < size2D; i++)
+	{
+		int vals_in_row = Acsr->ia[i + 1] - Acsr->ia[i];
+		for (int j = 0; j < vals_in_row; j++)
+		{
+			A[i + lda * (Acsr->ja[vals_count + j] - 1)] = Acsr->values[vals_count + j];
+		}
+		vals_count += vals_in_row;
+	}
+
+	if (vals_count != Acsr->non_zeros) printf("!!!Error!!! CSR to DENSE!\n");
+
+#else
+	int inf[6] = { 1, 0, 1, 2, Acsr->non_zeros, 7 };
+	mkl_zdnscsr(inf, &size2D, &size2D, A, &lda, Acsr->values, Acsr->ja, Acsr->ia, &info);
+#endif
+
+	fprint(size2D, size2D, A, lda, "LaplacePML.dat");
+
 	// Solution by PARDISO
+	printf("pardiso solve\n");
 	phase = 13;
 	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, Acsr->values, Acsr->ia, Acsr->ja, perm, &rhs, iparm, &msglvl, f, x_sol, &error);
 	
 	if (error != 0) printf("pardiso error code = %d\n", error);
 
-	norm = dznrm2(&size2D, x_sol, &ione);
+	//norm = dznrm2(&size2D, x_sol, &ione);
+	norm = RelError(zlange, size2D, 1, x_sol, x_orig, size2D, thresh);
+	printf("Pardiso norm = %e\n", norm);
+
+	int* ipiv = alloc_arr<int>(size2D);
+	for (int i = 0; i < size2D; i++)
+		x_sol[i] = f[i];
+
+	zgetrf(&size2D, &size2D, A, &lda, ipiv, &info);
+	printf("getrf error code = %d\n", info);
+
+	dtype *work = alloc_arr<dtype>(2 * size2D);
+	double *rwork = alloc_arr<double>(2 * size2D);
+	double anorm = zlange("1", &size2D, &size2D, A, &lda, NULL);
+	double rcond = 0;
+	zgecon("1", &size2D, A, &lda, &anorm, &rcond, work, rwork, &info);
+	printf("cond number = %e\n", rcond);
+
+	zgetrs("no", &size2D, &ione, A, &lda, ipiv, x_sol, &lda, &info);
+	printf("getrs error code = %d\n", info);
+
+	norm = RelError(zlange, size2D, 1, x_sol, x_orig, size2D, thresh);
+	printf("LAPACK norm = %e\n", norm);
 
 	// Reduce PML
 //	reducePML2D(x, y, size2D, x_sol, size2D_nopml, x_sol_ex_nopml);
@@ -546,15 +694,15 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 	norm = RelError(zlange, size2D_nopml, 1, x_sol_prd_nopml, x_sol_ex_nopml, size2D_nopml, thresh);
 	//norm = RelError(zlange, size2D, 1, x_sol, x_orig, size2D, thresh);
 
-#if 0
+#if 1
 	// Output
 	char *str1, *str2, *str3;
 	str1 = alloc_arr<char>(255);
 	str2 = alloc_arr<char>(255);
 	str3 = alloc_arr<char>(255);
-	sprintf(str1, "Charts2D_v4/model_pml_%lf_%lf__%lf", k_beta2.real(), k_beta2.imag(), x.h);
-	sprintf(str2, "Charts2D_v4/model_pml_ex_%lf_%lf__%lf", k_beta2.real(), k_beta2.imag(), x.h);
-	sprintf(str3, "Charts2D_v4/model_pml_pard_%lf_%lf__%lf", k_beta2.real(), k_beta2.imag(), x.h);
+	sprintf(str1, "Charts2D_v5/model_pml_%lf_%lf__%lf", k_beta2.real(), k_beta2.imag(), x.h);
+	sprintf(str2, "Charts2D_v5/model_pml_ex_%lf_%lf__%lf", k_beta2.real(), k_beta2.imag(), x.h);
+	sprintf(str3, "Charts2D_v5/model_pml_pard_%lf_%lf__%lf", k_beta2.real(), k_beta2.imag(), x.h);
 
 	bool pml_flag = 0;
 	output2D(str1, pml_flag, x, y, x_orig, x_sol);
@@ -574,6 +722,7 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 	free_arr(Acsr->ia);
 	free_arr(Acsr->ja);
 	free_arr(Acsr);
+	free_arr(A);
 
 	return norm;
 }
@@ -687,7 +836,7 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 
 	//double ppw = c / nu / x.h;
 
-	double kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (y.l * y.l);
+	double kww = 4.0 * double(PI) * double(PI) * (i - nhalf) * (i - nhalf) / (y.l * y.l);
 	double kwave2 = k * k - kww;
 	dtype kwave_beta2 = dtype{ (k * k - kww), k * k * beta_eq };
 

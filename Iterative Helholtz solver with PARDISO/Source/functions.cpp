@@ -45,6 +45,39 @@ void print(int m, int n, dtype *u, int ldu, char *mess)
 	printf("\n");
 }
 
+void fprint(int m, int n, dtype *u, int ldu, char *mess)
+{
+	FILE *out = fopen("LaplacePML_real.dat", "w");
+	for (int i = 0; i < m; i++)
+	{
+		//fprintf(out, "%d ", i);
+		for (int j = 0; j < n; j++)
+		{
+			fprintf(out, "%4.2lf ", u[i + ldu * j].real());
+		}
+		fprintf(out, "\n");
+	}
+
+	fprintf(out,"\n");
+
+	fclose(out);
+
+	out = fopen("LaplacePML_imag.dat", "w");
+	for (int i = 0; i < m; i++)
+	{
+		//fprintf(out, "%d ", i);
+		for (int j = 0; j < n; j++)
+		{
+			fprintf(out, "%4.2lf ", u[i + ldu * j].imag());
+		}
+		fprintf(out, "\n");
+	}
+
+	fprintf(out, "\n");
+
+	fclose(out);
+}
+
 void Eye(int n, dtype *H, int ldh)
 {
 	for (int j = 0; j < n; j++)
@@ -106,7 +139,7 @@ void GenerateDiagonal1DBlock(double w, int part_of_field, size_m x, size_m y, si
 	   dtype* alpX, dtype* alpY, dtype* alpZ)
 {
 	int n = x.n;
-	double k = (double)kk;
+	double k = double(kk);
 
 	Clear(n, n, DD, lddd);
 	
@@ -607,8 +640,8 @@ double d(double x)
 	//printf("x = %lf\n", x);
 
 	//const double C = 100;
-	const double C = 100;
-	return C * pow(x, 2);
+	const double C = 0;
+	return C * x * x;
 
 	// 10 * x ^ 2, проверить , что значения 0 и С на границах
 	// - 15 h < x < 0
@@ -754,7 +787,7 @@ void GenerateDeltaL(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D
 			{
 				ij = i + j * nx;
 				ijk = ij + k * size2D;
-				deltaL[ijk] = omega * omega * (dtype{ 1.0, beta_eq } / (sound2D[ij] * sound2D[ij]) - 1.0 / (sound3D[ijk] * sound3D[ijk]));
+				deltaL[ijk] = double(omega) * double(omega) * (dtype{ 1.0, beta_eq } / (sound2D[ij] * sound2D[ij]) - 1.0 / (sound3D[ijk] * sound3D[ijk]));
 
 				zp = k * z.h;
 				if (k < z.spg_pts)
@@ -819,7 +852,8 @@ dtype alpha(size_m xyz, double i)
 			//if ((abs(x - 0) < EPS_ZERO) || (abs(x - 1) < EPS_ZERO)) printf("right: i = %lf x = %lf\n", i, x);
 		}
 
-		return dtype{ 0, -omega } / dtype{ d(x), -omega };
+		return dtype{ 0, -double(omega) } / dtype{ d(x), -double(omega) };
+		//return dtype{ double(omega) * double(omega), -double(omega) * d(x) } / (double(omega) * double(omega) + d(x) * d(x));
 	}
 	else return 1.0;
 }
@@ -1080,7 +1114,7 @@ void GenerateDiagonal2DBlock(char* problem, int blk3D, size_m x, size_m y, size_
 {
 	int n = x.n * y.n;
 	int size = n * z.n;
-	double k = (double)kk;
+	double k = double(kk);
 
 	// diagonal blocks in dense format
 	//#pragma omp parallel for simd schedule(static)
@@ -1554,7 +1588,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	dtype* work;
 	dtype zdum;
 	double time;
-	double k2 = double(kk) * (kk);
+	double k2 = double(kk) * double(kk);
 	double kww;
 	int count = 0;
 	int ratio = 0;
@@ -1672,14 +1706,14 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 #ifdef MKL_FFT
 		if (k < z.n / 2 - 1)
 		{
-			kww = 4.0 * PI * PI * k * k / (z.l * z.l);
+			kww = 4.0 * double(PI) * double(PI) * k * k / (z.l * z.l);
 		}
 		else
 		{
-			kww = 4.0 * PI * PI * (z.n - k) * (z.n - k) / (z.l * z.l);
+			kww = 4.0 * double(PI) * double(PI) * (z.n - k) * (z.n - k) / (z.l * z.l);
 		}
 #else
-		kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (z.l * z.l);
+		kww = 4.0 * double(PI)* double(PI) * (i - nhalf) * (i - nhalf) / (z.l * z.l);
 #endif
 
 		D2csr[k] = (ccsr*)malloc(sizeof(ccsr));
@@ -2271,7 +2305,7 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, ccsr* Acsr, dtype
 
 	if (w == -1)
 	{
-#if 0
+#if 1
 		for (int l1 = 0; l1 < size; l1++)
 		{
 			Acsr->ia[l1] = count + 1;
@@ -3008,7 +3042,8 @@ void GenSparseMatrixOnline1DwithPML(int w, size_m x, size_m y, size_m z, ccsr* A
 	int size2 = x.n - 1;
 	int non_zeros_in_1D3diag = size + size2 * 2;
 	double RelRes = 0;
-	double k = (double)kk;
+	double k = double(kk);
+
 	//double kww = 4.0 * PI * PI * (w - n2) * (w - n2) / (y.l * y.l);
 	//double kww = 4 * PI * PI * (w - n2) * (w - n2);
 
@@ -3294,9 +3329,9 @@ dtype u_ex_complex(size_m xx, size_m yy, size_m zz, double x, double y, double z
 
 	if (r == 0) r = 0.005;
 	
-	double arg = (double)(kk) * r;
+	double arg = double(kk) * r;
 
-	return my_exp(arg) / (4.0 * PI * r);
+	return my_exp(arg) / (4.0 * double(PI) * r);
 
 /*	double ksi1, ksi2, ksi3;
 
@@ -3325,7 +3360,7 @@ dtype u_ex_complex_sound3D(size_m xx, size_m yy, size_m zz, double x, double y, 
 
 	if (r == 0) r = 0.005;
 
-	dtype kk_loc = (double)omega / MakeSound3D(xx, yy, zz, x, y, z, source);
+	dtype kk_loc = double(omega) / MakeSound3D(xx, yy, zz, x, y, z, source);
 
 	dtype arg = kk_loc * r;
 	
@@ -3334,7 +3369,7 @@ dtype u_ex_complex_sound3D(size_m xx, size_m yy, size_m zz, double x, double y, 
 
 	// e ^ {i k r} / (4 Pi r)
 
-	return EulerExp(arg) / (4.0 * PI * r);
+	return EulerExp(arg) / (4.0 * double(PI) * r);
 }
 
 dtype F3D_ex_complex(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source, int &l)
@@ -3554,6 +3589,7 @@ void ResidCSR2D(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g
 	dtype *f1 = alloc_arr<dtype>(size);
 	dtype *g_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *f_nopml = alloc_arr<dtype>(size_nopml);
+	dtype *f1_nopml = alloc_arr<dtype>(size_nopml);
 	int ione = 1;
 
 	FILE *out = fopen("ResidTestCSR2D.dat", "w");
@@ -3565,15 +3601,22 @@ void ResidCSR2D(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g
 	for (int i = 0; i < size; i++)
 		g[i] = f[i] - f1[i];
 
-	for (int i = 0; i < size; i++)
-	fprintf(out, "%d %lf %lf\n", i, f[i].real(), f1[i].real());
 
 #ifdef DEBUG
 	print_vec(size, f, g, "f and g");
 #endif
 
+	RelRes = zlange("Frob", &size, &ione, g, &size, NULL);
+	RelRes = RelRes / zlange("Frob", &size, &ione, f, &size, NULL);
+
+	printf("RelRes |Au_ex - f| with PML zone = %e\n", RelRes);
+
 	reducePML2D(x, y, size, g, size_nopml, g_nopml);
 	reducePML2D(x, y, size, f, size_nopml, f_nopml);
+	reducePML2D(x, y, size, f1, size_nopml, f1_nopml);
+
+	for (int i = 0; i < size_nopml; i++)
+		fprintf(out, "%d %lf %lf\n", i, f_nopml[i].real(), f1_nopml[i].real());
 
 	//RelRes = zlange("Frob", &size, &ione, g, &size, NULL);
 	//RelRes = RelRes / zlange("Frob", &size, &ione, f, &size, NULL);
@@ -3581,12 +3624,18 @@ void ResidCSR2D(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g
 	RelRes = zlange("Frob", &size_nopml, &ione, g_nopml, &size_nopml, NULL);
 	RelRes = RelRes / zlange("Frob", &size_nopml, &ione, f_nopml, &size_nopml, NULL);
 
-	printf("End resid\n");
 	fclose(out);
+
+#if 1
+#pragma omp parallel for schedule(static)
+	for (int i = 0; i < size; i++)
+		f[i] = f1[i];
+#endif
 
 	free_arr(f1);
 	free_arr(g_nopml);
 	free_arr(f_nopml);
+	free_arr(f1_nopml);
 }
 
 
@@ -4369,7 +4418,7 @@ void Solve1DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f1D, dtype *x_s
 	printf("L = %lf\n", x.l);
 	printf("PML = %lf\n", x.pml_pts * x.h);
 	printf("SOURCE in 2D WITH PML AT: (%lf)\n", sourcePML.x);
-	double k = (double)kk;
+	double k = double(kk);
 
 	char *str1, *str2, *str3;
 	str1 = alloc_arr<char>(255);
@@ -4404,7 +4453,7 @@ void Solve1DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f1D, dtype *x_s
 	dtype *x_sol_ex_nopml = alloc_arr<dtype>(size1D_nopml);
 	dtype *x_sol_prd_nopml = alloc_arr<dtype>(size1D_nopml);
 
-	double ppw = 1.0 / (sqrt(abs(kwave2)) / (2.0 * PI)) / z.h;
+	double ppw = 1.0 / (sqrt(abs(kwave2)) / (2.0 * double(PI))) / z.h;
 	printf("ppw = %lf\n", ppw);
 
 	// источник в каждой задаче в середине 
@@ -4517,7 +4566,7 @@ void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_s
 	printf("Lx = %lf, Ly = %lf\n", x.l, y.l);
 	printf("PML_x = %lf, PML_y = %lf\n", x.pml_pts * x.h, y.pml_pts * y.h);
 	printf("SOURCE in 2D WITH PML AT: (%lf, %lf)\n", sourcePML.x, sourcePML.y);
-	double k = (double)kk;
+	double k = double(kk);
 	int nhalf = z.n / 2;
 	int src = 0;
 
@@ -4531,7 +4580,7 @@ void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_s
 	int count = 0;
 	int i = nhalf;
 
-	double kww = 4.0 * PI * PI * (i - nhalf) * (i - nhalf) / (z.l * z.l);
+	double kww = 4.0 * double(PI) * double(PI) * (i - nhalf) * (i - nhalf) / (z.l * z.l);
 	double kwave2 = k * k - kww;
 
 	dtype alpha_k;
@@ -4542,7 +4591,7 @@ void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_s
 
 
 	double c = 300;
-	double omega_loc = 2.0 * PI * nu;
+	double omega_loc = 2.0 * double(PI) * nu;
 	double norm = 0;
 
 	//double ppw = c / nu / x.h;

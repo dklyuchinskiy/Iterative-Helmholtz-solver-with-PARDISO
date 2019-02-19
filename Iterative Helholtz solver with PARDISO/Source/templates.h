@@ -55,6 +55,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 void check_norm_circle(size_m x, size_m y, size_m z, dtype* x_orig_nopml, dtype* x_sol_nopml, point source, double thresh);
 void print_2Dcsr_mat(size_m x, size_m y, ccsr* D2csr);
 void print_2Dcsr_mat2(size_m x, size_m y, ccsr* D2csr);
+void fprint(int m, int n, dtype *u, int ldu, char *mess);
 void print_2Dcsr_mat_to_file(size_m x, size_m y, ccsr* D2csr, char * s);
 void check_test_3Dsolution_in1D(int n1, int n2, int n3, dtype* u_sol, dtype *u_ex, double thresh);
 void SetRHS3DForTest(size_m xx, size_m yy, size_m zz, dtype* f, point source, int& l);

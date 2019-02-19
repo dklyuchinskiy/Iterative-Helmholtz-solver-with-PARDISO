@@ -200,6 +200,7 @@ int main()
 #ifndef PERF
 	TestAll();
 #endif
+
 	Test2DLaplaceLevander4th();
 	//Test2DHelmholtzLevander4th();
 	system("pause");
@@ -317,7 +318,7 @@ int main()
 	system("pause");
 #endif
 
-	double lambda = (double)(c_z) / nu;
+	double lambda = double(c_z) / nu;
 	double ppw = lambda / x.h;
 	int niter = 20;  // 4 iter for freq = 2
 					// 12 iter for freq = 4
