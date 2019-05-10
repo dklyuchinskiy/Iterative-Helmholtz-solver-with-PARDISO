@@ -22,7 +22,7 @@ typedef std::complex<double> dtype;
 
 //#define DEBUG
 
-#define EPS 0.00001
+#define EPS 1e-12
 
 struct MatrixCSRReal {
 
@@ -168,10 +168,11 @@ enum class DIAG13
 //#define OUTPUT
 //#define GNUPLOT
 //#define GEN_3D_MATRIX
+//#define TEST_HELM_1D
+
 
 #define ORDER4
-
-//#define TEST_HELM_1D
+#define HOMO
 
 #ifdef HELMHOLTZ
 #define nu 4
@@ -179,6 +180,8 @@ enum class DIAG13
 /*--------------*/
 #define ky 1.8
 //#define beta_eq 0.005
+//#define beta_eq 0.0
+
 #define beta_eq 0.5
 
 #define omega 2.0 * (PI) * (nu)
@@ -212,12 +215,19 @@ enum class DIAG13
 template<typename T>
 T* alloc_arr(long long int n)
 {
-//	printf("%lli\n", n);
 	T *f = (T*)malloc(n * sizeof(T));
 
 #pragma omp parallel for schedule(static)
 	for (long long int i = 0; i < n; i++)
 		f[i] = 0.0;
+
+	return f;
+}
+
+template<typename T>
+T* alloc_arr2(long long int n)
+{
+	T *f = (T*)malloc(n * sizeof(T));
 
 	return f;
 }
@@ -231,7 +241,7 @@ void free_arr(T* &arr)
 template<typename T>
 void MultVectorConst(int n, T* v1, T alpha, T* v2)
 {
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < n; i++)
 		v2[i] = v1[i] * alpha;
 }
