@@ -201,10 +201,10 @@ int main()
 	TestAll();
 #endif
 
-	Test2DLaplaceLevander4th();
-	//Test2DHelmholtzLevander4th();
-	system("pause");
-//	return 0;
+	//Test2DLaplaceLevander4th(); // laplace + manufactored laplace and helmholtz
+	//Test2DHelmholtzLevander4th(); // exact helm
+	//system("pause");
+	//return 0;
 #if 1
 						
 #ifdef PML			   // 50 pts   - 7 % and 8 % if beta = 0.3 (ppw = 26)
@@ -246,9 +246,9 @@ int main()
 
 	x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-	int n1 = 49 + 2 * x.pml_pts;		    // number of point across the directions
-	int n2 = 49 + 2 * y.pml_pts;
-	int n3 = 49 + 2 * z.spg_pts;
+	int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
+	int n2 = 99 + 2 * y.pml_pts;
+	int n3 = 99 + 2 * z.spg_pts;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 
@@ -320,7 +320,7 @@ int main()
 
 	double lambda = double(c_z) / nu;
 	double ppw = lambda / x.h;
-	int niter = 20;  // 4 iter for freq = 2
+	int niter = 12;  // 4 iter for freq = 2
 					// 12 iter for freq = 4
 
 	printf("The length of the wave: %lf\n", lambda);
@@ -627,11 +627,12 @@ int main()
 	FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh);
 
 	all_time = omp_get_wtime() - all_time;
+
+	//-------------------------------------------
 	printf("Time: %lf\n", all_time);
-
-	RelRes = 0;
-
 	printf("size = %d size_no_pml = %d\n", size, size_nopml);
+
+#ifdef HOMO
 
 #ifndef TEST_HELM_1D
 	for (int k = 0; k < z.n; k++)
@@ -639,6 +640,14 @@ int main()
 		int src = size2D / 2;
 		NullifySource2D(x, y, &x_sol[k * size2D], src, 5);
 		NullifySource2D(x, y, &x_orig[k * size2D], src, 5);
+	}
+#endif
+
+#if 0
+	printf("Print 1D projections...\n");
+	for (int k = 0; k < z.n; k++)
+	{
+		PrintProjection1D(x, y, &x_orig[k * size2D], &x_sol[k * size2D], k);
 	}
 #endif
 
@@ -662,6 +671,12 @@ int main()
 #endif
 	// Output
 
+
+	// DEBUG OF RELEASE
+	//-------------------
+#undef PERF
+	// ------------------
+
 #ifndef PERF
 #define OUTPUT
 #define GNUPLOT
@@ -669,7 +684,11 @@ int main()
 
 //#define OUTPUT
 #ifdef OUTPUT
+#ifndef ORDER4
 	output("ChartsFreq4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+#else
+	output("ChartsFreq4_Order4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+#endif
 #endif
 
 	printf("----------------------------------------------\n");
@@ -721,10 +740,12 @@ int main()
 
 	printf("----------------------------------------------\n");
 
-//#define GNUPLOT
+#define GNUPLOT
 
 #ifdef GNUPLOT
 	pml_flag = true;
+
+#ifndef ORDER4
 	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/ex_pard", pml_flag, 4, x, y, z);
 	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/imag/ex_pard", pml_flag, 5, x, y, z);
 	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/helm_ft", pml_flag, 6, x, y, z);
@@ -732,7 +753,71 @@ int main()
 	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/diff", pml_flag, 8, x, y, z);
 	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/imag/diff", pml_flag, 9, x, y, z);
 #else
+	gnuplot("ChartsFreq4_Order4/model_ft", "ChartsFreq4_Order4/real/ex_pard", pml_flag, 4, x, y, z);
+	gnuplot("ChartsFreq4_Order4/model_ft", "ChartsFreq4_Order4/imag/ex_pard", pml_flag, 5, x, y, z);
+	gnuplot("ChartsFreq4_Order4/model_ft", "ChartsFreq4_Order4/real/helm_ft", pml_flag, 6, x, y, z);
+	gnuplot("ChartsFreq4_Order4/model_ft", "ChartsFreq4_Order4/imag/helm_ft", pml_flag, 7, x, y, z);
+	gnuplot("ChartsFreq4_Order4/model_ft", "ChartsFreq4_Order4/real/diff", pml_flag, 8, x, y, z);
+	gnuplot("ChartsFreq4_Order4/model_ft", "ChartsFreq4_Order4/imag/diff", pml_flag, 9, x, y, z);
+#endif
+#else
 	printf("No printing results...\n");
+#endif
+
+#else
+	// NON Homogenious domain
+	// method Runge
+
+	reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
+	reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
+	reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
+
+#define OUTPUT
+#ifdef OUTPUT
+	printf("Output results to file...\n");
+	output("Charts3DHetero/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+#endif
+
+#define GNUPLOT
+#ifdef GNUPLOT
+	printf("Printing with GNUPLOT...\n");
+	pml_flag = true;
+	gnuplot("Charts3DHetero/model_ft", "Charts3DHetero/real/helm_ft", pml_flag, 6, x, y, z);
+	gnuplot("Charts3DHetero/model_ft", "Charts3DHetero/imag/helm_ft", pml_flag, 7, x, y, z);
+#else
+	printf("No printing results...\n");
+#endif
+
+	// Method Runge (for 3 diff grids)
+	// f(2h) - f(h)
+	// ------------
+	// f(h) - f(h/2)
+
+	char str[255];
+	sprintf(str, "sol3D_N%d.dat", x.n_nopml + 1);
+	FILE *file = fopen(str, "w");
+
+	for (int i = 0; i < size_nopml; i++)
+		fprintf(file, "%lf %lf\n", x_sol_nopml[i].real(), x_sol_nopml[i].imag());
+
+	fclose(file);
+
+	bool make_runge_count;
+#ifdef MAKE_RUNGE_3D
+	make_runge_count = true;
+#else
+	make_runge_count = false;
+#endif
+
+	double order;
+	if (make_runge_count)
+	{
+		order = Runge(x, x, x, y, y, y, z, z, z, "sol3D_N50.dat", "sol3D_N100.dat", "sol3D_N200.dat", 3);
+	}
+
+//	printf("order Runge = %lf\n", order);
+	fclose(file);	
+	
 #endif
 
 #ifndef ONLINE

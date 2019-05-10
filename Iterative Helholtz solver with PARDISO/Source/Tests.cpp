@@ -383,42 +383,97 @@ void TestSymmSparseMatrixOnline2DwithPML(size_m x, size_m y, size_m z, ccsr *Acs
 void Test2DLaplaceLevander4th()
 {
 	printf("------------------\n--------Test Laplace--------\n---------------\n");
-	size_m x, y;
+	
+	int nsize = 6;
+	size_m *x = alloc_arr2<size_m>(nsize * sizeof(size_m));
+	size_m *y = alloc_arr2<size_m>(nsize * sizeof(size_m));
 
-	x.pml_pts = y.pml_pts = 4;
-	x.spg_pts = y.spg_pts = 0;
+	for (int i = 0; i < nsize; i++)
+	{
+		x[i].pml_pts = y[i].pml_pts = 0;
+		x[i].spg_pts = y[i].spg_pts = 0;
+	}
 
 	double norm, prev = 1;
-	int dist = 1;
+	//int dist = 1;
+	int dist = 100; // for e^(x^2 + y^2) / (omega)
+	//int dist = 1.0;
 
-	for (int n = 7; n <= 7; n *= 2)
+#if 1
+	// Gen Exact Solution on the Lowest Grid
+	//------------------------------------
+	size_m x_ex, y_ex;
+	x_ex.n = 400 - 1;
+	y_ex.n = 400 - 1;
+	dtype *x_sol = alloc_arr<dtype>(x_ex.n * y_ex.n);
+
+	x_ex.n_nopml = x_ex.n;
+	y_ex.n_nopml = y_ex.n;
+
+	x_ex.pml_pts = y_ex.pml_pts = 0;
+	x_ex.spg_pts = y_ex.spg_pts = 0;
+
+	x_ex.l = dist;
+	y_ex.l = dist;
+
+	x_ex.h = x_ex.l / (x_ex.n + 1);
+	y_ex.h = y_ex.l / (y_ex.n + 1);
+
+	//Test2DLaplaceLevander4thKernelExactSolutionOnly(x_ex, y_ex);
+	Test2DLaplaceLevander4thKernelGenNumSolutionLowGrid(x_ex, y_ex, x_sol);
+	//--------------------------------------
+#endif
+	for (int n = 50, i = 0; n <= 200; n *= 2, i++)
 	{
-		x.n = n - 1 + 2 * x.pml_pts;
-		y.n = n - 1 + 2 * y.pml_pts;
+		x[i].n = n - 1 + 2 * x[i].pml_pts;
+		y[i].n = n - 1 + 2 * y[i].pml_pts;
 
-		x.n_nopml = x.n - 2 * x.pml_pts;
-		y.n_nopml = y.n - 2 * y.pml_pts;
+		x[i].n_nopml = x[i].n - 2 * x[i].pml_pts;
+		y[i].n_nopml = y[i].n - 2 * y[i].pml_pts;
 
-		x.l = dist + (double)(2 * x.pml_pts * dist) / (x.n_nopml + 1);
-		y.l = dist + (double)(2 * y.pml_pts * dist) / (y.n_nopml + 1);
+		x[i].l = dist + (double)(2 * x[i].pml_pts * dist) / (x[i].n_nopml + 1);
+		y[i].l = dist + (double)(2 * y[i].pml_pts * dist) / (y[i].n_nopml + 1);
 
-		x.h = x.l / (x.n + 1);
-		y.h = y.l / (y.n + 1);
+		x[i].h = x[i].l / (x[i].n + 1);
+		y[i].h = y[i].l / (y[i].n + 1);
 
-		norm = Test2DLaplaceLevander4thKernel(x, y);
+		norm = Test2DLaplaceLevander4thKernel(x[i], y[i], x_ex, y_ex, x_sol);
 		printf("Size = %d, norm = %e, scale = %lf\n", n, norm, prev / norm);
 		prev = norm;
 
-		x.pml_pts *= 2;
-		y.pml_pts *= 2;
+		x[i].pml_pts *= 2;
+		y[i].pml_pts *= 2;
 	}
+
+	size_m z;
+	double order;
+
+	/* x0 - x1 / x1 - x2 ---> 4,   x0 - xT/ x1 - xT  ---> 16 */
+#if 1
+	printf("Runge...\n");
+	order = Runge(x[0], x[1], x_ex, y[0], y[1], y_ex, z, z, z, "sol2D_N50.dat", "sol2D_N100.dat", "sol2Dex_N400.dat", 2);
+	printf("Order 1 = %lf\n", order);
+	order = Runge(x[1], x[2], x_ex, y[1], y[2], y_ex, z, z, z, "sol2D_N100.dat", "sol2D_N200.dat", "sol2Dex_N400.dat", 2);
+	printf("Order 2 = %lf\n", order);
+//	order = Runge(x[2], x[3], x[4], y[2], y[3], y[4], z, z, z, "sol2D_N200.dat", "sol2D_N400.dat", "sol2Dex_N800.dat", 2);
+//	printf("Order 3 = %lf\n", order);
+	//order = Runge(x[3], x[4], x[5], y[3], y[4], y[5], z, z, z, "sol2D_N400.dat", "sol2D_N800.dat", "sol2D_N1600.dat", 2);
+	//printf("Order 4 = %lf\n", order);
+#else
+	order = Runge(x[0], x[1], x_ex, y[0], y[1], y_ex, z, z, z, "sol2D_N50.dat", "sol2D_N100.dat", "sol2Dex_N800.dat", 2);
+	printf("Order 1 = %lf\n", order);
+	order = Runge(x[1], x[2], x_ex, y[1], y[2], y_ex, z, z, z, "sol2D_N100.dat", "sol2D_N200.dat", "sol2Dex_N800.dat", 2);
+	printf("Order 2 = %lf\n", order);
+	order = Runge(x[2], x[3], x_ex, y[2], y[3], y_ex, z, z, z, "sol2D_N200.dat", "sol2D_N400.dat", "sol2Dex_N800.dat", 2);
+	printf("Order 3 = %lf\n", order);
+#endif
 }
 
 dtype Test2DLaplaceExact(size_m xx, size_m yy, double x, double y, point src)
 {
 	//return x * x - y * y;
 	//return sin(2 * PI * x) * sin(2 * PI * y);
-#if 0
+#if 1
 	double sigma = 10;
 	return exp(-((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / (sigma * sigma));
 #else
@@ -426,7 +481,7 @@ dtype Test2DLaplaceExact(size_m xx, size_m yy, double x, double y, point src)
 	//return dtype{ x,  100.0 * x * x * x / (3.0 * double(omega)) } * dtype{ y, 100.0 * y * y * y / (3.0 * double(omega)) } ;
 #endif
 	// zero boundary
-	return x * (x - xx.l) * y * (y - yy.l) ;
+	//return x * (x - xx.l) * y * (y - yy.l) ;
 }
 
 #if 0
@@ -446,6 +501,8 @@ dtype Test2DLaplaceRHS(size_m xx, size_m yy, double x, double y, point src, dtyp
 //		(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2))
 //		+ k2 * Test2DLaplaceExact(x, y, src);
 #else
+	double h = 1.0 / xx.pml_pts;
+
 	// Helmholtz + correct PML
 	if ((x < xx.h * xx.pml_pts && y < yy.h * yy.pml_pts) || (x < xx.h * xx.pml_pts && y >= yy.l - yy.h * yy.pml_pts) ||
 		(x >= xx.l - xx.h * xx.pml_pts && y < yy.h * yy.pml_pts) || (x >= xx.l - xx.h * xx.pml_pts && y >= yy.l - yy.h * yy.pml_pts))
@@ -455,6 +512,8 @@ dtype Test2DLaplaceRHS(size_m xx, size_m yy, double x, double y, point src, dtyp
 	}
 	else if (x < xx.h * xx.pml_pts || x >= xx.l - xx.h * xx.pml_pts)
 	{
+		//if (x < xx.h * xx.pml_pts) x = 1.0 - x / xx.h * h;
+		//else x = 1.0 + (x / xx.h - xx.n + 1) * h;
 		return dtype{ 0, 200.0 * y / double(omega) } * dtype{ x, 100.0 * x * x * x / (3.0 * double(omega)) } + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
 	}
 	else if (y < yy.h * yy.pml_pts || y >= yy.l - yy.h * yy.pml_pts)
@@ -483,15 +542,16 @@ dtype Test2DLaplaceRHS(size_m xx, size_m yy, double x, double y, point src, dtyp
 	double sigma = 10;
 
 	// Laplace
-	//return Test2DLaplaceExact(x, y, src) * 4.0 * 
+	//return Test2DLaplaceExact(xx, yy, x, y, src) * 4.0 * 
 		//(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2));
 
 	// Helmholtz
-//	return Test2DLaplaceExact(x, y, src) * 4.0 *
-//		(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2))
-//		+ k2 * Test2DLaplaceExact(x, y, src);
+	return Test2DLaplaceExact(xx, yy, x, y, src) * 4.0 *
+		(((x - src.x) * (x - src.x) + (y - src.y) * (y - src.y)) / pow(sigma, 4) - 1.0 / pow(sigma, 2))
+		+ k2 * Test2DLaplaceExact(xx, yy, x, y, src);
 
 	// Helmholtz + correct PML
+#if 0
 	if ((x < xx.h * xx.pml_pts && y < yy.h * yy.pml_pts) || (x < xx.h * xx.pml_pts && y >= yy.l - yy.h * yy.pml_pts) ||
 		(x >= xx.l - xx.h * xx.pml_pts && y < yy.h * yy.pml_pts) || (x >= xx.l - xx.h * xx.pml_pts && y >= yy.l - yy.h * yy.pml_pts))
 	{
@@ -514,11 +574,12 @@ dtype Test2DLaplaceRHS(size_m xx, size_m yy, double x, double y, point src, dtyp
 	{
 		return 2.0 * x * (x - xx.l) + 2.0 * y * (y - yy.l) + k2 * Test2DLaplaceExact(xx, yy, x, y, src);
 	}
+#endif
 }
 #endif
 
 
-double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
+double Test2DLaplaceLevander4thKernel(size_m x, size_m y, size_m x_lg, size_m y_lg, dtype* x_sol_low_grid)
 {
 	// 2D test
 	printf("-----------------TEST FOR h = %lf----------------\n", x.h);
@@ -541,11 +602,11 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 
 
 	ccsr *Acsr = (ccsr*)malloc(sizeof(ccsr));
-	Acsr->values = alloc_arr<dtype>(non_zeros_in_2Dblock3diag);
+	Acsr->values = alloc_arr<dtype>(non_zeros_in_2Dblock13diag);
 	Acsr->ia = alloc_arr<int>(size2D + 1);
-	Acsr->ja = alloc_arr<int>(non_zeros_in_2Dblock3diag);
-	Acsr->ia[size2D] = non_zeros_in_2Dblock3diag + 1;
-	Acsr->non_zeros = non_zeros_in_2Dblock3diag;
+	Acsr->ja = alloc_arr<int>(non_zeros_in_2Dblock13diag);
+	Acsr->ia[size2D] = non_zeros_in_2Dblock13diag + 1;
+	Acsr->non_zeros = non_zeros_in_2Dblock13diag;
 
 	printf("Non_zeros = %d\n", Acsr->non_zeros);
 
@@ -571,28 +632,47 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 	int info;
 
 	point src = { x.l / 2, y.l / 2 };
-	//double k = 0.02;
-	double k = 0;
+	double k = 0.02;
+	//double k = 0;
 	dtype k_beta2 = k * k * dtype{ 1.0, beta_eq };
 
 	printf("Lx = %lf, Ly = %lf\n", x.l, y.l);
 	printf("Source point Laplace: x = %lf, y = %lf\n", src.x, src.y);
 
+#if 0
 	// Set original solution
 	for (int j = 0; j < y.n; j++)
 		for (int i = 0; i < x.n; i++)
 			x_orig[i + x.n * j] = Test2DLaplaceExact(x, y, x.h * (i + 1), y.h * (j + 1), src);
+#else
+	// Set original solution as the numerical solution on the lowest grid
+
+	int step = (x_lg.n + 1) / (x.n + 1);
+	printf("step cur_sol vs low_grid_sol = %d\n", step);
+	printf("size1 = %d, size2 = %d, (i + lda2h * j)last = %d, (i + ldah2 * j) * step1 = %d\n", size2D, x_lg.n * y_lg.n, x.n - 1 + x.n * (y.n - 1), step * (x.n) - 1 + x_lg.n * (step * (y.n) - 1));
+	system("pause");
+	for (int j = 0; j < y.n; j++)
+		for (int i = 0; i < x.n; i++)
+		{
+		//	printf("%d %d", i + x.n * j, step * (i + 1) - 1 + x_lg.n * (step * (j + 1) - 1));
+			x_orig[i + x.n * j] = x_sol_low_grid[step * (i + 1) - 1 + x_lg.n * (step * (j + 1) - 1)];
+		}
+
+	system("pause");
+#endif
 
 	// Set right-hand-side
 	for (int j = 0; j < y.n; j++)
 		for (int i = 0; i < x.n; i++)
 			f[i + x.n * j] = Test2DLaplaceRHS(x, y, x.h * (i + 1), y.h * (j + 1), src, k_beta2);
 
+#if 0
 	FILE* out = fopen("RHStest.dat", "w+");
 	for (int i = 0; i < size2D; i++)
 		fprintf(out, "%d %lf %lf\n", i, f[i].real(), f[i].imag());
 
 	fclose(out);
+#endif
 
 #if 1
     // для 5-ти точечного шаблона с ненулевыми граничными условиями
@@ -609,29 +689,31 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 	}
 #endif
 
+#if 0
 	FILE* out2 = fopen("RHStest_bound.dat", "w+");
 	for (int i = 0; i < size2D; i++)
 		fprintf(out2, "%d %lf %lf\n", i, f[i].real(), f[i].imag());
 
 	fclose(out2);
+#endif
 
 	// Fill matrix
-	//GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, Acsr, k_beta2, freqs);
-	GenSparseMatrixOnline2DwithPML(-1, x, y, Acsr, k_beta2, freqs);
+	GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, Acsr, k_beta2, freqs);
+	//GenSparseMatrixOnline2DwithPML(-1, x, y, Acsr, k_beta2, freqs);
 
 	// Check residual norm
 	ResidCSR2D(x, y, Acsr, x_orig, f, g, norm);
 	printf("Resid norm |Au_ex - f| = %e\n", norm);
 
+#if 0
+
 	dtype* A = alloc_arr<dtype>(size2D * size2D); int lda = size2D;
 
-	system("pause");
 	// CSR to dense
-	printf("matrix gen\n");
+	printf("dense matrix gen\n");
 	int count1 = 0, count2 = 0;
 	int vals_count = 0;
 
-#if 1
 
 	for (int i = 0; i < size2D; i++)
 	{
@@ -646,11 +728,11 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 	if (vals_count != Acsr->non_zeros) printf("!!!Error!!! CSR to DENSE!\n");
 
 #else
-	int inf[6] = { 1, 0, 1, 2, Acsr->non_zeros, 7 };
-	mkl_zdnscsr(inf, &size2D, &size2D, A, &lda, Acsr->values, Acsr->ja, Acsr->ia, &info);
+//	int inf[6] = { 1, 0, 1, 2, Acsr->non_zeros, 7 };
+	//mkl_zdnscsr(inf, &size2D, &size2D, A, &lda, Acsr->values, Acsr->ja, Acsr->ia, &info);
 #endif
 
-	fprint(size2D, size2D, A, lda, "LaplacePML.dat");
+	//fprint(size2D, size2D, A, lda, "LaplacePML.dat");
 
 	// Solution by PARDISO
 	printf("pardiso solve\n");
@@ -662,7 +744,7 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 	//norm = dznrm2(&size2D, x_sol, &ione);
 	norm = RelError(zlange, size2D, 1, x_sol, x_orig, size2D, thresh);
 	printf("Pardiso norm = %e\n", norm);
-
+#if 0
 	int* ipiv = alloc_arr<int>(size2D);
 	for (int i = 0; i < size2D; i++)
 		x_sol[i] = f[i];
@@ -682,6 +764,7 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 
 	norm = RelError(zlange, size2D, 1, x_sol, x_orig, size2D, thresh);
 	printf("LAPACK norm = %e\n", norm);
+#endif
 
 	// Reduce PML
 //	reducePML2D(x, y, size2D, x_sol, size2D_nopml, x_sol_ex_nopml);
@@ -692,9 +775,19 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 	reducePML2D(x, y, size2D, x_sol, size2D_nopml, x_sol_prd_nopml);
 
 	norm = RelError(zlange, size2D_nopml, 1, x_sol_prd_nopml, x_sol_ex_nopml, size2D_nopml, thresh);
+	
+	check_norm_circle2D(x, y, x_orig, x_sol, src, thresh);
+
+	char str[255];
+	sprintf(str, "sol2D_N%d.dat", x.n_nopml + 1);
+	FILE *out = fopen(str, "w");
+	for (int i = 0; i < size2D_nopml; i++)
+		fprintf(out, "%16.14lf %16.14lf\n", x_sol_prd_nopml[i].real(), x_sol_prd_nopml[i].imag());
+	fclose(out);
+
 	//norm = RelError(zlange, size2D, 1, x_sol, x_orig, size2D, thresh);
 
-#if 1
+#if 0
 	// Output
 	char *str1, *str2, *str3;
 	str1 = alloc_arr<char>(255);
@@ -722,7 +815,281 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y)
 	free_arr(Acsr->ia);
 	free_arr(Acsr->ja);
 	free_arr(Acsr);
-	free_arr(A);
+
+	free_arr(freqs);
+	free_arr(iparm);
+	free_arr(perm);
+	free_arr(pt);
+
+	return norm;
+}
+
+double Test2DLaplaceLevander4thKernelGenNumSolutionLowGrid(size_m x, size_m y, dtype *x_sol)
+{
+	// 2D test
+	printf("-----------------TEST FOR h = %lf----------------\n", x.h);
+	int size2D = x.n * y.n;
+	int size2D_nopml = x.n_nopml * y.n_nopml;
+	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
+	int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
+	//int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
+	int ione = 1;
+	int zero = 0;
+	int itwo = 2;
+
+	dtype *f = alloc_arr<dtype>(size2D);
+	dtype *g = alloc_arr<dtype>(size2D);
+
+	dtype *x_sol_prd_nopml = alloc_arr<dtype>(size2D_nopml);
+
+
+	ccsr *Acsr = (ccsr*)malloc(sizeof(ccsr));
+	Acsr->values = alloc_arr<dtype>(non_zeros_in_2Dblock13diag);
+	Acsr->ia = alloc_arr<int>(size2D + 1);
+	Acsr->ja = alloc_arr<int>(non_zeros_in_2Dblock13diag);
+	Acsr->ia[size2D] = non_zeros_in_2Dblock13diag + 1;
+	Acsr->non_zeros = non_zeros_in_2Dblock13diag;
+
+	printf("Non_zeros = %d\n", Acsr->non_zeros);
+
+	int* freqs = alloc_arr<int>(size2D);
+
+	double norm;
+	double thresh = 10e-6;
+
+	//-------- PARDISO ----------
+	int mtype = 13;
+	int *iparm = alloc_arr<int>(64);
+	int *perm = alloc_arr<int>(size2D);
+	size_t *pt = alloc_arr<size_t>(64);
+
+	pardisoinit(pt, &mtype, iparm);
+
+	int maxfct = 1;
+	int mnum = 1;
+	int rhs = 1;
+	int msglvl = 0;
+	int error = 0;
+	int phase; // analisys + factorization + solution
+	int info;
+
+	point src = { x.l / 2, y.l / 2 };
+	double k = 0.02;
+	//double k = 0;
+	dtype k_beta2 = k * k * dtype{ 1.0, beta_eq };
+
+	// Set right-hand-side
+	for (int j = 0; j < y.n; j++)
+		for (int i = 0; i < x.n; i++)
+			f[i + x.n * j] = Test2DLaplaceRHS(x, y, x.h * (i + 1), y.h * (j + 1), src, k_beta2);
+
+
+	// Fill matrix
+	printf("Matrix generation...\n");
+	GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, Acsr, k_beta2, freqs);
+	//GenSparseMatrixOnline2DwithPML(-1, x, y, Acsr, k_beta2, freqs);
+
+	// Solution by PARDISO
+	printf("pardiso solve\n");
+	phase = 13;
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, Acsr->values, Acsr->ia, Acsr->ja, perm, &rhs, iparm, &msglvl, f, x_sol, &error);
+
+	if (error != 0) printf("pardiso error code = %d\n", error);
+
+
+	// Check accuracy
+	reducePML2D(x, y, size2D, x_sol, size2D_nopml, x_sol_prd_nopml);
+
+	char str[255];
+	sprintf(str, "sol2Dex_N%d.dat", x.n_nopml + 1);
+	FILE *out = fopen(str, "w");
+	for (int i = 0; i < size2D_nopml; i++)
+		fprintf(out, "%16.14lf %16.14lf\n", x_sol_prd_nopml[i].real(), x_sol_prd_nopml[i].imag());
+	fclose(out);
+
+	//norm = RelError(zlange, size2D, 1, x_sol, x_orig, size2D, thresh);
+
+
+	free_arr(f);
+	free_arr(g);
+
+	free_arr(x_sol_prd_nopml);
+	free_arr(Acsr->values);
+	free_arr(Acsr->ia);
+	free_arr(Acsr->ja);
+	free_arr(Acsr);
+
+	free_arr(freqs);
+	free_arr(iparm);
+	free_arr(perm);
+	free_arr(pt);
+
+	return norm;
+}
+
+double Test2DLaplaceLevander4thKernelExactSolutionOnly(size_m x, size_m y)
+{
+	// 2D test
+	printf("-----------------TEST FOR h = %lf----------------\n", x.h);
+	int size2D = x.n * y.n;
+	int size2D_nopml = x.n_nopml * y.n_nopml;
+	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
+	int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
+	//int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
+	int ione = 1;
+	int zero = 0;
+	int itwo = 2;
+
+	dtype *x_sol = alloc_arr<dtype>(size2D);
+	dtype *x_orig = alloc_arr<dtype>(size2D);
+	dtype *f = alloc_arr<dtype>(size2D);
+	dtype *g = alloc_arr<dtype>(size2D);
+
+	dtype *x_sol_ex_nopml = alloc_arr<dtype>(size2D_nopml);
+	dtype *x_sol_prd_nopml = alloc_arr<dtype>(size2D_nopml);
+
+
+	ccsr *Acsr = (ccsr*)malloc(sizeof(ccsr));
+	Acsr->values = alloc_arr<dtype>(non_zeros_in_2Dblock13diag);
+	Acsr->ia = alloc_arr<int>(size2D + 1);
+	Acsr->ja = alloc_arr<int>(non_zeros_in_2Dblock13diag);
+	Acsr->ia[size2D] = non_zeros_in_2Dblock13diag + 1;
+	Acsr->non_zeros = non_zeros_in_2Dblock13diag;
+
+	printf("Non_zeros = %d\n", Acsr->non_zeros);
+
+	int* freqs = alloc_arr<int>(size2D);
+
+	double norm;
+	double thresh = 10e-6;
+
+	int maxfct = 1;
+	int mnum = 1;
+	int rhs = 1;
+	int msglvl = 0;
+	int error = 0;
+	int phase; // analisys + factorization + solution
+	int info;
+
+	point src = { x.l / 2, y.l / 2 };
+	//double k = 0.02;
+	double k = 0;
+	dtype k_beta2 = k * k * dtype{ 1.0, beta_eq };
+
+	printf("Lx = %lf, Ly = %lf\n", x.l, y.l);
+	printf("Source point Laplace: x = %lf, y = %lf\n", src.x, src.y);
+
+	// Set original solution
+	for (int j = 0; j < y.n; j++)
+		for (int i = 0; i < x.n; i++)
+			x_orig[i + x.n * j] = Test2DLaplaceExact(x, y, x.h * (i + 1), y.h * (j + 1), src);
+
+	// Set right-hand-side
+	for (int j = 0; j < y.n; j++)
+		for (int i = 0; i < x.n; i++)
+			f[i + x.n * j] = Test2DLaplaceRHS(x, y, x.h * (i + 1), y.h * (j + 1), src, k_beta2);
+
+#if 0
+	FILE* out = fopen("RHStest.dat", "w+");
+	for (int i = 0; i < size2D; i++)
+		fprintf(out, "%d %lf %lf\n", i, f[i].real(), f[i].imag());
+
+	fclose(out);
+#endif
+
+#if 1
+	// для 5-ти точечного шаблона с ненулевыми граничными условиями
+	for (int j = 0; j < y.n; j++)
+	{
+		f[j * x.n + 0] -= Test2DLaplaceExact(x, y, 0, y.h * (j + 1), src) / (x.h * x.h);
+		f[j * x.n + x.n - 1] -= Test2DLaplaceExact(x, y, x.l, y.h * (j + 1), src) / (x.h * x.h);
+	}
+
+	for (int i = 0; i < x.n; i++)
+	{
+		f[0 * x.n + i] -= Test2DLaplaceExact(x, y, x.h * (i + 1), 0, src) / (y.h * y.h);
+		f[(y.n - 1) * x.n + i] -= Test2DLaplaceExact(x, y, x.h * (i + 1), y.l, src) / (y.h * y.h);
+	}
+#endif
+
+#if 0
+	FILE* out2 = fopen("RHStest_bound.dat", "w+");
+	for (int i = 0; i < size2D; i++)
+		fprintf(out2, "%d %lf %lf\n", i, f[i].real(), f[i].imag());
+
+	fclose(out2);
+#endif
+
+	// Fill matrix
+	GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, Acsr, k_beta2, freqs);
+	//GenSparseMatrixOnline2DwithPML(-1, x, y, Acsr, k_beta2, freqs);
+
+	// Check residual norm
+	ResidCSR2D(x, y, Acsr, x_orig, f, g, norm);
+	printf("Resid norm |Au_ex - f| = %e\n", norm);
+
+#if 0
+
+	dtype* A = alloc_arr<dtype>(size2D * size2D); int lda = size2D;
+
+	// CSR to dense
+	printf("dense matrix gen\n");
+	int count1 = 0, count2 = 0;
+	int vals_count = 0;
+
+
+	for (int i = 0; i < size2D; i++)
+	{
+		int vals_in_row = Acsr->ia[i + 1] - Acsr->ia[i];
+		for (int j = 0; j < vals_in_row; j++)
+		{
+			A[i + lda * (Acsr->ja[vals_count + j] - 1)] = Acsr->values[vals_count + j];
+		}
+		vals_count += vals_in_row;
+	}
+
+	if (vals_count != Acsr->non_zeros) printf("!!!Error!!! CSR to DENSE!\n");
+
+#else
+	//	int inf[6] = { 1, 0, 1, 2, Acsr->non_zeros, 7 };
+		//mkl_zdnscsr(inf, &size2D, &size2D, A, &lda, Acsr->values, Acsr->ja, Acsr->ia, &info);
+#endif
+
+	//norm = dznrm2(&size2D, x_sol, &ione);
+	norm = RelError(zlange, size2D, 1, x_sol, x_orig, size2D, thresh);
+	printf("Pardiso norm = %e\n", norm);
+
+	// Check accuracy
+	reducePML2D(x, y, size2D, x_orig, size2D_nopml, x_sol_ex_nopml);
+	reducePML2D(x, y, size2D, x_sol, size2D_nopml, x_sol_prd_nopml);
+
+	norm = RelError(zlange, size2D_nopml, 1, x_sol_prd_nopml, x_sol_ex_nopml, size2D_nopml, thresh);
+
+	check_norm_circle2D(x, y, x_orig, x_sol, src, thresh);
+
+	char str[255];
+	sprintf(str, "sol2Dex_N%d.dat", x.n_nopml + 1);
+	FILE *out = fopen(str, "w");
+	for (int j = 0; j < y.n; j++)
+		for (int i = 0; i < x.n; i++)
+			fprintf(out, "%lf %lf\n", x_sol_ex_nopml[i + x.n * j].real(), x_sol_ex_nopml[i + x.n * j].imag());
+		//fprintf(out, "%lf %lf %lf %lf\n", x_sol_ex_nopml[i + x.n * j].real(), x_sol_ex_nopml[i + x.n * j].imag(), x.h * (i + 1), y.h * (j + 1));
+	fclose(out);
+
+	//norm = RelError(zlange, size2D, 1, x_sol, x_orig, size2D, thresh);
+
+
+	free_arr(x_sol);
+	free_arr(x_orig);
+	free_arr(f);
+	free_arr(g);
+
+	free_arr(x_sol_ex_nopml);
+	free_arr(x_sol_prd_nopml);
+	free_arr(Acsr->values);
+	free_arr(Acsr->ia);
+	free_arr(Acsr->ja);
+	free_arr(Acsr);
 
 	return norm;
 }
@@ -733,12 +1100,12 @@ void Test2DHelmholtzLevander4th()
 	printf("------------------\n--------Test Hekmholtz-------\n---------------\n");
 	size_m x, y;
 
-	x.pml_pts = y.pml_pts = 20;
+	x.pml_pts = y.pml_pts = 10;
 	x.spg_pts = y.spg_pts = 0;
 
 	double norm, prev = 1;
 
-	for (int n = 50; n <= 400; n *= 2)
+	for (int n = 50; n <= 200; n *= 2)
 	{
 		x.n = n - 1 + 2 * x.pml_pts;
 		y.n = n - 1 + 2 * y.pml_pts;
@@ -819,7 +1186,6 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 
 
 	int count = 0;
-	int i = nhalf;
 
 	dtype alpha_k;
 	dtype *x_sol_ex = alloc_arr<dtype>(size2D);
@@ -830,12 +1196,16 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 	dtype *x_sol_ex_nopml = alloc_arr<dtype>(size2D_nopml);
 	dtype *x_sol_prd_nopml = alloc_arr<dtype>(size2D_nopml);
 
+	dtype *x_sol1D_ex = alloc_arr<dtype>(y.n);
+	dtype *x_sol1D_prd = alloc_arr<dtype>(y.n);
+
 
 	double norm = 0;
 	double thresh = 10e-6;
 
 	//double ppw = c / nu / x.h;
 
+	int i = nhalf;
 	double kww = 4.0 * double(PI) * double(PI) * (i - nhalf) * (i - nhalf) / (y.l * y.l);
 	double kwave2 = k * k - kww;
 	dtype kwave_beta2 = dtype{ (k * k - kww), k * k * beta_eq };
@@ -851,6 +1221,7 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 	// normalization of rhs
 	printf("Pardiso solve\n");
 	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f2D, x_sol_prd, &error);
+	if (error != 0) printf("!!!PARDISO ERROR!!!\n");
 
 	double eps = 0.01; // 1 percent
 
@@ -869,13 +1240,34 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 
 	NullifySource2D(x, y, x_sol_ex, src, 5);
 	NullifySource2D(x, y, x_sol_prd, src, 5);
-	x_sol_ex[src] = x_sol_prd[src] = 0;
+
+	check_norm_circle2D(x, y, x_sol_ex, x_sol_prd, sourcePML, thresh);
 
 	output2D(str1, pml_flag, x, y, x_sol_ex, x_sol_prd);
-
 	gnuplot2D(str1, str2, pml_flag, 3, x, y);
 	gnuplot2D(str1, str3, pml_flag, 5, x, y);
 
+
+	// output 1D - X direction
+	sprintf(str1, "Charts2D_v3/model_pml1Dx_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
+	sprintf(str2, "Charts2D_v3/model_pml1Dx_diff_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
+
+	output1D(str1, pml_flag, x, &x_sol_ex[x.n * (y.n - 1) / 2], &x_sol_prd[x.n * (y.n - 1) / 2]);
+	gnuplot1D(str1, str2, pml_flag, 0, x);
+
+	// output 1D - Y direction
+	sprintf(str1, "Charts2D_v3/model_pml2Dy_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
+	sprintf(str2, "Charts2D_v3/model_pml1Dy_diff_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
+
+	for (int j = 0; j < y.n; j++)
+	{
+		x_sol1D_ex[j] = x_sol_ex[(x.n - 1) / 2 + j * x.n];
+		x_sol1D_prd[j] = x_sol_prd[(x.n - 1) / 2 + j * x.n];
+	}
+	output1D(str1, pml_flag, y, x_sol1D_ex, x_sol1D_prd);
+	gnuplot1D(str1, str2, pml_flag, 0, y);
+
+	// check norm solution
 	reducePML2D(x, y, size2D, x_sol_ex, size2D_nopml, x_sol_ex_nopml);
 	reducePML2D(x, y, size2D, x_sol_prd, size2D_nopml, x_sol_prd_nopml);
 

@@ -44,8 +44,10 @@ void Test_TransferBlock3Diag_to_CSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dt
 void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr, ccsr *Dcsr_nopml, /*out */ ccsr* Dcsr_reduced, double eps);
 void Test2DLaplaceLevander4th();
 void Test2DHelmholtzLevander4th();
-double Test2DLaplaceLevander4thKernel(size_m x, size_m y);
+double Test2DLaplaceLevander4thKernel(size_m x, size_m y, size_m x_lg, size_m y_lg, dtype* x_sol);
 double Test2DHelmholtzLevander4thKernel(size_m x, size_m y);
+double Test2DLaplaceLevander4thKernelExactSolutionOnly(size_m x, size_m y);
+double Test2DLaplaceLevander4thKernelGenNumSolutionLowGrid(size_m x, size_m y, dtype* x_sol);
 
 // FFT
 void Test_FFT1D_Real(int n /* grid points in 1 dim */, double eps);

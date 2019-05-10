@@ -443,7 +443,7 @@ void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double sp
 		double norm = RelError(zlange, size2D, 1, &x_sol_nopml[k * size2D], &x_orig_nopml[k * size2D], size, 0.001);
 		norms_re[k] = RelError(dlange, size2D, 1, &x_sol_re[k * size2D], &x_orig_re[k * size2D], size, eps1p);
 		norms_im[k] = RelError(dlange, size2D, 1, &x_sol_im[k * size2D], &x_orig_im[k * size2D], size, eps1p);
-		if (niter == 25) printf("i = %d norm = %lf norm_re = %lf norm_im = %lf\n", k, norm, norms_re[k], norms_im[k]);
+		if (niter == 12) printf("i = %d norm = %lf norm_re = %lf norm_im = %lf\n", k, norm, norms_re[k], norms_im[k]);
 	}
 
 #if 0
@@ -457,6 +457,39 @@ void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double sp
 
 	fclose(fout);
 #endif
+}
+
+void PrintProjection1D(size_m x, size_m y, dtype *x_ex, dtype *x_prd, int freq)
+{
+	char *str1 = alloc_arr<char>(255);
+	char *str2 = alloc_arr<char>(255);
+	bool pml_flag = false;
+
+	dtype* x_sol1D_ex = alloc_arr<dtype>(x.n);
+	dtype* x_sol1D_prd = alloc_arr<dtype>(x.n);
+
+	// output 1D - X direction
+	sprintf(str1, "Charts3D/model_pml1Dx_%d__%lf", freq, x.h);
+	sprintf(str2, "Charts3D/model_pml1Dx_diff_%d__%lf", freq, x.h);
+
+	output1D(str1, pml_flag, x, &x_ex[x.n * (y.n - 1) / 2], &x_prd[x.n * (y.n - 1) / 2]);
+	gnuplot1D(str1, str2, pml_flag, 0, x);
+
+	// output 1D - Y direction
+	sprintf(str1, "Charts3D/model_pml2Dy_%d__%lf", freq, x.h);
+	sprintf(str2, "Charts3D/model_pml1Dy_diff_%d__%lf", freq, x.h);
+
+	for (int j = 0; j < y.n; j++)
+	{
+		x_sol1D_ex[j] = x_ex[(x.n - 1) / 2 + j * x.n];
+		x_sol1D_prd[j] = x_prd[(x.n - 1) / 2 + j * x.n];
+	}
+
+	output1D(str1, pml_flag, y, x_sol1D_ex, x_sol1D_prd);
+	gnuplot1D(str1, str2, pml_flag, 0, y);
+
+	free_arr(x_sol1D_ex);
+	free_arr(x_sol1D_prd);
 }
 
 void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_sol, point source, double thresh)
@@ -496,6 +529,57 @@ void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_
 
 	printf("Square: 0 < x < %lf, 0 < y < %lf, 0 < z < %lf.\n", xx.l, yy.l, zz.l);
 	printf("Norm in circle: %lf < r < %lf: %lf\n", r0, r_max, norm);
+
+	free_arr(x_sol_circ);
+	free_arr(x_orig_circ);
+}
+
+void check_norm_circle2D(size_m xx, size_m yy, dtype* x_orig, dtype* x_sol, point source, double thresh)
+{
+	int n1 = xx.n;
+	int n2 = yy.n;
+
+	int size2D = n1 * n2;
+
+	double x, y;
+	double r;
+	double r0 = (5 + xx.pml_pts) * xx.h - source.x;
+	double r_max = xx.l - (5 + xx.pml_pts) * xx.h - source.x;
+	double norm;
+
+	int pts_inside_circle = 0;
+	int pts_all_domain = 0;
+
+	dtype* x_sol_circ = alloc_arr<dtype>(size2D);
+	dtype* x_orig_circ = alloc_arr<dtype>(size2D);
+
+		for (int j = 0; j < n2; j++)
+			for (int i = 0; i < n1; i++)
+			{
+				x = (i + 1) * xx.h - source.x;
+				y = (j + 1) * yy.h - source.y;
+				r = sqrt(x * x + y * y);
+				if (r >= r0 && r <= r_max)
+				{
+					x_sol_circ[i + n1 * j] = x_sol[i + n1 * j];
+					x_orig_circ[i + n1 * j] = x_orig[i + n1 * j];
+					pts_inside_circle++;
+				}
+				pts_all_domain++;
+			}
+
+	norm = RelError(zlange, size2D, 1, x_sol_circ, x_orig_circ, size2D, thresh);
+
+	printf("Square: 0 < x < %lf, 0 < y < %lf\n", xx.l, yy.l);
+	printf("RelError in circle: %lf < r < %lf: %e\n", r0 + source.x, r_max + source.x, norm);
+	printf("Points inside circle = %d. All domain = %d\n", pts_inside_circle, pts_all_domain);
+
+	char str[255]; sprintf(str, "CircleSolOrig_N%d.dat", xx.n);
+	FILE *out = fopen(str, "w");
+	for (int i = 0; i < size2D; i++)
+		fprintf(out, "%d %lf %lf\n", i, x_sol_circ[i].real(), x_orig_circ[i].imag());
+
+	fclose(out);
 
 	free_arr(x_sol_circ);
 	free_arr(x_orig_circ);
@@ -639,8 +723,7 @@ double d(double x)
 {
 	//printf("x = %lf\n", x);
 
-	//const double C = 100;
-	const double C = 0;
+	const double C = 100;
 	return C * x * x;
 
 	// 10 * x ^ 2, проверить , что значения 0 и С на границах
@@ -655,7 +738,164 @@ dtype MakeSound2D(size_m xx, size_m yy, double x, double y, point source)
 
 dtype MakeSound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source)
 {
+	dtype c1 = 0.1;
+	dtype c2 = 0.1;
+	dtype c3 = 0.1;
+#ifdef HOMO
 	return c_z;
+#else
+	return c_z + c1 * x + c2 * y + c3 * z;
+#endif
+}
+
+double Runge(size_m x1, size_m x2, size_m x3,
+			 size_m y1, size_m y2, size_m y3, 
+			 size_m z1, size_m z2, size_m z3, 
+			 char *str1, char *str2, char *str3, int dim)
+{
+	// the lowest size (50 from line 50, 100, 200)
+	int size1, size2, size3;
+
+	if (dim == 3)
+	{
+		size1 = x1.n_nopml * y1.n_nopml * z1.n_nopml;
+#define RUNGE3D
+#ifdef RUNGE3D
+		size2 = size3 = size1;
+#else
+		size2 = x2.n_nopml * y2.n_nopml * z2.n_nopml;
+		size3 = x3.n_nopml * y3.n_nopml * z3.n_nopml;
+#endif
+	}
+	else if (dim == 2)
+	{
+		size1 = x1.n_nopml * y1.n_nopml;
+		size2 = x2.n_nopml * y2.n_nopml;
+		size3 = x3.n_nopml * y3.n_nopml;
+	}
+	else
+	{
+		size1 = x1.n_nopml;
+		size2 = x2.n_nopml;
+		size3 = x3.n_nopml;
+	}
+	FILE* file1, *file2, *file3;
+	file1 = fopen(str1, "r");
+	file2 = fopen(str2, "r");
+	file3 = fopen(str3, "r");
+	double a, b;
+	double f1, f2, f3;
+	int ione = 1;
+
+	dtype *sol2h = alloc_arr<dtype>(size1); int lda2h = x1.n_nopml;
+	dtype *solh = alloc_arr<dtype>(size2); int ldah = x2.n_nopml;
+	dtype *solh2 = alloc_arr<dtype>(size3); int ldah2 = x3.n_nopml;
+
+	for (int i = 0; i < size1; i++)
+	{
+		fscanf(file1, "%lf %lf\n", &a, &b);
+		sol2h[i] = dtype{ a, b };
+	}
+	//printf("LAST 1 = %lf", sol2h[size1 - 1].real(), sol2h[size1 - 1].imag());
+
+	for (int i = 0; i < size2; i++)
+	{
+		fscanf(file2, "%lf  %lf\n", &a, &b);
+		solh[i] = dtype{ a, b };
+	}
+	//printf("LAST 2 = %lf", solh[size2 - 1].real(), solh[size2 - 1].imag());
+
+	for (int i = 0; i < size3; i++)
+	{
+		fscanf(file3, "%lf %lf\n", &a, &b);
+		solh2[i] = dtype{ a, b };
+	}
+	//printf("LAST 3 = %lf", solh2[size3 - 1].real(), solh2[size3 - 1].imag());
+
+	f1 = dznrm2(&size1, sol2h, &ione);
+	f2 = dznrm2(&size2, solh, &ione);
+	f3 = dznrm2(&size3, solh2, &ione);
+
+	//printf("Runge (||u1|| - ||u2||) / (||u2|| - ||u3||) = %lf\n", (f1 - f2) / (f2 - f3));
+
+#if 0
+	int step1 = (x2.n + 1) / (x1.n + 1);
+	int step2 = (x3.n + 1) / (x1.n + 1);
+
+	printf("step1 = %d, step2 = %d\n", step1, step2);
+
+	dtype *hlp2h = alloc_arr<dtype>(size1);
+	dtype *hlph = alloc_arr<dtype>(size1);
+
+	for (int j = 0; j < y1.n_nopml; j++)
+		for (int i = 0; i < x1.n_nopml; i++)
+		{
+			hlp2h[i + lda2h * j] = sol2h[i + lda2h * j] - solh2[step2 * (i + ldah2 * j)];
+			hlph[i + lda2h * j] = solh[step1 * (i + ldah * j)] - solh2[step2 * (i + ldah2 * j)];
+		}
+	f1 = dznrm2(&size1, hlp2h, &ione) * sqrt(x1.h);
+	f2 = dznrm2(&size1, hlph, &ione) * sqrt(x2.h);
+#else
+	int step1 = (x3.n + 1) / (x1.n + 1);
+	int step2 = (x3.n + 1) / (x2.n + 1);
+
+	printf("step1 = %d, step2 = %d\n", step1, step2);
+
+	dtype *hlp2h = alloc_arr<dtype>(size1);
+	dtype *hlph = alloc_arr<dtype>(size2);
+
+#if 0
+	for (int j = 0; j < y1.n; j++)
+		for (int i = 0; i < x1.n; i++)
+			hlp2h[i + lda2h * j] = sol2h[i + lda2h * j] - solh2[step1 * (i + 1) - 1 + ldah2 * (step1 * (j + 1) - 1)];
+	// 0, 1, 2, 3, 4, 5, 6 vs 3, 7, 11
+
+	printf("size1 = %d, (i + lda2h * j)last = %d, (i + ldah2 * j) * step1 = %d\n", size1, x1.n - 1 + lda2h * (y1.n - 1), step1 * (x1.n) - 1 + ldah2 * (step1 * (y1.n) - 1));
+
+	for (int j = 0; j < y2.n; j++)
+		for (int i = 0; i < x2.n; i++)
+			hlph[i + ldah * j] = solh[i + ldah * j] - solh2[step2 * (i + 1) - 1 + ldah2 * (step2 * (j + 1) - 1)];
+	// 0, 1, 2, 3, 4, 5, 6 vs 1, 3, 5, 7, 9, 11
+
+	printf("size2 = %d, (i + ldah * j)last = %d, (i + ldah2 * j) * step2 = %d\n", size2, x2.n - 1 + ldah * (y2.n - 1), step2 * (x2.n) - 1 + ldah2 * (step2 * y2.n - 1));
+
+	//f1 = dznrm2(&size1, hlp2h, &ione) * sqrt(x1.h);
+	//f2 = dznrm2(&size2, hlph, &ione) * sqrt(x2.h);
+	f1 = zlange("F", &size1, &ione, hlp2h, &lda2h, NULL);// *sqrt(x1.h);
+	f2 = zlange("F", &size2, &ione, hlph, &ldah, NULL);// *sqrt(x2.h);
+#else
+	for (int j = 0; j < y1.n; j++)
+		for (int i = 0; i < x1.n; i++)
+			hlp2h[i + lda2h * j] = solh2[step1 * (i + 1) - 1 + ldah2 * (step1 * (j + 1) - 1)];
+	// 0, 1, 2, 3, 4, 5, 6 vs 3, 7, 11
+
+	printf("size1 = %d, (i + lda2h * j)last = %d, (i + ldah2 * j) * step1 = %d\n", size1, x1.n - 1 + lda2h * (y1.n - 1), step1 * (x1.n) - 1 + ldah2 * (step1 * (y1.n) - 1));
+
+	for (int j = 0; j < y2.n; j++)
+		for (int i = 0; i < x2.n; i++)
+			hlph[i + ldah * j] = solh2[step2 * (i + 1) - 1 + ldah2 * (step2 * (j + 1) - 1)];
+	// 0, 1, 2, 3, 4, 5, 6 vs 1, 3, 5, 7, 9, 11
+	double eps = 1e-6;
+	f1 = RelError2(zlange, x1.n, y1.n, sol2h, lda2h, hlp2h, lda2h, eps);
+	f2 = RelError2(zlange, x2.n, y2.n, solh, ldah, hlph, ldah, eps);
+#endif
+
+	printf("size3 = %d\n", size3);
+#endif
+
+	free_arr(hlp2h);
+	free_arr(hlph);
+	free_arr(sol2h);
+	free_arr(solh);
+	free_arr(solh2);
+
+	fclose(file1);
+	fclose(file2);
+	fclose(file3);
+
+	printf("Runge ||u(2h) - u(h/2)|| = %e\n||u(h) - u(h/2)|| = %e\n", f1, f2);
+
+	return f1 / f2;
 }
 
 void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
@@ -700,22 +940,20 @@ void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2
 	dtype c0_min;
 
 #if 1
-	for (int j = 0; j < Ny; j++)
-		for (int i = 0; i < Nx; i++)
+	for (int j = y.pml_pts; j < Ny - y.pml_pts; j++)
+		for (int i = x.pml_pts; i < Nx - x.pml_pts; i++)
 		{
 			c0_max = sound3D[z.spg_pts * n + j * Nx + i];
 			c0_min = sound3D[z.spg_pts * n + j * Nx + i];
 
-			for (int k = 0; k < Nz; k++)
+			for (int k = z.spg_pts; k < Nz - z.spg_pts; k++)
 			{
-				if (k >= z.spg_pts && k < (Nz - z.spg_pts))
-				{
 					if (abs(sound3D[k * n + j * Nx + i]) > abs(c0_max)) c0_max = sound3D[k * n + j * Nx + i];
 					if (abs(sound3D[k * n + j * Nx + i]) < abs(c0_min)) c0_min = sound3D[k * n + j * Nx + i];
-				}
 			}
 
 			sound2D[j * Nx + i] = 0.5 * (c0_max + c0_min);
+			printf("sound[%d][%d] = %lf\n", i, j, sound2D[j * Nx + i].real());
 		}
 #else
 #pragma omp parallel for schedule(dynamic)
@@ -822,8 +1060,6 @@ dtype alpha(size_m xyz, double i)
 	if (xyz.pml_pts == 0) return 1.0;
 	else h = 1.0 / xyz.pml_pts;
 
-	if (i < 0 || i > xyz.n - 1) return 0;
-
 	if (i < xyz.pml_pts || i >= (xyz.n - xyz.pml_pts))
 	{
 		if (i < xyz.pml_pts)
@@ -834,8 +1070,7 @@ dtype alpha(size_m xyz, double i)
 			// i = 0 ,       x = 1.0
 			// i = pml - 1 , x = h 
 
-			if (x < 0 || x > 1)  printf("left: i = %lf x = %lf\n", i, x);
-
+			//if (x < 0 || x > 1)  printf("left: i = %lf x = %lf\n", i, x);
 			//if ((abs(x - 0) < EPS_ZERO) || (abs(x - 1) < EPS_ZERO)) printf("left: i = %lf x = %lf\n", i, x);
 		}
 		else if (i >= (xyz.n - xyz.pml_pts))
@@ -848,7 +1083,7 @@ dtype alpha(size_m xyz, double i)
 			// i = n - pml , x = h
 			// i = n - 1   , x = 1.0
 
-			if (x < 0 || x > 1)  printf("right: i = %lf x = %lf\n", i, x);
+			//if (x < 0 || x > 1)  printf("right: i = %lf x = %lf\n", i, x);
 			//if ((abs(x - 0) < EPS_ZERO) || (abs(x - 1) < EPS_ZERO)) printf("right: i = %lf x = %lf\n", i, x);
 		}
 
@@ -924,7 +1159,7 @@ dtype Hankel(dtype z)
 	void *vmblock = NULL;
 
 	int n = 1; // number of functions
-	int nz;
+	int nz = 0;
 
 	//memory allocation for cyr, cyi, cwr, cwi
 	vmblock = vminit();
@@ -959,6 +1194,8 @@ dtype Hankel(dtype z)
 
 	// Hankel function of the 1 kind
 	ZBESH(z.real(), z.imag(), fnu, kode, m, n, res_real, res_imag, &nz, &ierr);
+	if (nz != 0) printf("!!! UNDERFLOW IN HANKEL !!!\n");
+	if (ierr != 0) printf("!!! ERROR IN HANKEL !!!\n");
 
 	return { res_real[1], res_imag[1] };
 
@@ -972,7 +1209,11 @@ dtype set_exact_2D_Hankel(double x, double y, dtype k, point source)
 
 	double r = sqrt(x * x + y * y);
 
-	if (r == 0) r = 0.005;
+	if (abs(r) < EPS)
+	{
+		r = 0.005;
+		//printf("MIIIIIIIIIIIIIIIIIIIIID\n");
+	}
 
 
 	return Hankel(k * r);
@@ -984,9 +1225,7 @@ void get_exact_2D_Hankel(int Nx, int Ny, size_m x, size_m y, dtype* x_sol_ex, dt
 		for (int i = 0; i < Nx; i++)
 		{
 			x_sol_ex[j * Nx + i] = set_exact_2D_Hankel((i + 1) * x.h, (j + 1) * y.h, k, source);
-
-			x_sol_ex[j * Nx + i] *= -0.25;
-			x_sol_ex[j * Nx + i] = dtype{ -x_sol_ex[j * Nx + i].imag(), x_sol_ex[j * Nx + i].real() };
+			x_sol_ex[j * Nx + i] *= dtype{0, -0.25};
 		}
 }
 
@@ -1553,6 +1792,56 @@ void Copy2DCSRMatrix(int size2D, int nonzeros, ccsr* &A, ccsr* &B)
 	B->solve = A->solve;
 }
 
+void HeteroSoundSpeed2DExtensionToPML(size_m x, size_m y, dtype *sound2D)
+{
+	int ii = 0, jj = 0;
+
+	// left x PML
+	for (int j = 0; j < y.n; j++)
+	{
+		ii = x.pml_pts; jj = j;
+		for (int i = 0; i < x.pml_pts; i++)
+			sound2D[i + x.n * j] = sound2D[ii + x.n * jj];
+	}
+
+	// right x PML
+	for (int j = 0; j < y.n; j++)
+	{
+		ii = x.n - x.pml_pts - 1; jj = j;
+		for (int i = x.n - x.pml_pts; i < x.n; i++)
+			sound2D[i + x.n * j] = sound2D[ii + x.n * jj];
+	}
+
+	// upper y PML
+	for (int i = 0; i < x.n; i++)
+	{
+		jj = y.pml_pts; ii = i;
+		for (int j = 0; j < y.pml_pts; j++)
+			sound2D[i + x.n * j] = sound2D[ii + x.n * jj];
+	}
+
+	// lower y PML
+	for (int i = 0; i < x.n; i++)
+	{
+		jj = y.n - y.pml_pts - 1; ii = i;
+		for (int j = y.n - y.pml_pts; j < y.n; j++)
+			sound2D[i + x.n * j] = sound2D[ii + x.n * jj];
+	}
+
+}
+
+dtype IntegralNorm(int size, dtype *vec, double h)
+{
+	dtype norm = 0;
+	for (int i = 0; i < size; i++)
+	{
+		norm += vec[i];
+	}
+	norm *= h;
+
+	return sqrt(norm);
+}
+
 void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh)
 {
 	printf("-------------FGMRES-----------\n");
@@ -1627,18 +1916,18 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	// Gen velocity of sound in 3D domain
 	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
 
+	// Extension of sound speed to PML zone
+	HeteroSoundSpeed2DExtensionToPML(x, y, sound2D);
+
+	// Gen DeltaL function
+	GenerateDeltaL(x, y, z, sound3D, sound2D, deltaL);
+
 	char str1[255] = "sound_speed2D";
 	//	output(str1, false, x, y, z, sound3D, deltaL);
 	//	output2D(str1, false, x, y, sound2D, sound2D);
 
-		// Gen DeltaL function
-	GenerateDeltaL(x, y, z, sound3D, sound2D, deltaL);
-
 	char str2[255] = "sound_speed_deltaL";
-	//	output(str2, false, x, y, z, sound3D, deltaL);
-
-	free_arr(sound2D);
-	free_arr(sound3D);
+	//	output(str2, false, x, y, z, sound3D, deltaL)
 
 	printf("-----Step 1. Memory allocation for 2D problems\n");
 
@@ -1647,10 +1936,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	int non_zeros_in_2Dblock9diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n) + 4 * (x.n - 1) * (y.n - 1);
 	int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
 
-#ifdef TEST_HELM_1D
-	non_zeros_in_2Dblock3diag += y.n * 2;
-	non_zeros_in_2Dblock3diag += x.n * 2;
-#endif
 
 	int non_zeros;
 
@@ -1690,7 +1975,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	printf("time for constructing = %lf sec\n", time);
 
 	time = omp_get_wtime();
-//	TestSymmSparseMatrixOnline2DwithPML(x, y, z, D2csr_zero);
+	TestSymmSparseMatrixOnline2DwithPML(x, y, z, D2csr_zero);
 	time = omp_get_wtime() - time;
 
 	// Memory for 2D CSR matrix
@@ -1717,20 +2002,17 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 #endif
 
 		D2csr[k] = (ccsr*)malloc(sizeof(ccsr));
-		dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } - kww;
 
 
 		if (nu == 2) ratio = 15;
 		else ratio = 3;
 
 		if (kww < ratio * k2)
-	//	if (1)
+		//if (1)
 		{
+			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } - kww;
+
 			printf("Solved k = %d beta2 = (%lf, %lf)\n", k, kwave_beta2.real(), kwave_beta2.imag());
-#ifdef TEST_HELM_1D
-			non_zeros_in_2Dblock3diag += y.n * 2;
-			non_zeros_in_2Dblock3diag += x.n * 2;
-#endif
 			D2csr[k]->values = alloc_arr<dtype>(non_zeros);
 			D2csr[k]->ia = alloc_arr<int>(size2D + 1);
 			D2csr[k]->ja = alloc_arr<int>(non_zeros);
@@ -1744,12 +2026,21 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 
 #else
 			Copy2DCSRMatrix(size2D, non_zeros, D2csr_zero, D2csr[k]);
-
 			D2csr[k]->solve = 1;
 
-#pragma omp parallel for simd schedule(static)
-			for (int i = 0; i < size; i++)
-				D2csr[k]->values[freqs[i]] += kwave_beta2;
+			dtype kxyz;
+		
+			for (int j = 0; j < y.n; j++)
+				for (int i = 0; i < x.n; i++)
+				{
+#ifdef HOMO
+					D2csr[k]->values[freqs[i + x.n * j]] += kwave_beta2;
+#else				
+					kxyz = double(omega) / sound2D[i + j * x.n];
+					kwave_beta2 = kxyz * kxyz * dtype{ 1, beta_eq } - kww;
+					D2csr[k]->values[freqs[i + x.n * j]] += kwave_beta2;
+#endif
+				}
 #endif
 
 #if 1
@@ -1823,6 +2114,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	dtype *f_rsd_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *x_orig_nopml = alloc_arr<dtype>(size_nopml);
+	dtype *x_sol_prev_nopml = alloc_arr<dtype>(size_nopml);
 
 	// test
 	dtype *f_sol = alloc_arr<dtype>(size);
@@ -2005,6 +2297,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 			reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
 
+#ifdef HOMO
 			norm = RelError(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
 			printf("Residual in 3D phys domain |x_sol - x_orig| / |x_orig| = %lf\n", norm);
 			printf("-----------\n");
@@ -2017,9 +2310,14 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			norm_im = rel_error(dlange, size_nopml, 1, x_sol_im, x_orig_im, size_nopml, thresh);
 			norm = rel_error(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
 
-			printf("norm_re = %lf\n", norm_re, thresh);
-			printf("norm_im = %lf\n", norm_im, thresh);
-			printf("norm = %lf\n", norm, thresh);
+			printf("norm_re = %lf\n", norm_re);
+			printf("norm_im = %lf\n", norm_im);
+			printf("norm = %lf\n", norm);
+#else
+			norm = RelError(zlange, size_nopml, 1, x_sol_nopml, x_sol_prev_nopml, size_nopml, thresh);
+			MultVectorConst<dtype>(size_nopml, x_sol_nopml, 1.0, x_sol_prev_nopml);
+			printf("norm |u_k+1 - u_k|= %e\n", norm);
+#endif
 			printf("--------------------------------------------------------------------------------\n");
 		}
 		
@@ -2534,7 +2832,7 @@ void GenSparseMatrixOnline2DwithPMLand9Points(int w, size_m x, size_m y, size_m 
 
 	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat.dat");
 }
-#if 0
+#if 1
 void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acsr, dtype kwave_beta2, int* freqs)
 {
 	int size = x.n * y.n;
@@ -2747,7 +3045,6 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 	if (non_zeros_in_2Dblock13diag != Acsr->non_zeros) printf("!!!ERROR!!! Uncorrect value of non_zeros inside 2D 13diag: %d != %d\n", non_zeros_in_2Dblock13diag, Acsr->non_zeros);
 	//	else printf("Gen 2D matrix for frequency w = %d, k^2 - ky^2 = (%lf %lf)\n", w, kwave_beta2.real(), kwave_beta2.imag());
 
-
 //#define DEBUG
 
 	if (w == -1)
@@ -2842,7 +3139,6 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 #else
 				Acsr->values[count++] = beta2D_pml_13pts(x, y, DIAG13::zero, kwave_beta2, j1, k1);
 #endif
-
 			}
 
 			l2 = l1 + 1;
@@ -2872,7 +3168,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 
 			l2 = l1 + 3;
 			take_coord2D(x.n, y.n, l2, j1, k1);
-			if (l1 == l2 - 3 && (l1 + 1) % x.n != 0 && (l1 + 2) % x.n != 0 && (l1 + 3) % x.n != 0)
+			if (l2 < size && (l1 + 1) % x.n != 0 && (l1 + 2) % x.n != 0 && (l1 + 3) % x.n != 0)
 			{
 				Acsr->ja[count] = l2 + 1;
 #ifdef DEBUG
@@ -2942,7 +3238,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 		//	printf("SUCCESSED 2D generation for frequency %d!\n", w);
 	}
 
-	//print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat13pts.dat");
+	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat13pts.dat");
 #undef DEBUG
 }
 #endif
@@ -3536,6 +3832,7 @@ void ResidCSR2DHelm(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtyp
 	int size_nopml = (x.n - 2 * x.pml_pts) * (y.n - 2 * y.pml_pts);
 	dtype *f1 = alloc_arr<dtype>(size);
 	int ione = 1;
+	double thresh = 1e-8;
 
 	struct safe_val
 	{
@@ -3549,8 +3846,10 @@ void ResidCSR2DHelm(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtyp
 	for (int i = 0; i < size; i++)
 	{
 		g[i] = f[i] - f1[i];
+		//f[i] = f1[i];
 		//if (abs(f[i]) != 0) printf("%12.10lf %12.10lf %12.10lf %12.10lf\n", f[i].real(), f[i].imag(), f1[i].real(), f1[i].imag());
 
+#if 1
 		if (abs(f[i]) != 0)
 		{
 			p1.i = i;
@@ -3558,6 +3857,7 @@ void ResidCSR2DHelm(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtyp
 			printf("non_zero value in f[%d] = (%lf, %lf)\n", i, f[i].real(), f[i].imag());
 			f[i] = f1[i] = g[i] = 0;
 		}
+#endif
 	}
 
 
@@ -3573,7 +3873,18 @@ void ResidCSR2DHelm(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtyp
 	RelRes = zlange("Frob", &size_nopml, &ione, g_nopml, &size_nopml, NULL);
 	//RelRes /= p1.val.real();
 
+	printf("resid in circle\n");
+	check_norm_circle2D(x, y, f, f1, source, thresh);
+
 	f[p1.i] = p1.val;
+
+	char str[255];
+	sprintf(str, "ResidHelmholtz2D_N%d.dat", x.n);
+	FILE *out = fopen(str, "w");
+	for (int i = 0; i < size_nopml; i++)
+		fprintf(out, "%d %23.18lf %23.18lf\n", i, g_nopml[i].real(), g_nopml[i].imag());
+
+	fclose(out);
 
 	printf("End resid\n");
 
@@ -3615,18 +3926,24 @@ void ResidCSR2D(size_m x, size_m y, ccsr* Dcsr, dtype* x_sol, dtype *f, dtype* g
 	reducePML2D(x, y, size, f, size_nopml, f_nopml);
 	reducePML2D(x, y, size, f1, size_nopml, f1_nopml);
 
+#if 0
 	for (int i = 0; i < size_nopml; i++)
 		fprintf(out, "%d %lf %lf\n", i, f_nopml[i].real(), f1_nopml[i].real());
+#else
+	for (int i = 0; i < size; i++)
+		fprintf(out, "%d %lf %lf\n", i, f[i].real(), f1[i].real());
+#endif
 
-	//RelRes = zlange("Frob", &size, &ione, g, &size, NULL);
-	//RelRes = RelRes / zlange("Frob", &size, &ione, f, &size, NULL);
-
+#if 0
+	RelRes = zlange("Frob", &size, &ione, g, &size, NULL);
+	RelRes = RelRes / zlange("Frob", &size, &ione, f, &size, NULL);
+#else
 	RelRes = zlange("Frob", &size_nopml, &ione, g_nopml, &size_nopml, NULL);
 	RelRes = RelRes / zlange("Frob", &size_nopml, &ione, f_nopml, &size_nopml, NULL);
-
+#endif
 	fclose(out);
 
-#if 1
+#if 0
 #pragma omp parallel for schedule(static)
 	for (int i = 0; i < size; i++)
 		f[i] = f1[i];
@@ -3865,8 +4182,7 @@ void gnuplot2D(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m
 
 void gnuplot1D(char *splot, char *sout, bool pml_flag, int col, size_m x)
 {
-	char *str;
-	str = alloc_arr<char>(255);
+	char *str = alloc_arr<char>(255);
 	int Nx;
 	if (pml_flag == true)
 	{
@@ -3879,27 +4195,49 @@ void gnuplot1D(char *splot, char *sout, bool pml_flag, int col, size_m x)
 
 	FILE* file1;
 	//sprintf(str, "run.plt", numb++);
-	if (col == 3) str = "run_ex.plt";
-	else str = "run_pard.plt";
 
-	file1 = fopen(str, "w");
+	if (col != 0)
+	{
+		if (col == 3) str = "run_ex.plt";
+		else str = "run_pard.plt";
 
-	//fprintf(file1, "reset\nclear\n");
-	fprintf(file1, "set term png font \"Times-Roman, 16\"\n");
-	//fprintf(file, "set view map\n");
-	fprintf(file1, "set xrange[0:%lf]\n", x.l);
-	fprintf(file1, "set yrange[-50:50]\n");
+		file1 = fopen(str, "w");
 
-	fprintf(file1, "set output '%s_re.png'\n", sout);
-	fprintf(file1, "plot '%s.dat' u 1:%d w linespoints pt 7 pointsize 1 notitle\n\n", splot, col);
+		//fprintf(file1, "reset\nclear\n");
+		fprintf(file1, "set term png font \"Times-Roman, 16\"\n");
+		//fprintf(file, "set view map\n");
+		fprintf(file1, "set xrange[0:%lf]\n", x.l);
+		fprintf(file1, "set yrange[-50:50]\n");
 
-	fprintf(file1, "set output '%s_im.png'\n", sout);
-	fprintf(file1, "plot '%s.dat' u 1:%d w linespoints pt 7 pointsize 1 notitle\n\n", splot, col + 1);
+		fprintf(file1, "set output '%s_re.png'\n", sout);
+		fprintf(file1, "plot '%s.dat' u 1:%d w linespoints pt 7 pointsize 1 notitle\n\n", splot, col);
 
-	fprintf(file1, "exit\n");
+		fprintf(file1, "set output '%s_im.png'\n", sout);
+		fprintf(file1, "plot '%s.dat' u 1:%d w linespoints pt 7 pointsize 1 notitle\n\n", splot, col + 1);
+
+		fprintf(file1, "exit\n");
+		fclose(file1);
+	}
+	else
+	{
+		str = "run_diff.plt";
+		file1 = fopen(str, "w");
+
+		fprintf(file1, "set term png font \"Times-Roman, 16\"\n");
+		//fprintf(file, "set view map\n");
+		fprintf(file1, "set xrange[0:%lf]\n", x.l);
+
+		fprintf(file1, "set output '%s_re.png'\n", sout);
+		fprintf(file1, "plot '%s.dat' u 1:2 w linespoints pt 7 pointsize 1 title \"exact\", '%s.dat' u 1:4 w linespoints pt 7 pointsize 1 title \"num\" \n\n", splot, splot);
+
+		fprintf(file1, "set output '%s_im.png'\n", sout);
+		fprintf(file1, "plot '%s.dat' u 1:3 w linespoints pt 7 pointsize 1 title \"exact\", '%s.dat' u 1:5 w linespoints pt 7 pointsize 1 title \"num\" \n\n", splot, splot);
 
 
-	fclose(file1);
+		fprintf(file1, "exit\n");
+		fclose(file1);
+	}
+
 	system(str);
 }
 
@@ -3952,7 +4290,7 @@ void print_2Dcsr_mat(size_m x, size_m y, ccsr* D2csr)
 }
 
 
-void print_2Dcsr_mat_to_file(size_m x, size_m y, ccsr* D2csr, char * s)
+void print_2Dcsr_mat_to_file(size_m x, size_m y, ccsr* D2csr, char *s)
 {
 	int count1 = 0;
 	int count2 = 0;
@@ -3960,7 +4298,7 @@ void print_2Dcsr_mat_to_file(size_m x, size_m y, ccsr* D2csr, char * s)
 
 	FILE* fout;
 	fout = fopen(s, "w");
-
+#if 0
 	for (int i = 0; i < size; i++)
 	{
 		for (int j = 0; j < size; j++)
@@ -3977,6 +4315,22 @@ void print_2Dcsr_mat_to_file(size_m x, size_m y, ccsr* D2csr, char * s)
 	}
 
 	fprintf(fout, "count1 = %d count2 = %d valuesN = %d\n", count1, count2, D2csr->non_zeros);
+
+#else
+	int vals_count = 0;
+
+	for (int i = 0; i < size; i++)
+	{
+		int vals_in_row = D2csr->ia[i + 1] - D2csr->ia[i];
+		for (int j = 0; j < vals_in_row; j++)
+		{
+			fprintf(fout, "%6.3lf ", D2csr->values[vals_count + j].real());
+		}
+		vals_count += vals_in_row;
+		fprintf(fout, "\n");
+	}
+	fprintf(fout, "n1 = %d, count = %d, valuesN = %d\n", x.n, vals_count, D2csr->non_zeros);
+#endif
 
 	fclose(fout);
 }
@@ -4276,6 +4630,7 @@ void GenRHSandSolution2DComplexWaveNumber(size_m x, size_m y, ccsr* D2csr, dtype
 		normalization_of_exact_sol(x.n, y.n, x, y, u_ex2D, alpha_k);
 
 		norm = resid_2D_Hankel(x, y, D2csr, u_ex2D, f2D, sourcePML);
+		norm *= x.h * x.h;
 		printf("resid ||A * x_sol - kf|| 2D Hankel: %lf\n", norm);
 
 	}

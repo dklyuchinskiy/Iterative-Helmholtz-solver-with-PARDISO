@@ -79,6 +79,7 @@ map<vector<int>, double> concat_maps(const map<vector<int>, double>& map1, const
 
 dtype zdot(int size, dtype* v1, dtype* v2);
 void ComputeResidual(size_m x, size_m y, size_m z, double kw, const dtype* u, const dtype *f, dtype* f_res, double &RelRes);
+void check_norm_circle2D(size_m xx, size_m yy, dtype* x_orig, dtype* x_sol, point source, double thresh);
 
 // BinaryTrees.cpp
 
@@ -158,9 +159,11 @@ dtype F2D_ex_complex(size_m xx, size_m yy, double x, double y, point source, int
 dtype F1D_ex_complex(size_m xx, double x, point source, int& l);
 void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_orig, dtype* x_pard);
 void gnuplot(char *str1, char *str2, bool pml_flag, int col, size_m x, size_m y, size_m z);
+void output1D(char *str, bool pml_flag, size_m x, dtype* x_orig, dtype* x_pard);
 void output2D(char *str, bool pml_flag, size_m x, size_m y, dtype* x_orig, dtype* x_pard);
 void gnuplot2D(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m y);
 void gnuplot1D(char *splot, char *sout, bool pml_flag, int col, size_m x);
+void PrintProjection1D(size_m x, size_m y, dtype *x_sol_ex, dtype *x_sol_prd, int freq);
 dtype alpha(size_m xyz, double i);
 dtype beta(size_m, size_m y, size_m z, int diag_case, int i, int j, int k);
 void check_exact_sol_Hankel(dtype alpha_k, double k2, size_m y, size_m z, dtype* x_sol_prd, double eps);
@@ -176,8 +179,10 @@ void extendPML3D(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2
 void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound, point source);
 void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D, point source);
 dtype MakeSound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
+double Runge(size_m x1, size_m x2, size_m x3, size_m y1, size_m y2, size_m y3, size_m z1, size_m z2, size_m z3, char *str1, char *str2, char *str3, int dim);
 dtype MakeSound2D(size_m xx, size_m yy, double x, double y, point source);
 void GenerateDeltaL(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D, dtype* deltaL);
+void HeteroSoundSpeed2DExtensionToPML(size_m x, size_m y, dtype *sound2D);
 void Solve1DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f1D, dtype *x_sol1D, double thresh);
 void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_sol2D, double thresh);
 dtype beta2D(size_m x, size_m y, int diag_case, int i, int j);

@@ -95,6 +95,31 @@ double RelError(double(*LANGE)(const char *, const int*, const int*, const Matri
 }
 
 template <typename MatrixType>
+double RelError2(double(*LANGE)(const char *, const int*, const int*, const MatrixType*, const int*, double *),
+	int m, int n, const MatrixType *Hrec, int ldh1, const MatrixType *Hinit, int ldh2, double eps)
+{
+	double norm = 0;
+	MatrixType *Hdiff = alloc_arr<MatrixType>(m * n); int ldh = m;
+
+	// Norm of residual
+#pragma omp parallel for schedule(static)
+	for (int j = 0; j < n; j++)
+#pragma omp simd
+		for (int i = 0; i < m; i++)
+			Hdiff[i + ldh * j] = Hrec[i + ldh1 * j] - Hinit[i + ldh2 * j];
+
+	norm = LANGE("Frob", &m, &n, Hdiff, &ldh, NULL);
+	norm = norm / LANGE("Frob", &m, &n, Hinit, &ldh2, NULL);
+
+	free_arr(Hdiff);
+
+	return norm;
+
+	//if (norm < eps) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
+	//else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+}
+
+template <typename MatrixType>
 double AbsError(double(*LANGE)(const char *, const int*, const int*, const MatrixType*, const int*, double *),
 	int m, int n, const MatrixType *Hrec, const MatrixType *Hinit, int ldh, double eps)
 {
