@@ -469,11 +469,14 @@ void PrintProjection1D(size_m x, size_m y, dtype *x_ex, dtype *x_prd, int freq)
 	dtype* x_sol1D_prd = alloc_arr<dtype>(x.n);
 
 	// output 1D - X direction
-	sprintf(str1, "Charts3D/model_pml1Dx_%d__%lf", freq, x.h);
-	sprintf(str2, "Charts3D/model_pml1Dx_diff_%d__%lf", freq, x.h);
+	for(int j = 0; j < y.n - 1; j++)
+	{
+		sprintf(str1, "Charts3D/model_pml1Dx_sec%d_freq%d__h%d", j, freq, (int)x.h);
+		sprintf(str2, "Charts3D/model_pml1Dx_diff_sec%d_freq%d__h%d", j, freq, (int)x.h);
 
-	output1D(str1, pml_flag, x, &x_ex[x.n * (y.n - 1) / 2], &x_prd[x.n * (y.n - 1) / 2]);
-	gnuplot1D(str1, str2, pml_flag, 0, x);
+		output1D(str1, pml_flag, x, &x_ex[x.n * j], &x_prd[x.n * j]);
+		gnuplot1D(str1, str2, pml_flag, 0, x);
+	}
 
 	// output 1D - Y direction
 	sprintf(str1, "Charts3D/model_pml2Dy_%d__%lf", freq, x.h);
@@ -739,33 +742,34 @@ dtype MakeSound2D(size_m xx, size_m yy, double x, double y, point source)
 dtype MakeSound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source)
 {
 	dtype c1 = 0.1;
-	dtype c2 = 0.1;
-	dtype c3 = 0.1;
+	dtype c2 = 0.4;
+	dtype c3 = 0.7;
 #ifdef HOMO
 	return c_z;
 #else
-	return c_z + c1 * x + c2 * y + c3 * z;
+	//return c_z + c1 * x + c2 * y + c3 * z;
+	return c1 * x + c2 * y + c3 * z;
 #endif
 }
 
 double Runge(size_m x1, size_m x2, size_m x3,
-			 size_m y1, size_m y2, size_m y3, 
-			 size_m z1, size_m z2, size_m z3, 
-			 char *str1, char *str2, char *str3, int dim)
+	size_m y1, size_m y2, size_m y3,
+	size_m z1, size_m z2, size_m z3,
+	char *str1, char *str2, char *str3, int dim)
 {
+	printf("Count RUNGE order...\n");
 	// the lowest size (50 from line 50, 100, 200)
 	int size1, size2, size3;
 
 	if (dim == 3)
 	{
+		x1.n_nopml = y1.n_nopml = z1.n_nopml = 49;
+		x2.n_nopml = y2.n_nopml = z2.n_nopml = 99;
+		x3.n_nopml = y3.n_nopml = z3.n_nopml = 199;
+
 		size1 = x1.n_nopml * y1.n_nopml * z1.n_nopml;
-#define RUNGE3D
-#ifdef RUNGE3D
-		size2 = size3 = size1;
-#else
 		size2 = x2.n_nopml * y2.n_nopml * z2.n_nopml;
 		size3 = x3.n_nopml * y3.n_nopml * z3.n_nopml;
-#endif
 	}
 	else if (dim == 2)
 	{
@@ -836,8 +840,9 @@ double Runge(size_m x1, size_m x2, size_m x3,
 	f1 = dznrm2(&size1, hlp2h, &ione) * sqrt(x1.h);
 	f2 = dznrm2(&size1, hlph, &ione) * sqrt(x2.h);
 #else
-	int step1 = (x3.n + 1) / (x1.n + 1);
-	int step2 = (x3.n + 1) / (x2.n + 1);
+	
+	int step1 = (x3.n_nopml + 1) / (x1.n_nopml + 1);
+	int step2 = (x3.n_nopml + 1) / (x2.n_nopml + 1);
 
 	printf("step1 = %d, step2 = %d\n", step1, step2);
 
@@ -864,20 +869,42 @@ double Runge(size_m x1, size_m x2, size_m x3,
 	f1 = zlange("F", &size1, &ione, hlp2h, &lda2h, NULL);// *sqrt(x1.h);
 	f2 = zlange("F", &size2, &ione, hlph, &ldah, NULL);// *sqrt(x2.h);
 #else
-	for (int j = 0; j < y1.n; j++)
-		for (int i = 0; i < x1.n; i++)
-			hlp2h[i + lda2h * j] = solh2[step1 * (i + 1) - 1 + ldah2 * (step1 * (j + 1) - 1)];
-	// 0, 1, 2, 3, 4, 5, 6 vs 3, 7, 11
-
-	printf("size1 = %d, (i + lda2h * j)last = %d, (i + ldah2 * j) * step1 = %d\n", size1, x1.n - 1 + lda2h * (y1.n - 1), step1 * (x1.n) - 1 + ldah2 * (step1 * (y1.n) - 1));
-
-	for (int j = 0; j < y2.n; j++)
-		for (int i = 0; i < x2.n; i++)
-			hlph[i + ldah * j] = solh2[step2 * (i + 1) - 1 + ldah2 * (step2 * (j + 1) - 1)];
-	// 0, 1, 2, 3, 4, 5, 6 vs 1, 3, 5, 7, 9, 11
 	double eps = 1e-6;
-	f1 = RelError2(zlange, x1.n, y1.n, sol2h, lda2h, hlp2h, lda2h, eps);
-	f2 = RelError2(zlange, x2.n, y2.n, solh, ldah, hlph, ldah, eps);
+	if (dim == 2)
+	{
+		for (int j = 0; j < y1.n_nopml; j++)
+			for (int i = 0; i < x1.n_nopml; i++)
+				hlp2h[i + lda2h * j] = solh2[step1 * (i + 1) - 1 + ldah2 * (step1 * (j + 1) - 1)];
+		// 0, 1, 2, 3, 4, 5, 6 vs 3, 7, 11
+
+		printf("size1 = %d, (i + lda2h * j)last = %d, (i + ldah2 * j) * step1 = %d\n", size1, x1.n - 1 + lda2h * (y1.n - 1), step1 * (x1.n) - 1 + ldah2 * (step1 * (y1.n) - 1));
+
+		for (int j = 0; j < y2.n_nopml; j++)
+			for (int i = 0; i < x2.n_nopml; i++)
+				hlph[i + ldah * j] = solh2[step2 * (i + 1) - 1 + ldah2 * (step2 * (j + 1) - 1)];
+
+		f1 = RelError2(zlange, x1.n_nopml, y1.n_nopml, sol2h, lda2h, hlp2h, lda2h, eps);
+		f2 = RelError2(zlange, x2.n_nopml, y2.n_nopml, solh, ldah, hlph, ldah, eps);
+	}
+	else if (dim == 3)
+	{
+		for (int k = 0; k < z1.n_nopml; k++)
+			for (int j = 0; j < y1.n_nopml; j++)
+				for (int i = 0; i < x1.n_nopml; i++)
+					hlp2h[i + x1.n_nopml * j + x1.n_nopml * y1.n_nopml * k] = solh2[step1 * (i + 1) - 1 + x3.n_nopml * (step1 * (j + 1) - 1) + x3.n_nopml * y3.n_nopml * (step1 * (k + 1) - 1)];
+		// 0, 1, 2, 3, 4, 5, 6 vs 3, 7, 11
+
+		//printf("size1 = %d, (i + lda2h * j)last = %d, (i + ldah2 * j) * step1 = %d\n", size1, x1.n - 1 + lda2h * (y1.n - 1), step1 * (x1.n) - 1 + ldah2 * (step1 * (y1.n) - 1));
+
+		for (int k = 0; k < z2.n_nopml; k++)
+			for (int j = 0; j < y2.n_nopml; j++)
+				for (int i = 0; i < x2.n_nopml; i++)
+					hlph[i + x2.n_nopml * j + x2.n_nopml * y2.n_nopml * k] = solh2[step2 * (i + 1) - 1 + x3.n_nopml * (step2 * (j + 1) - 1) + x3.n_nopml * y3.n_nopml * (step2 * (k + 1) - 1)];
+
+		f1 = RelError2(zlange, size1, 1, sol2h, size1, hlp2h, size1, eps);
+		f2 = RelError2(zlange, size2, 1, solh, size2, hlph, size2, eps);
+	}
+	// 0, 1, 2, 3, 4, 5, 6 vs 1, 3, 5, 7, 9, 11
 #endif
 
 	printf("size3 = %d\n", size3);
@@ -939,6 +966,9 @@ void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2
 	dtype c0_max;
 	dtype c0_min;
 
+	char str[255]; sprintf(str, "SoundSpeed_N%d.dat", x.n);
+	FILE *file = fopen(str, "w");
+
 #if 1
 	for (int j = y.pml_pts; j < Ny - y.pml_pts; j++)
 		for (int i = x.pml_pts; i < Nx - x.pml_pts; i++)
@@ -953,7 +983,7 @@ void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2
 			}
 
 			sound2D[j * Nx + i] = 0.5 * (c0_max + c0_min);
-			printf("sound[%d][%d] = %lf\n", i, j, sound2D[j * Nx + i].real());
+			fprintf(file, "sound[%d][%d] = %lf\n", i, j, sound2D[j * Nx + i].real());
 		}
 #else
 #pragma omp parallel for schedule(dynamic)
@@ -962,6 +992,7 @@ void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2
 				sound2D[j * Nx + i] = MakeSound2D(x, y, (i + 1) * x.h, (j + 1) * y.h, source);
 #endif
 	
+		fclose(file);
 }
 
 void GenerateDeltaL(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D, dtype* deltaL)
@@ -1975,7 +2006,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	printf("time for constructing = %lf sec\n", time);
 
 	time = omp_get_wtime();
-	TestSymmSparseMatrixOnline2DwithPML(x, y, z, D2csr_zero);
+	//TestSymmSparseMatrixOnline2DwithPML(x, y, z, D2csr_zero);
 	time = omp_get_wtime() - time;
 
 	// Memory for 2D CSR matrix
@@ -2832,7 +2863,7 @@ void GenSparseMatrixOnline2DwithPMLand9Points(int w, size_m x, size_m y, size_m 
 
 	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat.dat");
 }
-#if 1
+#if 0
 void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acsr, dtype kwave_beta2, int* freqs)
 {
 	int size = x.n * y.n;
@@ -3020,7 +3051,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 	//	printf("SUCCESSED 2D generation for frequency %d!\n", w);
 	}
 
-	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat13pts.dat");
+	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat13pts_old.dat");
 #undef DEBUG
 }
 #else
@@ -3056,7 +3087,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			// столбцы
 
 			l2 = l1 - 3 * x.n;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			take_coord2D(x.n, y.n, l1, j1, k1);
 			if (l2 >= 0)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3068,7 +3099,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			}
 
 			l2 = l1 - 2 * x.n;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			take_coord2D(x.n, y.n, l1, j1, k1);
 			if (l2 >= 0)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3080,7 +3111,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			}
 
 			l2 = l1 - x.n;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			take_coord2D(x.n, y.n, l1, j1, k1);
 			if (l2 >= 0)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3092,7 +3123,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			}
 
 			l2 = l1 - 3;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			take_coord2D(x.n, y.n, l1, j1, k1);
 			if (l2 >= 0 && (l2 + 1) % x.n != 0 && (l2 + 2) % x.n != 0 && (l2 + 3) % x.n != 0)
 			{
 				// не пишем, если номер строки -1, 2 строки кратен Nx
@@ -3105,7 +3136,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			}
 
 			l2 = l1 - 2;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			take_coord2D(x.n, y.n, l1, j1, k1);
 			if (l2 >= 0 && (l1 - 1) % x.n != 0 && l1 % x.n != 0)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3117,7 +3148,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			}
 
 			l2 = l1 - 1;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			take_coord2D(x.n, y.n, l1, j1, k1);
 			if (l2 >= 0 && l1 % x.n != 0)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3129,7 +3160,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			}
 
 			l2 = l1;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			take_coord2D(x.n, y.n, l1, j1, k1);
 			if (1)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3142,7 +3173,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			}
 
 			l2 = l1 + 1;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			take_coord2D(x.n, y.n, l1, j1, k1);
 			if (l2 < size && l2 % x.n != 0)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3154,7 +3185,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			}
 
 			l2 = l1 + 2;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			take_coord2D(x.n, y.n, l1, j1, k1);
 			if (l2 < size && (l2 - 1) % x.n != 0 && l2 % x.n != 0)
 			{
 				// не пишем, если номер строки + 1, 2, 3 строки кратен Nx
@@ -3167,8 +3198,8 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			}
 
 			l2 = l1 + 3;
-			take_coord2D(x.n, y.n, l2, j1, k1);
-			if (l2 < size && (l1 + 1) % x.n != 0 && (l1 + 2) % x.n != 0 && (l1 + 3) % x.n != 0)
+			take_coord2D(x.n, y.n, l1, j1, k1);
+			if (l2 < size && (l2 - 2) % x.n != 0 && (l2 - 1) % x.n != 0 && l2 % x.n != 0)
 			{
 				Acsr->ja[count] = l2 + 1;
 #ifdef DEBUG
@@ -3179,7 +3210,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			}
 
 			l2 = l1 + x.n;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			take_coord2D(x.n, y.n, l1, j1, k1);
 			if (l2 < size)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3191,7 +3222,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			}
 
 			l2 = l1 + 2 * x.n;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			take_coord2D(x.n, y.n, l1, j1, k1);
 			if (l2 < size)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3203,7 +3234,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 			}
 
 			l2 = l1 + 3 * x.n;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			take_coord2D(x.n, y.n, l1, j1, k1);
 			if (l2 < size)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3238,7 +3269,7 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 		//	printf("SUCCESSED 2D generation for frequency %d!\n", w);
 	}
 
-	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat13pts.dat");
+	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat13pts_new.dat");
 #undef DEBUG
 }
 #endif

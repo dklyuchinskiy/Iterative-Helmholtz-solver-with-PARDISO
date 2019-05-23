@@ -323,10 +323,13 @@ int main()
 	int niter = 12;  // 4 iter for freq = 2
 					// 12 iter for freq = 4
 
+	printf("Frequency nu = %d\n", nu);
 	printf("The length of the wave: %lf\n", lambda);
 	printf("ppw: %lf\n", ppw);
 	printf("FGMRES number of iterations: %d\n", niter + 1);
 
+
+	system("pause");
 	int n_nopml = x.n_nopml * y.n_nopml;
 	int size_nopml = n_nopml * z.n_nopml;
 	int size2D_nopml = n_nopml;
@@ -435,6 +438,31 @@ int main()
 #endif
 
 	printf("Grid steps: hx = %lf hy = %lf hz = %lf\n", x.h, y.h, z.h);
+
+	// Method Runge (for 3 diff grids)
+// f(2h) - f(h)
+// ------------
+// f(h) - f(h/2)
+
+#if 0
+	bool make_runge_count;
+#define MAKE_RUNGE_3D
+#ifdef MAKE_RUNGE_3D
+	make_runge_count = true;
+#else
+	make_runge_count = false;
+#endif
+
+	double order;
+	if (make_runge_count)
+	{
+		order = Runge(x, x, x, y, y, y, z, z, z, "sol3D_N50.dat", "sol3D_N100.dat", "sol3D_N200.dat", 3);
+		printf("order Runge = %lf\n", order);
+	}
+
+	system("pause");
+	return 0;
+#endif
 
 #ifndef STRUCT_CSR
 	// Generation matrix of coefficients, vector of solution (to compare with obtained) and vector of RHS
@@ -632,6 +660,7 @@ int main()
 	printf("Time: %lf\n", all_time);
 	printf("size = %d size_no_pml = %d\n", size, size_nopml);
 
+
 #ifdef HOMO
 
 #ifndef TEST_HELM_1D
@@ -655,12 +684,6 @@ int main()
 	reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 	reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
-	RelRes = dznrm2(&size_nopml, x_sol_nopml, &ione);
-	printf("norm x_sol = %lf\n", RelRes);
-
-//	for (int k = 0; k < z.n_nopml; k++)
-	//	x_orig_nopml[k * size2D_nopml + size2D_nopml / 2] = x_sol_nopml[k * size2D_nopml + size2D_nopml / 2] = 0;
-
 //	ResidCSR(x_nopml, y_nopml, z_nopml, Dcsr_nopml, x_sol_nopml, f_nopml, g_nopml, RelRes);
 //	printf("-----------\n");
 //	printf("Residual in 3D  ||A * x_sol - f|| = %lf\n", RelRes);
@@ -672,9 +695,10 @@ int main()
 	// Output
 
 
-	// DEBUG OF RELEASE
+	// DEBUG OF RELEASE SETTINGS
 	//-------------------
 #undef PERF
+#define PERF
 	// ------------------
 
 #ifndef PERF
@@ -683,6 +707,7 @@ int main()
 #endif
 
 //#define OUTPUT
+
 #ifdef OUTPUT
 #ifndef ORDER4
 	output("ChartsFreq4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
@@ -740,10 +765,11 @@ int main()
 
 	printf("----------------------------------------------\n");
 
-#define GNUPLOT
+//#define GNUPLOT
 
 #ifdef GNUPLOT
 	pml_flag = true;
+	printf("Print with Gnuplot...\n");
 
 #ifndef ORDER4
 	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/ex_pard", pml_flag, 4, x, y, z);
@@ -772,6 +798,24 @@ int main()
 	reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 	reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
+	//#define MAKE_RUNGE_3D
+
+#ifndef MAKE_RUNGE_3D
+	RelRes = dznrm2(&size_nopml, x_sol_nopml, &ione);
+	printf("norm x_sol = %lf\n", RelRes);
+
+	char str[255];
+	sprintf(str, "sol3D_N%d.dat", x.n_nopml + 1);
+	FILE *file = fopen(str, "w");
+
+	for (int i = 0; i < size_nopml; i++)
+		fprintf(file, "%18.16lf %18.16lf\n", x_sol_nopml[i].real(), x_sol_nopml[i].imag());
+
+	fclose(file);
+
+	//return 0;
+#endif
+
 #define OUTPUT
 #ifdef OUTPUT
 	printf("Output results to file...\n");
@@ -788,36 +832,7 @@ int main()
 	printf("No printing results...\n");
 #endif
 
-	// Method Runge (for 3 diff grids)
-	// f(2h) - f(h)
-	// ------------
-	// f(h) - f(h/2)
 
-	char str[255];
-	sprintf(str, "sol3D_N%d.dat", x.n_nopml + 1);
-	FILE *file = fopen(str, "w");
-
-	for (int i = 0; i < size_nopml; i++)
-		fprintf(file, "%lf %lf\n", x_sol_nopml[i].real(), x_sol_nopml[i].imag());
-
-	fclose(file);
-
-	bool make_runge_count;
-#ifdef MAKE_RUNGE_3D
-	make_runge_count = true;
-#else
-	make_runge_count = false;
-#endif
-
-	double order;
-	if (make_runge_count)
-	{
-		order = Runge(x, x, x, y, y, y, z, z, z, "sol3D_N50.dat", "sol3D_N100.dat", "sol3D_N200.dat", 3);
-	}
-
-//	printf("order Runge = %lf\n", order);
-	fclose(file);	
-	
 #endif
 
 #ifndef ONLINE
