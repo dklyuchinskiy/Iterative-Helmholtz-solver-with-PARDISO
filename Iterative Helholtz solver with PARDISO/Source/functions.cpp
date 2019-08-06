@@ -457,6 +457,9 @@ void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double sp
 
 	fclose(fout);
 #endif
+
+	free_arr(norms_re);
+	free_arr(norms_im);
 }
 
 void PrintProjection1D(size_m x, size_m y, dtype *x_ex, dtype *x_prd, int freq)
@@ -2141,16 +2144,24 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	dtype *eBeta = alloc_arr<dtype>(m + 1); int ldb = m + 1;
 
 	// resid
+#ifdef COMP_RESID
 	dtype *f_rsd = alloc_arr<dtype>(size);
 	dtype *f_rsd_nopml = alloc_arr<dtype>(size_nopml);
+#endif
+
 	dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *x_orig_nopml = alloc_arr<dtype>(size_nopml);
+
+#ifndef HOMO
 	dtype *x_sol_prev_nopml = alloc_arr<dtype>(size_nopml);
+#endif
 
 	// test
+#ifdef TEST_L0
 	dtype *f_sol = alloc_arr<dtype>(size);
 	dtype *x_gmres_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *f_sol_nopml = alloc_arr<dtype>(size_nopml);
+#endif
 
 	// test2
 	double *x_orig_re = alloc_arr<double>(size_nopml);
@@ -2218,8 +2229,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			}
 
 			H[j + 1 + ldh * j] = dznrm2(&size, w, &ione);
-			printf("norm H[%d][%d] = %lf %lf\n", j, j, H[j + ldh * j].real(), H[j + ldh * j].imag());
-			printf("norm H[%d][%d] = %lf %lf\n", j + 1, j, H[j + 1 + ldh * j].real(), H[j + 1 + ldh * j].imag());
+//			printf("norm H[%d][%d] = %lf %lf\n", j, j, H[j + ldh * j].real(), H[j + ldh * j].imag());
+//			printf("norm H[%d][%d] = %lf %lf\n", j + 1, j, H[j + 1 + ldh * j].real(), H[j + 1 + ldh * j].imag());
 
 			// Check the convergence to the exact solution
 			if (abs(H[j + 1 + ldh * j]) < thresh)
@@ -2252,13 +2263,13 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			zcopy(&size, x_init, &ione, x0, &ione);
 
 			// Set eBeta
-#pragma omp parallel for simd schedule(static)
 			for (int i = 0; i < m + 1; i++)
 				eBeta[i] = 0;
 
 			eBeta[0] = beta;
 
 			// Set working H because it is destroyed after GELS
+#pragma omp parallel for simd schedule(static)
 			for (int i = 0; i < m * (m + 1); i++)
 				Hgels[i] = H[i];
 
@@ -2306,6 +2317,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			printf("-----Step 5. Solve the last system-----\n");
 			Solve3DSparseUsingFT(x, y, z, iparm, perm, pt, D2csr, x0, x_sol, thresh);
 
+#ifdef TEST_L0
 			// 7. Test ||L0 * u_sol - w|| / ||w||
 			Multiply3DSparseUsingFT(x, y, z, iparm, perm, pt, D2csr, x_sol, f_sol, thresh);
 
@@ -2316,8 +2328,11 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 
 			printf("Residual in 3D phys domain |L0 * u_sol - x_gmres| / |x_gmres| = %e\n", norm);
 			printf("-----------\n");
+#endif
 
 			// 8. Reduce pml
+			printf("Nullify source...\n");
+#pragma omp parallel for simd schedule(static)
 			for (int k = 0; k < z.n; k++)
 			{
 				int src = size2D / 2;
@@ -2356,7 +2371,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			zcopy(&size, x0, &ione, x_init, &ione);
 #endif
 
-#ifdef OUTPUT
+#ifdef COMP_RESID
 		//	if (j == m - 1)
 			{
 				FILE* out = fopen("ResidualVector.txt", "w");
@@ -2370,7 +2385,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 #endif
 	} // End of iterations
 
-#if 0
+#ifdef COMP_RESID
 	ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);
 
 	printf("-----------\n");
@@ -2384,10 +2399,17 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	printf("-----------\n");
 	printf("Residual in 3D phys domain |A * x_sol - f| = %e\n", RelRes);
 	printf("-----------\n");
-#endif
 
 	free_arr(f_rsd);
 	free_arr(f_rsd_nopml);
+#endif
+
+#ifdef TEST_L0
+	free_arr(f_sol_nopml);
+	free_arr(f_sol);
+	free_arr(x_gmres_nopml);
+#endif
+
 	free_arr(H);
 	free_arr(Hgels);
 	free_arr(w);
@@ -2400,9 +2422,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	free_arr(x_orig_im);
 	free_arr(x_sol_re);
 	free_arr(x_sol_im);
-	free_arr(f_sol_nopml);
-	free_arr(f_sol);
-	free_arr(x_gmres_nopml);
 }
 
 void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, ccsr* Acsr, double eps)
@@ -4147,7 +4166,7 @@ void gnuplot(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m y
 	fprintf(file1, "set term png font \"Times-Roman, 16\"\n");
 	//fprintf(file, "set view map\n");
 	fprintf(file1, "set xrange[0:%d]\nset yrange[0:%d]\n", (int)LENGTH_X, (int)LENGTH_Y);
-	//fprintf(file1, "set zrange[0:2]\n");
+	//fprintf(file1, "set zrange[-0.03:0.03]\n");
 	fprintf(file1, "set pm3d\n");
 	fprintf(file1, "set palette\n");
 
