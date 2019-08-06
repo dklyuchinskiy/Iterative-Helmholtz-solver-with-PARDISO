@@ -171,7 +171,7 @@ enum class DIAG13
 //#define TEST_HELM_1D
 
 
-#define ORDER4
+//#define ORDER4
 #define HOMO
 
 #ifdef HELMHOLTZ

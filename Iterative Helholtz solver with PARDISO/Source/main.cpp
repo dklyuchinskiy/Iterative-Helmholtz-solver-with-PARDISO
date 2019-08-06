@@ -31,167 +31,6 @@ in sparse CSR format to save memory.
 
 *************************************************/
 
-#if 0
-int main()
-{
-	TestAll();
-	system("pause");
-#if 1
-	int n1 = 40;		    // number of point across the directions
-	int n2 = 40;
-	int n3 = 40;
-	int n = n1 * n2;		// size of blocks
-	int NB = n3;			// number of blocks
-	int size = n * NB;		// size of vector x and f: n1 * n2 * n3
-	int smallsize = 400;
-	double thresh = 1e-6;	// stop level of algorithm by relative error
-	int ItRef = 200;		// Maximal number of iterations in refirement
-	char bench[255] = "display"; // parameter into solver to show internal results
-	int sparse_size = n + 2 * (n - 1) + 2 * (n - n1);
-	int non_zeros_in_3diag = n + (n - 1) * 2 + (n - n1) * 2 - (n1 - 1) * 2;
-
-	size_m x, y, z;
-
-	x.n = n1;
-	y.n = n2;
-	z.n = n3;
-
-	x.l = y.l = z.l = n1 + 1;
-	x.h = x.l / (double)(x.n + 1);
-	y.h = y.l / (double)(y.n + 1);
-	z.h = z.l / (double)(z.n + 1);
-
-	dtype *D;
-	dtype *B_mat;
-
-	// Memory allocation for coefficient matrix A
-	// the size of matrix A: n^3 * n^3 = n^6
-#ifndef ONLINE
-	D = alloc_arr(size * n); // it's a matrix with size n^3 * n^2 = size * n
-	B_mat = alloc_arr((size - n) * n); 
-	int ldd = size;
-	int ldb = size - n;
-#else
-	D = alloc_arr<dtype>(n * n); // it's a matrix with size n^3 * n^2 = size * n
-	B_mat = alloc_arr<dtype>(n * n);
-	int ldd = n;
-	int ldb = n;
-#endif
-
-	// Factorization matrix
-#ifndef STRUCT_CSR
-	double *G = alloc_arr(size * n);
-	int ldg = size;
-#else
-	cmnode **Gstr;
-#endif
-
-	// Solution, right hand side and block B
-	dtype *B = alloc_arr<dtype>(size - n); // vector of diagonal elementes
-	dtype *x_orig = alloc_arr<dtype>(size);
-	dtype *x_sol = alloc_arr<dtype>(size);
-	dtype *f = alloc_arr<dtype>(size);
-
-#ifdef STRUCT_CSR
-	// Memory for CSR matrix
-	dcsr *Dcsr;
-	int non_zeros_in_block3diag = (n + (n - 1) * 2 + (n - x.n) * 2 - (x.n - 1) * 2) * z.n + 2 * (size - n);
-	Dcsr = (dcsr*)malloc(sizeof(dcsr));
-	Dcsr->values = alloc_arr<dtype>(non_zeros_in_block3diag);
-	Dcsr->ia = alloc_arr<int>(size + 1);
-	Dcsr->ja = alloc_arr<int>(non_zeros_in_block3diag);
-	Dcsr->ia[size] = non_zeros_in_block3diag + 1;
-#endif
-
-	int success = 0;
-	int itcount = 0;
-	double RelRes = 0;
-	double norm = 0;
-	int nthr = omp_get_max_threads();
-	
-	printf("Run in parallel on %d threads\n", nthr);
-		
-	printf("Grid steps: hx = %lf hy = %lf hz = %lf\n", x.h, y.h, z.h);
-
-#ifndef STRUCT_CSR
-	// Generation matrix of coefficients, vector of solution (to compare with obtained) and vector of RHS
-	GenMatrixandRHSandSolution(n1, n2, n3, D, ldd, B, x_orig, f);
-#else
-
-	// Generation of vector of solution (to compare with obtained), vector of RHS and block B
-	GenRHSandSolution(x, y, z, B, x_orig, f);
-
-	// Generation of sparse coefficient matrix
-#ifndef ONLINE
-	GenSparseMatrix(x, y, z, B_mat, ldb, D, ldd, B_mat, ldb, Dcsr);
-#else
-	GenSparseMatrixOnline(x, y, z, B_mat, n, D, n, B_mat, n, Dcsr);
-	free_arr(D);
-#endif
-	free_arr(B_mat);
-
-	printf("Non_zeros in block-tridiagonal matrix: %d\n", non_zeros_in_block3diag);
-
-	//	Test_CompareColumnsOfMatrix(n1, n2, n3, D, ldd, B, Dcsr, thresh);
-	Test_TransferBlock3Diag_to_CSR(n1, n2, n3, Dcsr, x_orig, f, thresh);
-#endif
-
-	printf("Solving %d x %d x %d Laplace equation\n", n1, n2, n3);
-	printf("The system has %d diagonal blocks of size %d x %d\n", n3, n1*n2, n1*n2);
-	printf("Compressed blocks method\n");
-	printf("Parameters: thresh = %g, smallsize = %d \n", thresh, smallsize);
-
-	// Calling the solver
-	
-#ifndef STRUCT_CSR
-	Block3DSPDSolveFast(n1, n2, n3, D, ldd, B, f, thresh, smallsize, ItRef, bench, G, ldg, x_sol, success, RelRes, itcount);
-#else
-
-#ifndef ONLINE
-	Block3DSPDSolveFastStruct(x, y, z, D, ldd, B, f, Dcsr, thresh, smallsize, ItRef, bench, Gstr, x_sol, success, RelRes, itcount);
-#else
-	Block3DSPDSolveFastStruct(x, y, z, NULL, ldd, B, f, Dcsr, thresh, smallsize, ItRef, bench, Gstr, x_sol, success, RelRes, itcount);
-#endif
-
-#endif
-	printf("success = %d, itcount = %d\n", success, itcount);
-	printf("-----------------------------------\n");
-
-	printf("Computing error ||x_{exact}-x_{comp}||/||x_{exact}||\n");
-	norm = rel_error_complex(n, 1, x_sol, x_orig, size, thresh);
-
-	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
-	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
-
-
-#ifdef STRUCT_CSR
-	Test_DirFactFastDiagStructOnline(x, y, z, Gstr, B, thresh, smallsize);
-	//Test_DirSolveFactDiagStructConvergence(x, y, z, Gstr, thresh, smallsize);
-	//Test_DirSolveFactDiagStructBlockRanks(x, y, z, Gstr);
-
-	for (int i = z.n - 1; i >= 0; i--)
-		FreeNodes(n, Gstr[i], smallsize);
-
-	free(Gstr);
-#endif
-
-
-#ifndef ONLINE
-	free_arr(D);
-	free_arr(B);
-#endif
-	free_arr(x_orig);
-	free_arr(x_sol);
-	free_arr(f);
-
-	system("pause");
-
-	return 0;
-#endif
-}
-
-#else
-
 #if 1
 int main()
 {
@@ -323,10 +162,13 @@ int main()
 	int niter = 12;  // 4 iter for freq = 2
 					// 12 iter for freq = 4
 
+	printf("Frequency nu = %d\n", nu);
 	printf("The length of the wave: %lf\n", lambda);
 	printf("ppw: %lf\n", ppw);
 	printf("FGMRES number of iterations: %d\n", niter + 1);
 
+
+	system("pause");
 	int n_nopml = x.n_nopml * y.n_nopml;
 	int size_nopml = n_nopml * z.n_nopml;
 	int size2D_nopml = n_nopml;
@@ -388,40 +230,6 @@ int main()
 	system("pause");
 #endif
 
-#ifdef GEN_3D_MATRIX
-
-	int non_zeros_in_3Dblock3diag = (n + (n - 1) * 2 + (n - x.n) * 2 - (y.n - 1) * 2) * z.n + 2 * (size - n);
-
-	dtype *D, *D_nopml;
-	dtype *B_mat, *B_mat_nopml;
-	dtype *B, *B_nopml;
-
-//	B = alloc_arr<dtype>(size - n); // vector of diagonal elementes
-//	B_nopml = alloc_arr<dtype>(size_nopml - n_nopml); // vector of diagonal elementes
-
-//	dtype *x_pard = alloc_arr<dtype>(size);
-
-	// Memory for 3D CSR matrix
-	ccsr *Dcsr;
-
-	Dcsr = (ccsr*)malloc(sizeof(ccsr));
-	Dcsr->values = alloc_arr<dtype>(non_zeros_in_3Dblock3diag);
-	Dcsr->ia = alloc_arr<int>(size + 1);
-	Dcsr->ja = alloc_arr<int>(non_zeros_in_3Dblock3diag);
-	Dcsr->ia[size] = non_zeros_in_3Dblock3diag + 1;
-	Dcsr->non_zeros = non_zeros_in_3Dblock3diag;
-
-	// Memory allocation for coefficient matrix A
-	// the size of matrix A: n^3 * n^3 = n^6
-
-//	D = alloc_arr<dtype>(n * n); // it's a matrix with size n^3 * n^2 = size * n
-//	B_mat = alloc_arr<dtype>(n * n);
-
-//	D_nopml = alloc_arr<dtype>(n_nopml * n_nopml);
-//	B_mat_nopml = alloc_arr<dtype>(n_nopml * n_nopml);
-
-#endif
-
 #ifdef _OPENMP
 	int nthr = omp_get_max_threads();
 	printf("Max_threads: %d threads\n", nthr);
@@ -436,10 +244,30 @@ int main()
 
 	printf("Grid steps: hx = %lf hy = %lf hz = %lf\n", x.h, y.h, z.h);
 
-#ifndef STRUCT_CSR
-	// Generation matrix of coefficients, vector of solution (to compare with obtained) and vector of RHS
-	GenMatrixandRHSandSolution(n1, n2, n3, D, ldd, B, x_orig, f);
+	// Method Runge (for 3 diff grids)
+// f(2h) - f(h)
+// ------------
+// f(h) - f(h/2)
+
+#if 0
+	bool make_runge_count;
+#define MAKE_RUNGE_3D
+#ifdef MAKE_RUNGE_3D
+	make_runge_count = true;
 #else
+	make_runge_count = false;
+#endif
+
+	double order;
+	if (make_runge_count)
+	{
+		order = Runge(x, x, x, y, y, y, z, z, z, "sol3D_N50.dat", "sol3D_N100.dat", "sol3D_N200.dat", 3);
+		printf("order Runge = %lf\n", order);
+	}
+
+	system("pause");
+	return 0;
+#endif
 
 	point source = { x.l / 2.0, y.l / 2.0, z.l / 2.0 };
 
@@ -448,139 +276,6 @@ int main()
 	//GenRHSandSolution(x, y, z, x_orig, f, source);
 
 	GenRHSandSolutionViaSound3D(x, y, z, x_orig, f, source);
-
-	// Generation of sparse coefficient matrix
-#ifdef GEN_3D_MATRIX
-	//printf("--------------- Gen sparse 3D matrix in CSR format... ---------------\n");
-	//GenSparseMatrixOnline3D(x, y, z, B, B_mat, n, D, n, B_mat, n, Dcsr);
-
-
-#if 1
-	ccsr *Dcsr_nopml;
-	int non_zeros_nopml = (n_nopml + (n_nopml - 1) * 2 + (n_nopml - x.n_nopml) * 2 - (y.n_nopml - 1) * 2) * z.n_nopml + 2 * (size_nopml - n_nopml);
-	Dcsr_nopml = (ccsr*)malloc(sizeof(ccsr));
-	Dcsr_nopml->values = alloc_arr<dtype>(non_zeros_nopml);
-	Dcsr_nopml->ia = alloc_arr<int>(size_nopml + 1);
-	Dcsr_nopml->ja = alloc_arr<int>(non_zeros_nopml);
-	Dcsr_nopml->ia[size_nopml] = non_zeros_nopml + 1;
-	Dcsr_nopml->non_zeros = non_zeros_nopml;
-
-	printf("-------------- Gen sparse 3D matrix in CSR format with PML... ------------\n");
-	timer1 = omp_get_wtime();
-//	GenSparseMatrixOnline3DwithPML(x, y, z, B, B_mat, n, D, n, B_mat, n, Dcsr, thresh);
-	timer2 = omp_get_wtime() - timer1;
-
-	printf("Time of GenSparseMatrixOnline3DwithPML: %lf\n", timer2);
-
-	printf("-------------- Gen sparse 3D matrix in CSR format with no PML... ------------\n");
-	timer1 = omp_get_wtime();
-//	GenSparseMatrixOnline3DwithPML(x_nopml, y_nopml, z_nopml, B_nopml, B_mat_nopml, n_nopml, D_nopml, n_nopml, B_mat_nopml, n_nopml, Dcsr_nopml, thresh);
-	timer2 = omp_get_wtime() - timer1;
-
-	printf("Time of GenSparseMatrixOnline3DnoPML: %lf\n", timer2);
-#endif
-
-	free_arr(D);
-	free_arr(B_mat);
-
-
-	printf("Analytic non_zeros in first row and last two 2D blocks: %d\n", non_zeros_in_3diag + n);
-	printf("Analytic non_zeros in three 2D block-row: %d\n", non_zeros_in_3diag + 2 * n);
-	printf("Analytic non_zeros in 3D block-tridiagonal matrix: %d\n", non_zeros_in_3Dblock3diag);
-
-#if 0
-	// Test PML
-	ccsr *Dcsr_reduced;
-	Dcsr_reduced = (ccsr*)malloc(sizeof(ccsr));
-	Dcsr_reduced->values = alloc_arr<dtype>(non_zeros_nopml);
-	Dcsr_reduced->ia = alloc_arr<int>(size_nopml + 1);
-	Dcsr_reduced->ja = alloc_arr<int>(non_zeros_nopml);
-	Dcsr_reduced->ia[size_nopml] = non_zeros_nopml + 1;
-	Dcsr_reduced->non_zeros = non_zeros_nopml;
-
-	printf("----------------- Running test PML... -----------\n");
-	timer1 = omp_get_wtime();
-	Test_PMLBlock3Diag_in_CSR(x, y, z, Dcsr, Dcsr_nopml, Dcsr_reduced, thresh);
-	timer2 = omp_get_wtime() - timer1;
-	printf("Time of Test_PMLBlock3Diag_in_CSR: %lf\n", timer2);
-
-	system("pause");
-#endif
-#endif
-
-#ifdef SOLVE_3D_PROBLEM
-
-
-
-	//	Test_CompareColumnsOfMatrix(n1, n2, n3, D, ldd, B, Dcsr, thresh);
-//	printf("--------------- Running test CSR... ----------------\n");
-	timer1 = omp_get_wtime();
-	//Test_TransferBlock3Diag_to_CSR(x, y, z, Dcsr, x_orig, f, thresh);
-	timer2 = omp_get_wtime() - timer1;
-//	printf("Time of Test_TransferBlock3Diag_to_CSR: %lf\n", timer2);
-
-	// Solve Pardiso
-	printf("-------------- Solving 3D system with Pardiso... -------------\n");
-	timer1 = omp_get_wtime();
-	SolvePardiso3D(x, y, z, Dcsr, x_pard, f, thresh);
-	timer2 = omp_get_wtime() - timer1;
-	printf("Time of  SolvePardiso3D: %lf\n", timer2);
-	printf("Computing error for 3D PARDISO ||x_{exact}-x_{comp}||/||x_{exact}||\n");
-
-	reducePML3D(x, y, z, size, x_pard, size_nopml, x_pard_nopml);
-
-	all_time = omp_get_wtime() - all_time;
-	printf("Elapsed time: %lf\n", all_time);
-
-	//norm = rel_error(zlange, size, 1, x_pard_cpy, x_orig, size, thresh);
-
-	pml_flag = true;
-
-#ifdef OUTPUT
-	//output("ChartsN100PML/model", pml_flag, x, y, z, x_orig_nopml, x_pard_nopml);
-#endif
-
-
-#ifdef GNUPLOT
-//	gnuplot("ChartsN100PML/model", "ChartsN100PML/helm_ex", pml_flag, 4, x, y, z);
-//	gnuplot("ChartsN100PML/model", "ChartsN100PML/helm_pard", pml_flag, 6, x, y, z);
-#endif
-	
-	//return 0;
-	//system("pause");
-
-	
-#ifdef OUTPUT
-	FILE* fout1 = fopen("solutions.dat", "w");
-
-	for (int i = 0; i < size_nopml; i++)
-		fprintf(fout1, "%d %12.10lf %12.10lf %12.10lf %12.10lf\n", i, x_orig_nopml[i].real(), x_orig_nopml[i].imag(), x_pard_nopml[i].real(), x_pard_nopml[i].imag());
-
-	fclose(fout1);
-#endif
-
-	//for (int i = 0; i < size; i++)
-	//fprintf(fout1, "%d %12.10lf %12.10lf %12.10lf %12.10lf\n", i, x_orig[i].real(), x_orig[i].imag(), x_pard[i].real(), x_pard[i].imag());
-
-	zlacpy("All", &size_nopml, &ione, x_pard_nopml, &size_nopml, x_pard_nopml_cpy, &size_nopml);
-
-	norm = rel_error(zlange, size_nopml, 1, x_pard_nopml_cpy, x_orig_nopml, size_nopml, thresh);
-
-	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
-	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
-
-
-	//free_arr(x_pard);
-	//free_arr(x_pard_nopml);
-	//free_arr(B);
-	//free_arr(f);
-	//free_arr(x_orig);
-	//free_arr(x_orig_nopml);
-	
-
-
-	system("pause");
-#endif
 
 #endif
 
@@ -632,6 +327,7 @@ int main()
 	printf("Time: %lf\n", all_time);
 	printf("size = %d size_no_pml = %d\n", size, size_nopml);
 
+
 #ifdef HOMO
 
 #ifndef TEST_HELM_1D
@@ -655,12 +351,6 @@ int main()
 	reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 	reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
-	RelRes = dznrm2(&size_nopml, x_sol_nopml, &ione);
-	printf("norm x_sol = %lf\n", RelRes);
-
-//	for (int k = 0; k < z.n_nopml; k++)
-	//	x_orig_nopml[k * size2D_nopml + size2D_nopml / 2] = x_sol_nopml[k * size2D_nopml + size2D_nopml / 2] = 0;
-
 //	ResidCSR(x_nopml, y_nopml, z_nopml, Dcsr_nopml, x_sol_nopml, f_nopml, g_nopml, RelRes);
 //	printf("-----------\n");
 //	printf("Residual in 3D  ||A * x_sol - f|| = %lf\n", RelRes);
@@ -672,9 +362,10 @@ int main()
 	// Output
 
 
-	// DEBUG OF RELEASE
+	// DEBUG OF RELEASE SETTINGS
 	//-------------------
 #undef PERF
+#define PERF
 	// ------------------
 
 #ifndef PERF
@@ -683,6 +374,7 @@ int main()
 #endif
 
 //#define OUTPUT
+
 #ifdef OUTPUT
 #ifndef ORDER4
 	output("ChartsFreq4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
@@ -740,10 +432,11 @@ int main()
 
 	printf("----------------------------------------------\n");
 
-#define GNUPLOT
+//#define GNUPLOT
 
 #ifdef GNUPLOT
 	pml_flag = true;
+	printf("Print with Gnuplot...\n");
 
 #ifndef ORDER4
 	gnuplot("ChartsFreq4/model_ft", "ChartsFreq4/real/ex_pard", pml_flag, 4, x, y, z);
@@ -772,6 +465,24 @@ int main()
 	reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 	reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
+	//#define MAKE_RUNGE_3D
+
+#ifndef MAKE_RUNGE_3D
+	RelRes = dznrm2(&size_nopml, x_sol_nopml, &ione);
+	printf("norm x_sol = %lf\n", RelRes);
+
+	char str[255];
+	sprintf(str, "sol3D_N%d.dat", x.n_nopml + 1);
+	FILE *file = fopen(str, "w");
+
+	for (int i = 0; i < size_nopml; i++)
+		fprintf(file, "%18.16lf %18.16lf\n", x_sol_nopml[i].real(), x_sol_nopml[i].imag());
+
+	fclose(file);
+
+	//return 0;
+#endif
+
 #define OUTPUT
 #ifdef OUTPUT
 	printf("Output results to file...\n");
@@ -788,41 +499,7 @@ int main()
 	printf("No printing results...\n");
 #endif
 
-	// Method Runge (for 3 diff grids)
-	// f(2h) - f(h)
-	// ------------
-	// f(h) - f(h/2)
 
-	char str[255];
-	sprintf(str, "sol3D_N%d.dat", x.n_nopml + 1);
-	FILE *file = fopen(str, "w");
-
-	for (int i = 0; i < size_nopml; i++)
-		fprintf(file, "%lf %lf\n", x_sol_nopml[i].real(), x_sol_nopml[i].imag());
-
-	fclose(file);
-
-	bool make_runge_count;
-#ifdef MAKE_RUNGE_3D
-	make_runge_count = true;
-#else
-	make_runge_count = false;
-#endif
-
-	double order;
-	if (make_runge_count)
-	{
-		order = Runge(x, x, x, y, y, y, z, z, z, "sol3D_N50.dat", "sol3D_N100.dat", "sol3D_N200.dat", 3);
-	}
-
-//	printf("order Runge = %lf\n", order);
-	fclose(file);	
-	
-#endif
-
-#ifndef ONLINE
-	free_arr(D);
-	free_arr(B);
 #endif
 
 	free_arr(x_orig);
@@ -833,5 +510,3 @@ int main()
 	return 0;
 #endif
 }
-#endif
-#endif
