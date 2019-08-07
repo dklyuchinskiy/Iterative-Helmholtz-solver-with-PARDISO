@@ -53,7 +53,7 @@ int main()
 					   // 150 pts  - 20 % and 10 % if beta = 0.05;
 					   //          - 6 % and 3 % if beta = 0.1
 					   // 200 pts  - 4 % and 4 % if beta = 0.1, 6 % and ? if beta = 0.2
-	int spg_pts = 50; // 250 pts  - 3 % and 3 % if beta = 0.1
+	int spg_pts = 100; // 250 pts  - 3 % and 3 % if beta = 0.1
 
 	// 3D
 	// 100 pt - 19 % if beta = 0.05
@@ -85,9 +85,9 @@ int main()
 
 	x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-	int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
-	int n2 = 99 + 2 * y.pml_pts;
-	int n3 = 99 + 2 * z.spg_pts;
+	int n1 = 199 + 2 * x.pml_pts;		    // number of point across the directions
+	int n2 = 199 + 2 * y.pml_pts;
+	int n3 = 199 + 2 * z.spg_pts;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 
@@ -234,9 +234,9 @@ int main()
 	int nthr = omp_get_max_threads();
 	printf("Max_threads: %d threads\n", nthr);
 	omp_set_dynamic(0);
-	nthr = 2;
+	nthr = 6;
 	omp_set_num_threads(nthr);
-	mkl_set_num_threads(2);
+	mkl_set_num_threads(6);
 	printf("Run in parallel on %d threads\n", nthr);
 #else
 	printf("Run sequential version on 1 thread\n");
@@ -249,7 +249,7 @@ int main()
 // ------------
 // f(h) - f(h/2)
 
-#if 0
+#if 1
 	bool make_runge_count;
 #define MAKE_RUNGE_3D
 #ifdef MAKE_RUNGE_3D
@@ -262,7 +262,7 @@ int main()
 	if (make_runge_count)
 	{
 		order = Runge(x, x, x, y, y, y, z, z, z, "sol3D_N50.dat", "sol3D_N100.dat", "sol3D_N200.dat", 3);
-		printf("order Runge = %lf\n", order);
+		printf("ratio = %lf, order Runge = %lf\n", order, log(order) / log(2.0));
 	}
 
 	system("pause");
@@ -486,15 +486,18 @@ int main()
 #define OUTPUT
 #ifdef OUTPUT
 	printf("Output results to file...\n");
-	output("Charts3DHetero/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+	char file1[255]; sprintf(file1, "Charts3DHetero/%d/model_ft", x.n_nopml + 1);
+	char file2[255]; sprintf(file2, "Charts3DHetero/%d/real/helm_ft", x.n_nopml + 1);
+	char file3[255]; sprintf(file3, "Charts3DHetero/%d/imag/helm_ft", x.n_nopml + 1);
+	output(file1, pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
 #endif
 
 #define GNUPLOT
 #ifdef GNUPLOT
 	printf("Printing with GNUPLOT...\n");
 	pml_flag = true;
-	gnuplot("Charts3DHetero/model_ft", "Charts3DHetero/real/helm_ft", pml_flag, 6, x, y, z);
-	gnuplot("Charts3DHetero/model_ft", "Charts3DHetero/imag/helm_ft", pml_flag, 7, x, y, z);
+	gnuplot(file1, file2, pml_flag, 6, x, y, z);
+	gnuplot(file1, file3, pml_flag, 7, x, y, z);
 #else
 	printf("No printing results...\n");
 #endif

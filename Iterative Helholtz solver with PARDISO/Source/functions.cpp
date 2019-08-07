@@ -904,8 +904,50 @@ double Runge(size_m x1, size_m x2, size_m x3,
 				for (int i = 0; i < x2.n_nopml; i++)
 					hlph[i + x2.n_nopml * j + x2.n_nopml * y2.n_nopml * k] = solh2[step2 * (i + 1) - 1 + x3.n_nopml * (step2 * (j + 1) - 1) + x3.n_nopml * y3.n_nopml * (step2 * (k + 1) - 1)];
 
+		// 0, 1, 2, 3, 4, 5, 6 vs 1, 3, 5, 7, 9, 11
+#if 0
 		f1 = RelError2(zlange, size1, 1, sol2h, size1, hlp2h, size1, eps);
 		f2 = RelError2(zlange, size2, 1, solh, size2, hlph, size2, eps);
+#else
+		int cur_z_1 = (z1.n_nopml + 1) / 2;
+		int cur_z_2 = cur_z_1 * 2 + 1;
+
+		cur_z_1 = 1;
+		cur_z_2 = 3;
+
+		for (int k = 0; k < z1.n_nopml; k++)
+			for (int j = 0; j < y1.n_nopml; j++)
+				for (int i = 0; i < x1.n_nopml; i++)
+				{
+					if(1)
+					//if (k == cur_z_1)
+					{
+						hlp2h[i + x1.n_nopml * j + x1.n_nopml * y1.n_nopml * k] -= sol2h[i + x1.n_nopml * j + x1.n_nopml * y1.n_nopml * k];
+					}
+					else
+					{
+						hlph[i + x1.n_nopml * j + x1.n_nopml * y1.n_nopml * k] = 0;
+					}
+				}
+
+		for (int k = 0; k < z2.n_nopml; k++)
+			for (int j = 0; j < y2.n_nopml; j++)
+				for (int i = 0; i < x2.n_nopml; i++)
+				{
+					if (1)
+					//if (k == cur_z_2)
+					{
+						hlph[i + x2.n_nopml * j + x2.n_nopml * y2.n_nopml * k] -= solh[i + x2.n_nopml * j + x2.n_nopml * y2.n_nopml * k];
+					}
+					else
+					{
+						hlph[i + x2.n_nopml * j + x2.n_nopml * y2.n_nopml * k] = 0;
+					}
+				}
+		f1 = IntegralNorm3D(x1, y1, z1, hlp2h);
+		f2 = IntegralNorm3D(x2, y2, z2, hlph);
+#endif
+
 	}
 	// 0, 1, 2, 3, 4, 5, 6 vs 1, 3, 5, 7, 9, 11
 #endif
@@ -926,6 +968,52 @@ double Runge(size_m x1, size_m x2, size_m x3,
 	printf("Runge ||u(2h) - u(h/2)|| = %e\n||u(h) - u(h/2)|| = %e\n", f1, f2);
 
 	return f1 / f2;
+}
+
+double IntegralNorm2D(size_m x, size_m y, char type, double* v)
+{
+	double norm = 0;
+	
+	if (type == 'I')
+	{
+		for (int i = 0; i < x.n; i++)
+			for (int j = 0; j < y.n; j++)
+				norm += v[i + x.n * j];
+
+		norm *= x.h / 2;
+	}
+	else if (type == '1')
+	{
+		for (int i = 0; i < x.n; i++)
+			for (int j = 0; j < y.n; j++)
+				norm += abs(v[i + x.n * j]);
+
+		norm *= x.h;
+	}
+	else if (type == 'F')
+	{
+		for (int i = 0; i < x.n; i++)
+			for (int j = 0; j < y.n; j++)
+				norm += v[i + x.n * j] * v[i + x.n * j];
+
+		norm = sqrt(norm);
+	}
+
+	return norm;
+}
+
+double IntegralNorm3D(size_m x, size_m y, size_m z, dtype* v)
+{
+	double norm = 0;
+
+	for (int k = 0; k < z.n_nopml; k++)
+		for (int j = 0; j < y.n_nopml; j++)
+			for (int i = 0; i < x.n_nopml; i++)
+				norm += abs(v[i + x.n_nopml * j + x.n_nopml * y.n_nopml * k]);
+
+	norm *= x.h;
+
+	return norm;
 }
 
 void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
@@ -4064,7 +4152,7 @@ void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_ori
 
 	for (int k = 0; k < Nz; k++)
 	{
-		sprintf(name, "%s_%02d.dat", str, k);
+		sprintf(name, "%s_%02d.dat", str, k + 1);
 		FILE *file = fopen(name, "w");
 		for (int j = 0; j < Ny; j++)
 			for (int i = 0; i < Nx; i++)
@@ -4176,8 +4264,8 @@ void gnuplot(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m y
 	//	if (col == 4) fprintf(file, "set cbrange[%12.10lf:%12.10lf]\n", x_orig[0 + 0 * Nx + k * Ny * Nx].real(), x_orig[(Nx - 1 + (Ny - 1) * Nx) / 2 + k * Ny * Nx].real());
 	//	else fprintf(file, "set cbrange[%12.10lf:%12.10lf]\n", x_sol[0 + 0 * Nx + k * Ny * Nx].real(), x_sol[(Nx - 1 + (Ny - 1) * Nx) / 2 + k * Ny * Nx].real());
 		//printf("k = %d\nleft: %d  %lf \nright: %d %lf \n\n", k, 0 + 0 * x.n, x_orig[0 + 0 * Nx + k * Ny * Nx].real(), (Nx - 1 + (Ny - 1) * Nx) / 2, x_orig[(Nx - 1 + (Ny - 1) * Nx) / 2 + k * Ny * Nx].real());
-		fprintf(file1, "set output '%s_z_%4.2lf.png'\n", sout, k * z.h);
-		fprintf(file1, "splot '%s_%02d.dat' u 2:1:%d w linespoints pt 7 palette pointsize 1 notitle\n\n", splot, k, col);
+		fprintf(file1, "set output '%s_z_%4.2lf.png'\n", sout, (k + 1) * z.h);
+		fprintf(file1, "splot '%s_%02d.dat' u 2:1:%d w linespoints pt 7 palette pointsize 1 notitle\n\n", splot, k + 1, col);
 	}
 
 	fprintf(file1, "exit\n");
