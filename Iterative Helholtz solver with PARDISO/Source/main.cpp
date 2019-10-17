@@ -107,6 +107,7 @@ int main()
 	int success = 0;
 	int itcount = 0;
 	double RelRes = 0;
+	double diff_sol = 0;
 	double norm = 0;
 	bool pml_flag = 1;
 	int i1, j1, k1;
@@ -159,7 +160,7 @@ int main()
 
 	double lambda = double(c_z) / nu;
 	double ppw = lambda / x.h;
-	int niter = 12;  // 4 iter for freq = 2
+	int niter = NITER * 3;  // 4 iter for freq = 2
 					// 12 iter for freq = 4
 
 	printf("Frequency nu = %d\n", nu);
@@ -319,7 +320,7 @@ int main()
 	// ------------ FGMRES-------------
 	all_time = omp_get_wtime();
 
-	FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh);
+	FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol);
 
 	all_time = omp_get_wtime() - all_time;
 
@@ -331,12 +332,8 @@ int main()
 #ifdef HOMO
 
 #ifndef TEST_HELM_1D
-	for (int k = 0; k < z.n; k++)
-	{
-		int src = size2D / 2;
-		NullifySource2D(x, y, &x_sol[k * size2D], src, 5);
-		NullifySource2D(x, y, &x_orig[k * size2D], src, 5);
-	}
+	NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 5);
+	NullifySource2D(x, y, &x_orig[z.n / 2 * size2D], size2D / 2, 5);
 #endif
 
 #if 0
@@ -432,7 +429,7 @@ int main()
 
 	printf("----------------------------------------------\n");
 
-//#define GNUPLOT
+#define GNUPLOT
 
 #ifdef GNUPLOT
 	pml_flag = true;
@@ -486,7 +483,7 @@ int main()
 #define OUTPUT
 #ifdef OUTPUT
 	printf("Output results to file...\n");
-	output("Charts3DHetero/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+	output("Charts3DHetero/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml, diff_sol);
 #endif
 
 #define GNUPLOT

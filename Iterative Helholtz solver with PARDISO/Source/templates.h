@@ -51,7 +51,7 @@ void print_vec(int size, int *vec1, double *vec2, char *name);
 void NormalizeVector(int size, dtype* v, dtype* out, double& norm);
 void GenRHSandSolutionViaSound3D(size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f, point source);
 dtype u_ex_complex_sound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
-void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh);
+void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double& diff_sol);
 void check_norm_circle(size_m x, size_m y, size_m z, dtype* x_orig_nopml, dtype* x_sol_nopml, point source, double thresh);
 void print_2Dcsr_mat(size_m x, size_m y, ccsr* D2csr);
 void print_2Dcsr_mat2(size_m x, size_m y, ccsr* D2csr);
@@ -157,7 +157,7 @@ dtype u_ex_complex(size_m xx, size_m yy, size_m zz, double x, double y, double z
 dtype F3D_ex_complex(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source, int& l);
 dtype F2D_ex_complex(size_m xx, size_m yy, double x, double y, point source, int& l);
 dtype F1D_ex_complex(size_m xx, double x, point source, int& l);
-void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_orig, dtype* x_pard);
+void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_orig, dtype* x_pard, double diff_sol);
 void gnuplot(char *str1, char *str2, bool pml_flag, int col, size_m x, size_m y, size_m z);
 void output1D(char *str, bool pml_flag, size_m x, dtype* x_orig, dtype* x_pard);
 void output2D(char *str, bool pml_flag, size_m x, size_m y, dtype* x_orig, dtype* x_pard);
