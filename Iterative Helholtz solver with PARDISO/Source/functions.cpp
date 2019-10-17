@@ -1046,6 +1046,16 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 				for (int i = 0; i < Nx; i++)
 					sound3D[k * n + j * Nx + i] = MakeSound3D(x, y, z, (i + 1) * x.h, (j + 1) * y.h, (k + 1) * z.h, source);
 #endif
+
+	char str[255]; sprintf(str, "SoundSpeed3D_N%d.dat", x.n);
+	FILE* file = fopen(str, "w");
+
+	for (int k = z.spg_pts; k < Nz - z.spg_pts; k++)
+		for (int j = y.pml_pts; j < Ny - y.pml_pts; j++)
+			for (int i = x.pml_pts; i < Nx - x.pml_pts; i++)
+				fprintf(file, "sound[%d][%d][%d] = %lf\n", i, j, k, sound3D[k * n + j * Nx + i].real());
+
+	fclose(file);
 }
 
 void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D, point source)
@@ -1057,7 +1067,7 @@ void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2
 	dtype c0_max;
 	dtype c0_min;
 
-	char str[255]; sprintf(str, "SoundSpeed_N%d.dat", x.n);
+	char str[255]; sprintf(str, "SoundSpeed2D_N%d.dat", x.n);
 	FILE *file = fopen(str, "w");
 
 #if 1
@@ -2045,7 +2055,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	GenerateDeltaL(x, y, z, sound3D, sound2D, deltaL);
 
 	char str1[255] = "sound_speed2D";
-	//	output(str1, false, x, y, z, sound3D, deltaL);
+	//output(str1, false, x, y, z, sound3D, deltaL);
 	//	output2D(str1, false, x, y, sound2D, sound2D);
 
 	char str2[255] = "sound_speed_deltaL";
@@ -4169,6 +4179,7 @@ void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_ori
 		fclose(file);
 	}
 
+#ifdef MATLAB
 	double lambda = double(c_z) / nu;
 	double ppw = lambda / x.h;
 	sprintf(name, "%s_3D.dat", str);
@@ -4192,6 +4203,7 @@ void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_ori
 				fprintf(file2, "%d %d %d %11.4e %11.4e\n", i, j, k, x_pard[i + j * Nx + k * Nx * Ny].real(), x_pard[i + j * Nx + k * Nx * Ny].imag());
 				
 	fclose(file2);
+#endif
 #else
 
 #if 0
