@@ -744,9 +744,9 @@ dtype MakeSound2D(size_m xx, size_m yy, double x, double y, point source)
 
 dtype MakeSound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source)
 {
-	dtype c1 = 0.1;
-	dtype c2 = 0.4;
-	dtype c3 = 0.7;
+	dtype c1 = (double)C1;
+	dtype c2 = (double)C2;
+	dtype c3 = (double)C3;
 #ifdef HOMO
 	return c_z;
 #else
@@ -1964,7 +1964,7 @@ dtype IntegralNorm(int size, dtype *vec, double h)
 	return sqrt(norm);
 }
 
-void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh)
+void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double &diff_sol)
 {
 	printf("-------------FGMRES-----------\n");
 
@@ -2419,14 +2419,11 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 #endif
 
 			// 8. Reduce pml
+#ifdef HOMO
 			printf("Nullify source...\n");
-#pragma omp parallel for simd schedule(static)
-			for (int k = 0; k < z.n; k++)
-			{
-				int src = size2D / 2;
-				NullifySource2D(x, y, &x_sol[k * size2D], src, 5);
-				NullifySource2D(x, y, &x_orig[k * size2D], src, 5);
-			}
+			NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 1);
+			NullifySource2D(x, y, &x_orig[z.n / 2 * size2D], size2D / 2, 1);
+#endif
 
 			reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 			reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
@@ -2448,9 +2445,9 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			printf("norm_im = %lf\n", norm_im);
 			printf("norm = %lf\n", norm);
 #else
-			norm = RelError(zlange, size_nopml, 1, x_sol_nopml, x_sol_prev_nopml, size_nopml, thresh);
+			diff_sol = RelError(zlange, size_nopml, 1, x_sol_nopml, x_sol_prev_nopml, size_nopml, thresh);
 			MultVectorConst<dtype>(size_nopml, x_sol_nopml, 1.0, x_sol_prev_nopml);
-			printf("norm |u_k+1 - u_k|= %e\n", norm);
+			printf("norm |u_k+1 - u_k|= %e\n", diff_sol);
 #endif
 			printf("--------------------------------------------------------------------------------\n");
 		}
@@ -4129,9 +4126,9 @@ double random(double min, double max)
 }
 
 
-void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_orig, dtype* x_pard)
+void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_orig, dtype* x_pard, double diff_sol)
 {
-	char name[255];
+	char name[255], name2[255];
 	int Nx, Ny, Nz;
 
 	if (pml_flag == true)
@@ -4149,7 +4146,8 @@ void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_ori
 
 
 	double rel_real, rel_imag;
-
+//#define BINARY
+#ifndef BINARY
 	for (int k = 0; k < Nz; k++)
 	{
 		sprintf(name, "%s_%02d.dat", str, k + 1);
@@ -4170,6 +4168,170 @@ void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_ori
 			}
 		fclose(file);
 	}
+
+	double lambda = double(c_z) / nu;
+	double ppw = lambda / x.h;
+	sprintf(name, "%s_3D.dat", str);
+	FILE *file2 = fopen(name, "w");
+	fprintf(file2, "Nx %d, Nz %d, Nz %d\n", Nx, Ny, Nz);
+	fprintf(file2, "hx %.2lf, hy %.2lf, hz %.2lf\n", x.h, y.h, z.h);
+	fprintf(file2, "Lx %.2lf, Ly %.2lf, Lz %.2lf\n", x.l, y.l, z.l);
+	fprintf(file2, "frequency nu %d\n", nu);
+#ifdef HOMO
+	fprintf(file2, "ppw %.2lf\n", ppw);
+#else
+	fprintf(file2, "sound speed %.1lf * x + %.1lf * y + %.1lf * z\n", C1, C2, C3);
+#endif
+	fprintf(file2, "x_pml %d, y_pml %d, z_sponge %d\n", x.pml_pts, y.pml_pts, z.spg_pts);
+	fprintf(file2, "niter %d\n", NITER * 3);
+	fprintf(file2, "u_{k+1}_u_{k} %11.4e\n", diff_sol);
+	fprintf(file2, "i j k Re(u) Im(u)\n");
+	for (int k = 0; k < Nz; k++)
+		for (int j = 0; j < Ny; j++)
+			for (int i = 0; i < Nx; i++)
+				fprintf(file2, "%d %d %d %11.4e %11.4e\n", i, j, k, x_pard[i + j * Nx + k * Nx * Ny].real(), x_pard[i + j * Nx + k * Nx * Ny].imag());
+				
+	fclose(file2);
+#else
+
+#if 0
+
+#if 1
+	for (int k = 0; k < 1; k++)
+	{
+		sprintf(name, "%s_%02d.bin", str, k);
+		FILE *file = fopen(name, "w");
+		for (int j = 0; j < 1; j++)
+			for (int i = 0; i < Nx; i++)
+			{
+				//struct package pack = {i * x.h, j * y.h, k * z.h, x_pard[i + j * Nx + k * Nx * Ny].real(), x_pard[i + j * Nx + k * Nx * Ny].imag()} ;
+				struct package2 pack = { i * x.h, j * y.h, x_pard[i + j * Nx + k * Nx * Ny] };
+				fwrite(&pack, sizeof(struct package2), 1, file);
+				if (fwrite == 0) printf("error writing file !\n");
+				//fprintf(file, "%12.10lf %12.10lf %12.10lf %12.10lf\n", pack.x, pack.y, pack.ureal, pack.uimag);
+			}
+		fclose(file);
+	}
+#if 1
+	for (int k = 0; k < 1; k++)
+	{
+		sprintf(name, "%s_%02d.bin", str, k);
+		sprintf(name2, "%s_%02d.dat", str, k);
+		FILE *file2 = fopen(name, "r");
+		FILE *file3 = fopen(name2, "w");
+
+		if (file2 == NULL)
+		{
+			fprintf(stderr, "\nError opend file\n");
+			//exit(1);
+		}
+			
+				struct package2 pack1;
+				printf("begin read\n");
+
+				while (fread(&pack1, sizeof(struct package2), 1, file2))
+				{
+					//printf("new string!\n");
+					//fprintf(file2, "%12.10lf %12.10lf %12.10lf %12.10lf %12.10lf\n", pack.x, pack.y, pack.z, pack.ureal, pack.uimag);
+					printf("%12.10lf %12.10lf %12.10lf %12.10lf\n", pack1.x, pack1.y, pack1.u.real(), pack1.u.imag());
+				}
+				printf("end read\n");
+			
+		fclose(file2);
+		fclose(file3);
+	}
+#endif
+#endif
+#endif
+
+#if 0
+	FILE *outfile;
+
+	// open file for writing 
+	outfile = fopen("person.dat", "w");
+	if (outfile == NULL)
+	{
+		fprintf(stderr, "\nError opend file\n");
+		exit(1);
+	}
+
+	struct person input1 = { 1.0, 3.0, "rohan", "sharma" };
+	struct person input2 = { 2.0, 6.0, "mahendra", "dhoni" };
+
+	// write struct to file 
+	fwrite(&input1, sizeof(struct person), 1, outfile);
+	fwrite(&input2, sizeof(struct person), 1, outfile);
+
+	if (fwrite != 0)
+		printf("contents to file written successfully !\n");
+	else
+		printf("error writing file !\n");
+
+	// close file 
+	fclose(outfile);
+
+	FILE *infile;
+	struct person input;
+
+	// Open person.dat for reading 
+	infile = fopen("person.dat", "r");
+	if (infile == NULL)
+	{
+		fprintf(stderr, "\nError opening file\n");
+		exit(1);
+	}
+
+	// read file contents till end of file 
+	while (fread(&input, sizeof(struct person), 1, infile))
+		printf("id = %lf x = %lf name = %s %s\n", input.id, input.x,
+			input.fname, input.lname);
+
+	// close file 
+	fclose(infile);
+#endif
+
+	for (int k = 0; k < Nz; k++)
+	{
+		sprintf(name, "%s_%02d.bin", str, k);
+		FILE *file = fopen(name, "w");
+		for (int j = 0; j < Ny; j++)
+			for (int i = 0; i < Nx; i++)
+			{
+				struct package3 pack = { i * x.h, j * y.h, x_pard[i + j * Nx + k * Nx * Ny].real() };
+				fwrite(&pack, sizeof(struct package3), 1, file);
+				if (fwrite == 0) printf("error writing file !\n");
+			}
+		fclose(file);
+	}
+
+#if 0
+	for (int k = 0; k < Nz; k++)
+	{
+		sprintf(name, "%s_%02d.bin", str, k);
+		sprintf(name2, "%s_%02d.dat", str, k);
+		FILE *file = fopen(name, "r");
+		FILE *file2 = fopen(name2, "w");
+
+		if (file == NULL)
+		{
+			fprintf(stderr, "\nError opend file\n");
+			//exit(1);
+		}
+
+		struct package3 pack;
+
+		while (fread(&pack, sizeof(struct package3), 1, file))
+		{
+			fprintf(file2, "%12.10lf %12.10lf %12.10lf\n", pack.x, pack.y, pack.sol);
+		}
+
+		fclose(file);
+		fclose(file2);
+
+	}
+#endif
+#endif
+
 }
 
 void output2D(char *str, bool pml_flag, size_m x, size_m y, dtype* x_orig, dtype* x_pard)

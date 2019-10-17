@@ -106,6 +106,38 @@ struct matrix
 	dtype val;
 };
 
+struct package
+{
+	double x;
+	double y;
+	double z;
+	double ureal;
+	double uimag;
+};
+
+struct package2
+{
+	double x;
+	double y;
+	dtype u;
+};
+
+struct package3
+{
+	double x;
+	double y;
+	double sol;
+};
+
+struct person
+{
+	double id;
+	double x;
+	char fname[20];
+	char lname[20];
+};
+
+
 enum class DIAG13
 {	
 	m_six = -6,
@@ -138,6 +170,11 @@ enum class DIAG13
 //#define LENGTH 8
 #define PERF
 
+
+// velocity model
+#define C1 0.1
+#define C2 0.4
+#define C3 0.7
 
 #if 0
 #define LENGTH_X 5120
@@ -186,6 +223,8 @@ enum class DIAG13
 
 #define omega 2.0 * (PI) * (nu)
 #define kk ((omega) / (c_z))
+
+#define NITER 12
 
 //#define kk ((omega) / (c_z))
 #else
