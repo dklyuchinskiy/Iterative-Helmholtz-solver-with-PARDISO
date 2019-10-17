@@ -65,6 +65,8 @@ void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, ccsr* Acs
 dtype beta2D_pml(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, int j);
 dtype beta2D_pml_9pts(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, int j, double sigma);
 dtype beta2D_pml_13pts(size_m x, size_m y, DIAG13 diag_case, dtype kwave_beta2, int i, int j);
+double IntegralNorm2D(size_m x, size_m y, char type, double* v);
+double IntegralNorm3D(size_m x, size_m y, size_m z, dtype* v);
 
 void print_map(const map<vector<int>, dtype>& SD);
 void print_csr(int n, dcsr* A);
