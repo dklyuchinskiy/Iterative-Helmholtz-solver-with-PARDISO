@@ -417,7 +417,7 @@ void check_norm_result(int n1, int n2, int n3, dtype* x_orig_nopml, dtype* x_sol
 
 }
 
-void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double spg, dtype* x_orig_nopml, dtype* x_sol_nopml,
+void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double spg, const dtype* x_orig_nopml, const dtype* x_sol_nopml,
 	double* x_orig_re, double* x_orig_im, double *x_sol_re, double *x_sol_im)
 {
 	printf("------------ACCURACY CHECK---------\n");
@@ -472,23 +472,26 @@ void PrintProjection1D(size_m x, size_m y, dtype *x_ex, dtype *x_prd, int freq)
 	dtype* x_sol1D_prd = alloc_arr<dtype>(x.n);
 
 	// output 1D - X direction
-	for(int j = 0; j < y.n - 1; j++)
+	for(int j = 0; j < y.n; j++)
 	{
-		sprintf(str1, "Charts3D/model_pml1Dx_sec%d_freq%d__h%d", j, freq, (int)x.h);
-		sprintf(str2, "Charts3D/model_pml1Dx_diff_sec%d_freq%d__h%d", j, freq, (int)x.h);
+		if (j == y.n / 2)
+		{
+			sprintf(str1, "Charts3D/projX/model_pml1Dx_freq%d_sec%d_h%d", freq, j, (int)x.h);
+			sprintf(str2, "Charts3D/projX/model_pml1Dx_diff_freq%d_sec%d_h%d", freq, j, (int)x.h);
 
-		output1D(str1, pml_flag, x, &x_ex[x.n * j], &x_prd[x.n * j]);
-		gnuplot1D(str1, str2, pml_flag, 0, x);
+			output1D(str1, pml_flag, x, &x_ex[x.n * j], &x_prd[x.n * j]);
+			gnuplot1D(str1, str2, pml_flag, 0, x);
+		}
 	}
 
 	// output 1D - Y direction
-	sprintf(str1, "Charts3D/model_pml2Dy_%d__%lf", freq, x.h);
-	sprintf(str2, "Charts3D/model_pml1Dy_diff_%d__%lf", freq, x.h);
+	sprintf(str1, "Charts3D/projY/model_pml1Dy_freq%d_sec%d_h%d", freq, x.n / 2, (int)x.h);
+	sprintf(str2, "Charts3D/projY/model_pml1Dy_diff_freq%d_sec%d_h%d", freq, x.n / 2, (int)x.h);
 
 	for (int j = 0; j < y.n; j++)
 	{
-		x_sol1D_ex[j] = x_ex[(x.n - 1) / 2 + j * x.n];
-		x_sol1D_prd[j] = x_prd[(x.n - 1) / 2 + j * x.n];
+		x_sol1D_ex[j] = x_ex[x.n / 2 + j * x.n];
+		x_sol1D_prd[j] = x_prd[x.n / 2 + j * x.n];
 	}
 
 	output1D(str1, pml_flag, y, x_sol1D_ex, x_sol1D_prd);
@@ -498,7 +501,7 @@ void PrintProjection1D(size_m x, size_m y, dtype *x_ex, dtype *x_prd, int freq)
 	free_arr(x_sol1D_prd);
 }
 
-void check_norm_circle(size_m xx, size_m yy, size_m zz, dtype* x_orig, dtype* x_sol, point source, double thresh)
+void check_norm_circle(size_m xx, size_m yy, size_m zz, const dtype* x_orig, const dtype* x_sol, point source, double thresh)
 {
 	int n1 = xx.n;
 	int n2 = yy.n;
@@ -2139,8 +2142,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		if (nu == 2) ratio = 15;
 		else ratio = 3;
 
-		if (kww < ratio * k2)
-		//if (1)
+		//if (kww < ratio * k2)
+		if (1)
 		{
 			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } - kww;
 
@@ -4154,7 +4157,6 @@ void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_ori
 		Nz = z.n;
 	}
 
-
 	double rel_real, rel_imag;
 //#define BINARY
 #ifndef BINARY
@@ -4179,6 +4181,7 @@ void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_ori
 		fclose(file);
 	}
 
+#define MATLAB 
 #ifdef MATLAB
 	double lambda = double(c_z) / nu;
 	double ppw = lambda / x.h;
@@ -4195,7 +4198,11 @@ void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_ori
 #endif
 	fprintf(file2, "x_pml %d, y_pml %d, z_sponge %d\n", x.pml_pts, y.pml_pts, z.spg_pts);
 	fprintf(file2, "niter %d\n", NITER * 3);
-	fprintf(file2, "u_{k+1}_u_{k} %11.4e\n", diff_sol);
+#ifdef HOMO
+	fprintf(file2, "||u_num-u_ex|| / ||u_ex|| %11.4e\n", diff_sol);
+#else
+	fprintf(file2, "||u_{k+1}-u_{k}|| / ||u_k|| %11.4e\n", diff_sol);
+#endif
 	fprintf(file2, "i j k Re(u) Im(u)\n");
 	for (int k = 0; k < Nz; k++)
 		for (int j = 0; j < Ny; j++)

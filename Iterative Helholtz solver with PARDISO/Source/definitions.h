@@ -209,7 +209,8 @@ enum class DIAG13
 
 
 //#define ORDER4
-//#define HOMO
+#define HOMO
+
 
 #ifdef HELMHOLTZ
 #define nu 4
@@ -224,7 +225,11 @@ enum class DIAG13
 #define omega 2.0 * (PI) * (nu)
 #define kk ((omega) / (c_z))
 
+#ifdef HOMO
+#define NITER 4
+#else
 #define NITER 12
+#endif
 
 //#define kk ((omega) / (c_z))
 #else
