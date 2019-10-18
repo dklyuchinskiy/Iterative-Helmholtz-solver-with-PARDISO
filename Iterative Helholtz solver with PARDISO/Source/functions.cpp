@@ -2434,7 +2434,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			// 8. Reduce pml
 #ifdef HOMO
 			printf("Nullify source...\n");
-			NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 1);
+			//NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 1);
 			NullifySource2D(x, y, &x_orig[z.n / 2 * size2D], size2D / 2, 1);
 #endif
 

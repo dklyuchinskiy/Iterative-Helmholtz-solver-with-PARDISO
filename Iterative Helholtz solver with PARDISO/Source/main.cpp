@@ -340,13 +340,13 @@ int main()
 #ifdef HOMO
 
 #ifndef TEST_HELM_1D
-	NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 1);
+	//NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 1);
 	NullifySource2D(x, y, &x_orig[z.n / 2 * size2D], size2D / 2, 1);
 #endif
 
 //#define OUTPUT
 
-#if 0
+#if 1
 	dtype* z_sol1D_ex = alloc_arr<dtype>(z.n);
 	dtype* z_sol1D_prd = alloc_arr<dtype>(z.n);
 
@@ -464,7 +464,7 @@ int main()
 
 	printf("----------------------------------------------\n");
 
-#define GNUPLOT
+//#define GNUPLOT
 
 #ifdef GNUPLOT
 	pml_flag = true;
