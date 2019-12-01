@@ -40,8 +40,8 @@ void Shell_FFT1D_Complex(ptr_test_fft func, const string& test_name, int& numb, 
 
 // Solver
 void Test_DirFactFastDiagStructOnline(size_m x, size_m y, size_m z, cmnode** Gstr, dtype *B, double thresh, int smallsize);
-void Test_TransferBlock3Diag_to_CSR(size_m x, size_m y, size_m z, ccsr* Dcsr, dtype* x_orig, dtype *f, double eps);
-void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ ccsr* Dcsr, ccsr *Dcsr_nopml, /*out */ ccsr* Dcsr_reduced, double eps);
+void Test_TransferBlock3Diag_to_CSR(size_m x, size_m y, size_m z, zcsr* Dcsr, dtype* x_orig, dtype *f, double eps);
+void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ zcsr* Dcsr, zcsr *Dcsr_nopml, /*out */ zcsr* Dcsr_reduced, double eps);
 void Test2DLaplaceLevander4th();
 void Test2DHelmholtzLevander4th();
 double Test2DLaplaceLevander4thKernel(size_m x, size_m y, size_m x_lg, size_m y_lg, dtype* x_sol);
@@ -63,8 +63,12 @@ void TestOrtogonalizedVectors(int n, dtype* vect1, dtype* vect2, double eps);
 void TestNormalizedVector(int n, dtype* vect, double eps);
 void TestFGMRES();
 void Test1DHelmholtz(int n1, int n2, int n3, dtype* u_sol, double thresh, char *str);
-void TestSymmSparseMatrixOnline2DwithPML(size_m x, size_m y, size_m z, ccsr *D2csr_zero);
+void TestSymmSparseMatrixOnline2DwithPML(size_m x, size_m y, size_m z, zcsr *D2csr_zero);
 void TestInverseTraversal(size_m x, size_m y, size_m z, const point source, const dtype *x_sol, const dtype *f_orig, double thresh);
+
+// HODLR
+void Test2DHelmholtzHODLR();
+void Test_DirFactFastDiagStructOnlineHODLR(size_m x, size_m y, cmnode** Gstr, dtype *B, dtype kwave2, double eps, int smallsize);
 
 #if 0
 

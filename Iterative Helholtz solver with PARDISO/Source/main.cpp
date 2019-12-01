@@ -42,8 +42,13 @@ int main()
 
 	//Test2DLaplaceLevander4th(); // laplace + manufactored laplace and helmholtz
 	//Test2DHelmholtzLevander4th(); // exact helm
+	//TestAll();
+#if 1
+	Test2DHelmholtzHODLR();
 	//system("pause");
 	//return 0;
+#endif
+
 #if 1
 						
 #ifdef PML			   // 50 pts   - 7 % and 8 % if beta = 0.3 (ppw = 26)
@@ -53,7 +58,7 @@ int main()
 					   // 150 pts  - 20 % and 10 % if beta = 0.05;
 					   //          - 6 % and 3 % if beta = 0.1
 					   // 200 pts  - 4 % and 4 % if beta = 0.1, 6 % and ? if beta = 0.2
-	int spg_pts = 100; // 250 pts  - 3 % and 3 % if beta = 0.1
+	int spg_pts = 50; // 250 pts  - 3 % and 3 % if beta = 0.1
 
 	// 3D
 	// 100 pt - 19 % if beta = 0.05
@@ -85,9 +90,9 @@ int main()
 
 	x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-	int n1 = 199 + 2 * x.pml_pts;		    // number of point across the directions
-	int n2 = 199 + 2 * y.pml_pts;
-	int n3 = 199 + 2 * z.spg_pts;
+	int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
+	int n2 = 99 + 2 * y.pml_pts;
+	int n3 = 99 + 2 * z.spg_pts;
 	int n = n1 * n2;		// size of blocks
 	int NB = n3;			// number of blocks
 
@@ -250,7 +255,7 @@ int main()
 // ------------
 // f(h) - f(h/2)
 
-#if 1
+#if 0
 	bool make_runge_count;
 #define MAKE_RUNGE_3D
 #ifdef MAKE_RUNGE_3D
@@ -332,8 +337,8 @@ int main()
 #ifdef HOMO
 
 #ifndef TEST_HELM_1D
-	NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 5);
-	NullifySource2D(x, y, &x_orig[z.n / 2 * size2D], size2D / 2, 5);
+	NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 1);
+	NullifySource2D(x, y, &x_orig[z.n / 2 * size2D], size2D / 2, 1);
 #endif
 
 #if 0
