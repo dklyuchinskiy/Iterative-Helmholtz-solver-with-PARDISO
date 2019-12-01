@@ -45,8 +45,8 @@ int main()
 	//TestAll();
 #if 1
 	Test2DHelmholtzHODLR();
-	system("pause");
-	return 0;
+	//system("pause");
+	//return 0;
 #endif
 
 #if 1

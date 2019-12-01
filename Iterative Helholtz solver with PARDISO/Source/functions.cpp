@@ -1995,7 +1995,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	int i1, j1, k1;
 
 	int nrhs = 1;
-	int lwork = -1;
 	int info = 0;
 	int col_min;
 	int row_min;
@@ -2007,7 +2006,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	dtype *deltaL = alloc_arr<dtype>(size);
 	dtype *sound3D = alloc_arr<dtype>(size);
 	dtype *sound2D = alloc_arr<dtype>(size2D);
-	dtype* work;
 	dtype zdum;
 	double time;
 	double k2 = double(kk) * double(kk);
@@ -2148,8 +2146,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		if (nu == 2) ratio = 15;
 		else ratio = 3;
 
-		//if (kww < ratio * k2)
-		if (1)
+		if (kww < ratio * k2)
+		//if (1)
 		{
 			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } - kww;
 			printf("Solved k = %d beta2 = (%lf, %lf)\n", k, kwave_beta2.real(), kwave_beta2.imag());
@@ -2211,9 +2209,10 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	}
 #else
 	int smallsize = 20;
-	char bench[255];
 	dtype *B = alloc_arr<dtype>((size2D - x.n) * z.n); // for right diagonal
 	bool *solves = alloc_arr<bool>(z.n);
+	int lwork = x.n * x.n;
+	dtype *work = alloc_arr2<dtype>(lwork);
 
 	for (int k = 0; k < z.n; k++)
 	{
@@ -2242,7 +2241,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			printf("Solved k = %d beta2 = (%lf, %lf)\n", k, kwave_beta2.real(), kwave_beta2.imag());
 
 			// Factorization of matrices
-			DirFactFastDiagStructOnline(x, y, Gstr[k], &B[k * (size2D - x.n)], kwave_beta2, thresh, smallsize, bench);
+			DirFactFastDiagStructOnline(x, y, Gstr[k], &B[k * (size2D - x.n)], kwave_beta2, work, lwork, thresh, smallsize);
 			solves[k] = true;
 			count++;
 
@@ -2436,7 +2435,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 				Hgels[i] = H[i];
 
 			// Query
-			lwork = -1;
+			int lwork = -1;
 			row_min = j + 2;
 			col_min = j + 1;
 
@@ -2446,7 +2445,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
 
 			lwork = (int)work_size.real();
-			work = alloc_arr<dtype>(lwork);
+			dtype *work = alloc_arr<dtype>(lwork);
 			// Run
 			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, work, &lwork, &info);
 			free_arr(work);
@@ -2502,8 +2501,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 
 			// 8. Reduce pml
 #ifdef HOMO
-			printf("Nullify source...\n");
-			//NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 1);
+			printf("Nullify source...\n"); // comment for printing with gnuplot
+			NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 1);
 			NullifySource2D(x, y, &x_orig[z.n / 2 * size2D], size2D / 2, 1);
 #endif
 
@@ -5091,11 +5090,11 @@ void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dt
 	int size2D = x.n * y.n;
 	MKL_LONG status;
 	double norm = 0;
+	int lwork = size2D + x.n;
 
-	dtype *x_sol_hss = alloc_arr<dtype>(size);
-	dtype *f_FFT = alloc_arr<dtype>(size);
-	dtype* u1D = alloc_arr<dtype>(z.n);
-	dtype* u1D_BFFT = alloc_arr<dtype>(z.n);
+	dtype *x_sol_hss = alloc_arr2<dtype>(size);
+	dtype *f_FFT = alloc_arr2<dtype>(size);
+	dtype *work = alloc_arr2<dtype>(lwork);
 
 	// f(x,y,z) -> fy(x,z) 
 	DFTI_DESCRIPTOR_HANDLE my_desc_handle;
@@ -5119,8 +5118,6 @@ void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dt
 	for (int w = 0; w < size2D; w++)
 	{
 		status = DftiComputeForward(my_desc_handle, (void*)&f[w], &f_FFT[w]);
-
-		//status = DftiComputeForward(my_desc_handle, f_FFT_in, &f_FFT_out[z.n * w]);
 	}
 
 	//#define PRINT
@@ -5177,7 +5174,7 @@ void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dt
 #ifdef SYMMETRY
 			AdjustRHS(x, y, &f_FFT[k * size2D]);
 #endif
-			DirSolveFastDiagStruct(x.n, y.n, Gstr[k], &B[k * (size2D - x.n)], &f_FFT[k * size2D], &x_sol_hss[k * size2D], thresh, smallsize);
+			DirSolveFastDiagStruct(x.n, y.n, Gstr[k], &B[k * (size2D - x.n)], &f_FFT[k * size2D], &x_sol_hss[k * size2D], work, lwork, thresh, smallsize);
 
 #ifdef PRINT
 			double eps = 0.01; // 1 percent
@@ -5247,8 +5244,6 @@ void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dt
 	for (int w = 0; w < size2D; w++)
 	{
 		status = DftiComputeBackward(my_desc_handle, &x_sol_hss[w], &x_sol[w]);
-
-		// status = DftiComputeBackward(my_desc_handle, u1D, u1D_BFFT);
 	}
 
 	status = DftiFreeDescriptor(&my_desc_handle);
@@ -5256,6 +5251,7 @@ void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dt
 
 	free_arr(x_sol_hss);
 	free_arr(f_FFT);
+	free_arr(work);
 }
 
 

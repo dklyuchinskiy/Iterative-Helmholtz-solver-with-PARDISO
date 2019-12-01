@@ -1,3 +1,4 @@
+#include "../templates.h"
 #include "definitionsHODLR.h"
 #include "templatesHODLR.h"
 #include "TestSuiteHODLR.h"
@@ -309,7 +310,7 @@ void LowRankApproxStruct(int n2, int n1 /* size of A21 = A */,
 		for (int i = 0; i < n2; i++)
 			A[i + lda * j] *= S[j];
 #else
-#pragma omp parallel for simd schedule(runtime)
+#pragma omp parallel for simd schedule(simd:static)
 		for (int i = 0; i < n2; i++)
 			U[i + ldu * j] *= S[j];
 
@@ -422,7 +423,7 @@ void DiagMultStruct(int n, cmnode* Astr, dtype *d, int smallsize)
 {
 	if (n <= smallsize)
 	{
-#pragma omp parallel for schedule(runtime)
+#pragma omp parallel for schedule(static)
 		for (int j = 0; j < n; j++)
 #pragma omp simd
 			for (int i = 0; i < n; i++)
@@ -440,14 +441,14 @@ void DiagMultStruct(int n, cmnode* Astr, dtype *d, int smallsize)
 		DiagMultStruct(n2, Astr->right, &d[n1], smallsize);
 
 		// D * U - каждая i-ая строка U умножается на элемент вектора d[i]
-#pragma omp parallel for schedule(runtime)
+#pragma omp parallel for schedule(static)
 		for (int j = 0; j < Astr->p; j++)
 #pragma omp simd
 			for (int i = 0; i < n2; i++)
 				Astr->U[i + n2 * j] *= d[n1 + i]; // вторая часть массива D
 
 												  // VT * D - каждый j-ый столбец умножается на элемент вектора d[j]
-#pragma omp parallel for schedule(runtime)
+#pragma omp parallel for schedule(static)
 		for (int j = 0; j < n1; j++)
 #pragma omp simd
 			for (int i = 0; i < Astr->p; i++)
@@ -2513,12 +2514,12 @@ void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, 
 	double tt1;
 
 	// set frequency
-	double k = (double)kk;
-	int nhalf = y.n / 2;
-	int i = nhalf;
-	double kww = 4.0 * double(PI) * double(PI) * (i - nhalf) * (i - nhalf) / (y.l * y.l);
-	double kwave2 = k * k - kww;
-	dtype kwave_beta2 = dtype{ (k * k - kww), k * k * beta_eq };
+	dtype kwave_beta2;
+	size_m z;	
+	SetFrequency("NO_FFT", x, y, z, y.n / 2, kwave_beta2);
+	
+	int lwork = size + n;
+	dtype *work = alloc_arr<dtype>(lwork);
 
 	printf("Factorization of matrix...\n");
 	tt = omp_get_wtime();
@@ -2526,7 +2527,7 @@ void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, 
 #ifndef ONLINE
 	DirFactFastDiagStruct(x.n, y.n, z.n, D, ldd, B, Gstr, thresh, smallsize, bench);
 #else
-	DirFactFastDiagStructOnline(x, y, Gstr, B, kwave_beta2, thresh, smallsize, bench);
+	DirFactFastDiagStructOnline(x, y, Gstr, B, kwave_beta2, work, lwork, thresh, smallsize);
 #endif
 	tt = omp_get_wtime() - tt;
 	if (compare_str(7, bench, "print_time"))
@@ -2537,7 +2538,7 @@ void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, 
 	printf("Solving of the system...\n");
 
 	tt = omp_get_wtime();
-	DirSolveFastDiagStruct(x.n, y.n, Gstr, B, f, x_sol, thresh, smallsize);
+	DirSolveFastDiagStruct(x.n, y.n, Gstr, B, f, x_sol, work, lwork, thresh, smallsize);
 	tt = omp_get_wtime() - tt;
 
 	if (compare_str(7, bench, "print_time"))
@@ -2569,7 +2570,7 @@ void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, 
 				system("pause");
 				tt = omp_get_wtime();
 
-				DirSolveFastDiagStruct(x.n, y.n, Gstr, B, g, x1, thresh, smallsize);
+				DirSolveFastDiagStruct(x.n, y.n, Gstr, B, g, x1, work, lwork, thresh, smallsize);
 
 #pragma omp parallel for simd schedule(static)
 				for (int i = 0; i < size; i++)
@@ -2591,27 +2592,27 @@ void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, 
 
 	free_arr(g);
 	free_arr(x1);
+	free_arr(work);
 }
 
 /* Функция вычисления разложения симметричной блочно-диагональной матрицы с использование сжатого формата.
 Внедиагональные блоки предполагаются диагональными матрицами */
-void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, dtype kwave_beta2,
-	double eps, int smallsize, char *bench)
+void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, dtype kwave_beta2, dtype *work, int lwork,
+	double eps, int smallsize)
 {
 	int n = x.n;
 	int nbr = y.n; // size of D is equal to nbr blocks by n elements
 	int size = n * nbr;
 	double tt;
 
-	if (compare_str(7, bench, "display"))
-	{
+#ifdef DISPLAY
 		printf("**********************************\n");
 		printf("Timing DirFactFastDiagStructOnline\n");
 		printf("**********************************\n");
-	}
+#endif
 
 	cmnode *DCstr;
-	dtype *DD = alloc_arr2<dtype>(n * n); int lddd = n;
+	dtype *DD = work; int lddd = n;
 
 	// Gen diagonal B
 	GenerateSubdiagonalB(x, y, B);
@@ -2619,16 +2620,18 @@ void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, d
 	Clear(n, n, DD, lddd);
 	tt = omp_get_wtime();
 	GenerateDiagonal1DBlockHODLR(0, x, y, DD, lddd, kwave_beta2);
-
 	SymRecCompressStruct(n, DD, lddd, DCstr, smallsize, eps, "SVD");
 	tt = omp_get_wtime() - tt;
-	if (compare_str(7, bench, "display")) printf("Compressing D(0) time: %lf\n", tt);
-
+#ifdef DISPLAY
+	printf("Compressing D(0) time: %lf\n", tt);
+#endif
 	Gstr = (cmnode**)malloc(nbr * sizeof(cmnode*));
 	tt = omp_get_wtime();
 	SymCompRecInvStruct(n, DCstr, Gstr[0], smallsize, eps, "SVD");
 	tt = omp_get_wtime() - tt;
-	if (compare_str(7, bench, "display")) printf("Computing G(1) time: %lf\n", tt);
+#ifdef DISPLAY
+	printf("Computing G(1) time: %lf\n", tt);
+#endif
 
 	//printf("Block %d. ", 0);
 	//	Test_RankEqual(DCstr, Gstr[0]);
@@ -2639,58 +2642,65 @@ void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, d
 	{
 		cmnode *DCstr, *TDstr, *TD1str;
 
-		// Clear matrix
 		Clear(n, n, DD, lddd);
 
 		tt = omp_get_wtime();
 		GenerateDiagonal1DBlockHODLR(k, x, y, DD, lddd, kwave_beta2);
 		SymRecCompressStruct(n, DD, lddd, DCstr, smallsize, eps, "SVD");
 		tt = omp_get_wtime() - tt;
-		if (compare_str(7, bench, "display")) printf("Compressing D(%d) time: %lf\n", k, tt);
+#ifdef DISPLAY
+		printf("Compressing D(%d) time: %lf\n", k, tt);
+#endif
 
 		tt = omp_get_wtime();
 		CopyStruct(n, Gstr[k - 1], TD1str, smallsize);
 
 		DiagMultStruct(n, TD1str, &B[ind(k - 1, n)], smallsize);
 		tt = omp_get_wtime() - tt;
-		if (compare_str(7, bench, "display")) printf("Mult D(%d) time: %lf\n", k, tt);
+#ifdef DISPLAY
+		printf("Mult D(%d) time: %lf\n", k, tt);
+#endif
 
 		tt = omp_get_wtime();
 		AddStruct(n, 1.0, DCstr, -1.0, TD1str, TDstr, smallsize, eps, "SVD");
 		tt = omp_get_wtime() - tt;
-		if (compare_str(7, bench, "display")) printf("Add %d time: %lf\n", k, tt);
-
+#ifdef DISPLAY
+		printf("Add %d time: %lf\n", k, tt);
+#endif
 
 		tt = omp_get_wtime();
 		SymCompRecInvStruct(n, TDstr, Gstr[k], smallsize, eps, "SVD");
 		tt = omp_get_wtime() - tt;
-		if (compare_str(7, bench, "display")) printf("Computing G(%d) time: %lf\n", k, tt);
+#ifdef DISPLAY
+		printf("Computing G(%d) time: %lf\n", k, tt);
+#endif
 
 		tt = omp_get_wtime();
 		FreeNodes(n, DCstr, smallsize);
 		FreeNodes(n, TDstr, smallsize);
 		FreeNodes(n, TD1str, smallsize);
 		tt = omp_get_wtime() - tt;
-		if (compare_str(7, bench, "display")) printf("Memory deallocation G(%d) time: %lf\n\n", k, tt);
+#ifdef DISPLAY
+		printf("Memory deallocation G(%d) time: %lf\n\n", k, tt);
+#endif
 	}
 
-	if (compare_str(7, bench, "display"))
-	{
+#ifdef DISPLAY
 		printf("****************************\n");
 		printf("End of DirFactFastDiag\n");
 		printf("****************************\n");
-	}
-
-	free_arr(DD);
+#endif
 }
 
-void DirSolveFastDiagStruct(int n1, int n2, cmnode* *Gstr, dtype *B, const dtype *f, dtype *x, double eps, int smallsize)
+void DirSolveFastDiagStruct(int n1, int n2, cmnode* *Gstr, dtype *B, const dtype *f, dtype *x, dtype *work, int lwork, double eps, int smallsize)
 {
 	int n = n1;
 	int nbr = n2;
-	int size = n * nbr;
-	dtype *tb = alloc_arr2<dtype>(size);
-	dtype *y = alloc_arr2<dtype>(n);
+	int size2D = n * nbr;
+
+	// lwork = size + n
+	dtype *tb = work;
+	dtype *y = &work[size2D];
 
 #pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < n; i++)
@@ -2698,29 +2708,26 @@ void DirSolveFastDiagStruct(int n1, int n2, cmnode* *Gstr, dtype *B, const dtype
 
 	for (int k = 1; k < nbr; k++)
 	{
-		RecMultLStruct(n, 1, Gstr[k - 1], &tb[ind(k - 1, n)], size, y, n, smallsize);
+		RecMultLStruct(n, 1, Gstr[k - 1], &tb[ind(k - 1, n)], size2D, y, n, smallsize);
 		DenseDiagMult(n, &B[ind(k - 1, n)], y, y);
 
-#pragma omp parallel for simd schedule(runtime)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < n; i++)
 			tb[ind(k, n) + i] = f[ind(k, n) + i] - y[i];
 	}
 
-	RecMultLStruct(n, 1, Gstr[nbr - 1], &tb[ind(nbr - 1, n)], size, &x[ind(nbr - 1, n)], size, smallsize);
+	RecMultLStruct(n, 1, Gstr[nbr - 1], &tb[ind(nbr - 1, n)], size2D, &x[ind(nbr - 1, n)], size2D, smallsize);
 
 	for (int k = nbr - 2; k >= 0; k--)
 	{
 		DenseDiagMult(n, &B[ind(k, n)], &x[ind(k + 1, n)], y);
 
-#pragma omp parallel for simd schedule(runtime)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < n; i++)
 			y[i] = tb[ind(k, n) + i] - y[i];
 
-		RecMultLStruct(n, 1, Gstr[k], y, n, &x[ind(k, n)], size, smallsize);
+		RecMultLStruct(n, 1, Gstr[k], y, n, &x[ind(k, n)], size2D, smallsize);
 	}
-
-	free_arr(tb);
-	free_arr(y);
 }
 
 void alloc_dense_node(int n, cmnode* &Cstr)

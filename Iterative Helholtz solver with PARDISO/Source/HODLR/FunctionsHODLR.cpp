@@ -332,6 +332,7 @@ void GenerateDiagonal1DBlockHODLR(int j, size_m x, size_m y, dtype *DD, int lddd
 	int n = x.n;
 
 	// diagonal blocks in dense format
+#pragma omp parallel for schedule(static)
 	for (int i = 0; i < n; i++)
 	{
 #ifdef SYMMETRY

@@ -128,7 +128,7 @@ enum class DIAG13
 #define PML
 #define GMRES_SIZE 128
 
-//#define HODLR
+#define HODLR
 #define HOMO
 #define SYMMETRY
 //#define CHECK_ACCURACY
@@ -198,7 +198,7 @@ enum class DIAG13
 #define kk ((omega) / (c_z))
 
 #ifdef HOMO
-#define NITER 4
+#define NITER 6
 #else
 #define NITER 12
 #endif
