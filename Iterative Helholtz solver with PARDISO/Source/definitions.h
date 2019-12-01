@@ -11,9 +11,9 @@ typedef std::complex<double> dtype;
 #define MKL_Complex16 dtype
 
 #if defined(_WIN32) || defined(WIN32)
-#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019\windows\mkl\include\mkl.h"
-#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019\windows\mkl\include\mkl_dfti.h"
-#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019\windows\mkl\include\mkl_rci.h"
+#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\mkl\include\mkl.h"
+#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\mkl\include\mkl_dfti.h"
+#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\mkl\include\mkl_rci.h"
 #else
 #include "mkl.h"
 #include "mkl_dfti.h"
@@ -21,6 +21,8 @@ typedef std::complex<double> dtype;
 #endif
 
 //#define DEBUG
+#define min(a, b) ((a) < (b)) ? (a) : (b)
+#define max(a, b) ((a) > (b)) ? (a) : (b)) 
 
 #define EPS 1e-12
 
@@ -42,7 +44,7 @@ struct MatrixCSRComplex
 	int solve = 0;
 };
 
-typedef struct MatrixCSRComplex ccsr;
+typedef struct MatrixCSRComplex zcsr;
 
 
 struct size_m 
@@ -61,43 +63,6 @@ struct point
 	double y;
 	double z;
 };
-
-struct BinaryMatrixTreeNode 
-{
-	int p = 0;
-	double *U = NULL;
-	double *VT = NULL;
-	double *A = NULL;
-	struct BinaryMatrixTreeNode *left;
-	struct BinaryMatrixTreeNode *right;
-};
-
-typedef struct BinaryMatrixTreeNode mnode;
-
-struct ComplexBinaryMatrixTreeNode 
-{
-	int p = 0;
-	dtype *U = NULL;
-	dtype *VT = NULL;
-	dtype *A = NULL;
-	struct ComplexBinaryMatrixTreeNode *left;
-	struct ComplexBinaryMatrixTreeNode *right;
-};
-
-typedef struct ComplexBinaryMatrixTreeNode cmnode;
-
-struct list 
-{
-	mnode* node;
-	struct list* next;
-};
-
-struct my_queue 
-{
-	struct list *first, *last;
-};
-
-typedef struct list qlist;
 
 struct matrix
 {
@@ -155,11 +120,22 @@ enum class DIAG13
 	six
 };
 
+#include "HODLR/definitionsHODLR.h"
+
 #define PI 3.141592653589793238462643
 
 #define HELMHOLTZ
 #define PML
 #define GMRES_SIZE 128
+
+//#define HODLR
+#define HOMO
+#define SYMMETRY
+//#define CHECK_ACCURACY
+
+//#define ORDER4
+#define PML_PTS 0
+
 
 #ifdef HELMHOLTZ
 #ifdef PML
@@ -208,9 +184,6 @@ enum class DIAG13
 //#define TEST_HELM_1D
 
 
-//#define ORDER4
-//#define HOMO
-
 #ifdef HELMHOLTZ
 #define nu 4
 #define c_z 1280.0
@@ -224,7 +197,11 @@ enum class DIAG13
 #define omega 2.0 * (PI) * (nu)
 #define kk ((omega) / (c_z))
 
+#ifdef HOMO
+#define NITER 4
+#else
 #define NITER 12
+#endif
 
 //#define kk ((omega) / (c_z))
 #else
