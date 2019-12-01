@@ -133,6 +133,9 @@ enum class DIAG13
 #define SYMMETRY
 //#define CHECK_ACCURACY
 
+//#define ORDER4
+#define PML_PTS 0
+
 
 #ifdef HELMHOLTZ
 #ifdef PML
@@ -181,9 +184,6 @@ enum class DIAG13
 //#define TEST_HELM_1D
 
 
-//#define ORDER4
-#define PML_PTS 0
-
 #ifdef HELMHOLTZ
 #define nu 4
 #define c_z 1280.0
@@ -197,7 +197,11 @@ enum class DIAG13
 #define omega 2.0 * (PI) * (nu)
 #define kk ((omega) / (c_z))
 
+#ifdef HOMO
+#define NITER 4
+#else
 #define NITER 12
+#endif
 
 //#define kk ((omega) / (c_z))
 #else

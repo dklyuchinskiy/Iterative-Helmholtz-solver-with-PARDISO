@@ -45,8 +45,8 @@ int main()
 	//TestAll();
 #if 1
 	Test2DHelmholtzHODLR();
-	//system("pause");
-	//return 0;
+	system("pause");
+	return 0;
 #endif
 
 #if 1
@@ -169,8 +169,16 @@ int main()
 					// 12 iter for freq = 4
 
 	printf("Frequency nu = %d\n", nu);
+
+#ifdef HOMO
 	printf("The length of the wave: %lf\n", lambda);
 	printf("ppw: %lf\n", ppw);
+#else
+	printf("Sound speed: min = %lf, max = %lf\n", x.pml_pts * x.h * (C1 + C2) + z.spg_pts * z.h * C3, (x.l - x.pml_pts * x.h) * (C1 + C2) + (z.l - z.spg_pts * z.h) * C3);
+#endif
+
+
+
 	printf("FGMRES number of iterations: %d\n", niter + 1);
 
 
@@ -337,8 +345,39 @@ int main()
 #ifdef HOMO
 
 #ifndef TEST_HELM_1D
-	NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 1);
+	// please comment for printing with gnuplot
+	//NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 1);
 	NullifySource2D(x, y, &x_orig[z.n / 2 * size2D], size2D / 2, 1);
+#endif
+
+//#define OUTPUT
+
+#if 0
+	// for printing with gnuplot (1D projections in sponge direction)
+	dtype* z_sol1D_ex = alloc_arr<dtype>(z.n);
+	dtype* z_sol1D_prd = alloc_arr<dtype>(z.n);
+
+	// output 1D - Z direction
+	char str1[255], str2[255];
+
+
+	for (int j = 0; j < y.n; j++)
+	{
+		if (j == y.n / 2 || j == y.n / 4 || j == y.n * 3 / 4)
+		{
+			sprintf(str1, "Charts3D/projZ/model_pml1Dz_sec%d_h%d", j, (int)z.h);
+			sprintf(str2, "Charts3D/projZ/model_pml1Dz_diff_sec%d_h%d", j, (int)z.h);
+
+			for (int k = 0; k < z.n; k++)
+			{
+				z_sol1D_ex[k] = x_orig[j + x.n * j + size2D * k];
+				z_sol1D_prd[k] = x_sol[j + x.n * j + size2D * k];
+			}
+
+			output1D(str1, pml_flag, z, z_sol1D_ex, z_sol1D_prd);
+			gnuplot1D(str1, str2, pml_flag, 0, z);
+		}
+	}
 #endif
 
 #if 0
@@ -348,7 +387,7 @@ int main()
 		PrintProjection1D(x, y, &x_orig[k * size2D], &x_sol[k * size2D], k);
 	}
 #endif
-
+	
 	reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
 	reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 	reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
@@ -375,16 +414,6 @@ int main()
 #define GNUPLOT
 #endif
 
-//#define OUTPUT
-
-#ifdef OUTPUT
-#ifndef ORDER4
-	output("ChartsFreq4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
-#else
-	output("ChartsFreq4_Order4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
-#endif
-#endif
-
 	printf("----------------------------------------------\n");
 
 //	free_arr(f);
@@ -402,9 +431,9 @@ int main()
 	check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, niter, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
 	check_norm_circle(x_nopml, y_nopml, z_nopml, x_orig_nopml, x_sol_nopml, source, thresh);
 
-	norm_re = rel_error(dlange, size_nopml, 1, x_sol_re, x_orig_re, size_nopml, thresh);
-	norm_im = rel_error(dlange, size_nopml, 1, x_sol_im, x_orig_im, size_nopml, thresh);
-	norm = rel_error(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
+	norm_re = RelError(dlange, size_nopml, 1, x_sol_re, x_orig_re, size_nopml, thresh);
+	norm_im = RelError(dlange, size_nopml, 1, x_sol_im, x_orig_im, size_nopml, thresh);
+	norm = RelError(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
 
 	printf("norm_re = %lf\n", norm_re, thresh);
 	printf("norm_im = %lf\n", norm_im, thresh);
@@ -413,6 +442,14 @@ int main()
 	check_test_3Dsolution_in1D(x.n_nopml, y.n_nopml, z.n_nopml, x_sol_nopml, x_orig_nopml, thresh);
 #endif
 
+#ifdef OUTPUT
+#ifndef HOMO
+	norm = diff_sol;
+#endif
+	output("ChartsFreq4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml, norm);
+
+	//output("ChartsFreq4_Order4/model_ft", pml_flag, x, y, z, x_orig_nopml, x_sol_nopml);
+#endif
 
 //	printf("Computing error ||x_{comp_prd}-x_{comp_fft}||/||x_{comp_prd}||\n");
 //	norm = rel_error(zlange, size_nopml, 1, x_pard_nopml_cpy, x_pard_nopml, size_nopml, thresh);
@@ -434,7 +471,7 @@ int main()
 
 	printf("----------------------------------------------\n");
 
-#define GNUPLOT
+//#define GNUPLOT
 
 #ifdef GNUPLOT
 	pml_flag = true;

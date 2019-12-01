@@ -15,10 +15,10 @@ The interface is declared in TestSuite.h
 
 void Test2DHelmholtzHODLR()
 {
-	int n1 = 100;		    // number of point across the directions
-	int n2 = 100;
+	int n1 = 200;		    // number of point across the directions
+	int n2 = 200;
 
-	int smallsize = 20;
+	int smallsize = 50;
 
 	size_m x, y, z;
 
@@ -103,12 +103,11 @@ void Test2DHelmholtzHODLR()
 
 	// set wave numbers
 	point sourcePML = { x.l / 2.0, y.l / 2.0 };
-	double k = (double)kk;
-	int nhalf = y.n / 2;
-	int i = nhalf;
-	double kww = 4.0 * double(PI) * double(PI) * (i - nhalf) * (i - nhalf) / (y.l * y.l);
-	dtype kwave_beta2 = dtype{ (k * k - kww), k * k * beta_eq };
+	dtype kwave_beta2;
 	int src = 0;
+
+	// set frequency
+	SetFrequency("NO_FFT", x, y, z, y.n / 2, kwave_beta2);
 
 #ifdef _OPENMP
 	nthr = omp_get_max_threads();
@@ -143,7 +142,10 @@ void Test2DHelmholtzHODLR()
 	int non_zeros = non_zeros_in_2Dblock3diag;
 
 	printf("Generate CSR matrix for kwave2 = (%lf, %lf)\n", kwave_beta2.real(), kwave_beta2.imag());
+	timer = omp_get_wtime();
 	GenSparseMatrixOnline2DwithPML(-1, x, y, D2csr, kwave_beta2, freqs);
+	timer = omp_get_wtime() - timer;
+	printf("Time for CSR constructing: %lf\n", timer);
 
 	//printf("Test symmetry...\n");
 	//TestSymmSparseMatrixOnline2DwithPML(x, y, z, D2csr);
@@ -158,7 +160,10 @@ void Test2DHelmholtzHODLR()
 #else
 	//GenRHSandSolution2D(x, y, x_orig, f); // change this function in helmholtz case
 
+	timer = omp_get_wtime();
 	GenRHSandSolution2DComplexWaveNumberHSS(x, y, x_orig, f, kwave_beta2, sourcePML, src);
+	timer = omp_get_wtime() - timer;
+	printf("Time for generating solution and RHS: %lf\n", timer);
 
 #endif
 
@@ -187,7 +192,7 @@ void Test2DHelmholtzHODLR()
 #ifndef ONLINE
 	Block3DSPDSolveFastStruct(x, y, D, ldd, B, f, Dcsr, thresh, smallsize, ItRef, bench, Gstr, x_sol, success, RelRes, itcount);
 #else
-	Block3DSPDSolveFastStruct(x, y, NULL, ldd, B, f, D2csr, thresh, smallsize, ItRef, bench, Gstr, x_sol, success, RelRes, itcount);
+	Block3DSPDSolveFastStruct(x, y, NULL, ldd, B, f, D2csr, thresh, smallsize, ItRef, "print_time", Gstr, x_sol, success, RelRes, itcount);
 #endif
 	timer = omp_get_wtime() - timer;
 	printf("Time HSS solver: %lf\n", timer);
@@ -244,31 +249,36 @@ void Test2DHelmholtzHODLR()
 	int mnum = 1;
 	int phase = 0;
 	int rhs = 1;
-	int msglvl = 1;
+	int msglvl = 0; // output - 1
 	int error = 0;
 
 	iparm[0] = 0;
 	pardisoinit(pt, &mtype, iparm);
-	iparm[26] = 1;
+	iparm[26] = 1; 
 	printf("Calling Pardiso...\n");
-#if 0
+#if 1
+	timer = omp_get_wtime();
 	phase = 11;
-	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, Dcsr->values, Dcsr->ia, Dcsr->ja, perm, &rhs, iparm, &msglvl, f, x_sol_prd, &error);
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f, x_sol_prd, &error);
 
-	printf("Error Pardiso: %d\n", error);
 	phase = 22;
-	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, Dcsr->values, Dcsr->ia, Dcsr->ja, perm, &rhs, iparm, &msglvl, f, x_sol_prd, &error);
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f, x_sol_prd, &error);
+	timer = omp_get_wtime() - timer;
+	printf("Pardiso preprocessing and factorization phases: %lf\n", timer); fflush(0);
 
+	timer = omp_get_wtime();
 	phase = 33;
-	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size, Dcsr->values, Dcsr->ia, Dcsr->ja, perm, &rhs, iparm, &msglvl, f, x_sol_prd, &error);
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f, x_sol_prd, &error);
+	timer = omp_get_wtime() - timer;
+	printf("Pardiso solving phase: %lf\n", timer); fflush(0);
 #else
 	phase = 13;
 	timer = omp_get_wtime();
 	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f, x_sol_prd, &error);
 	timer = omp_get_wtime() - timer;
-#endif
-	printf("Error Pardiso: %d\n", error); fflush(0);
 	printf("Time PARDISO: %lf\n", timer); fflush(0);
+#endif
+	if (error) printf("Error Pardiso: %d\n", error); fflush(0);
 
 	printf("Computing error ||x_{exact}-x_{PRD}||/||x_{exact}||\n");
 	NullifySource2D(x, y, x_sol_prd, src, 1);
