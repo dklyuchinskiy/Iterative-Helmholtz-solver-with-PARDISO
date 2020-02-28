@@ -69,7 +69,10 @@ void TestInverseTraversal(size_m x, size_m y, size_m z, const point source, cons
 // HODLR
 void Test2DHelmholtzHODLR();
 void Test_DirFactFastDiagStructOnlineHODLR(size_m x, size_m y, cmnode** Gstr, dtype *B, dtype kwave2, double eps, int smallsize);
-
+void TestDispersion(size_m x, size_m y, dtype *x_sol_prd_nopml, dtype *x_orig_nopml);
+void TestCircleNorm2D(size_m x, size_m y, dtype *x_sol, dtype *x_orig, point sourcePML, double thresh);
+void TestSymmSparseMatrixOnline2DwithPML9Pts(size_m x, size_m y, size_m z, zcsr *Acsr);
+void Test2DHelmholtzTuning9Pts();
 #if 0
 
 void Test_QueueList(int n, double eps, char* method, int smallsize);

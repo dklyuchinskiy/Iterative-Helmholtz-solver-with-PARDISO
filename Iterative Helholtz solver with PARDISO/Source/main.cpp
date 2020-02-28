@@ -42,11 +42,12 @@ int main()
 
 	//Test2DLaplaceLevander4th(); // laplace + manufactored laplace and helmholtz
 	//Test2DHelmholtzLevander4th(); // exact helm
+	//Test2DHelmholtzTuning9Pts();
 	//TestAll();
-#if 1
-	Test2DHelmholtzHODLR();
-	//system("pause");
-	//return 0;
+#if 0
+	//Test2DHelmholtzHODLR();
+	system("pause");
+	return 0;
 #endif
 
 #if 1
@@ -165,8 +166,10 @@ int main()
 
 	double lambda = double(c_z) / nu;
 	double ppw = lambda / x.h;
-	int niter = NITER * 3;  // 4 iter for freq = 2
+	//int niter = NITER * 3;  // 4 iter for freq = 2
 					// 12 iter for freq = 4
+
+	int niter = 25;
 
 	printf("Frequency nu = %d\n", nu);
 
@@ -247,10 +250,10 @@ int main()
 #ifdef _OPENMP
 	int nthr = omp_get_max_threads();
 	printf("Max_threads: %d threads\n", nthr);
-	omp_set_dynamic(0);
-	nthr = 6;
+	//omp_set_dynamic(0);
+	nthr = 4;
 	omp_set_num_threads(nthr);
-	mkl_set_num_threads(6);
+	mkl_set_num_threads(4);
 	printf("Run in parallel on %d threads\n", nthr);
 #else
 	printf("Run sequential version on 1 thread\n");
@@ -300,14 +303,14 @@ int main()
 #endif
 
 	printf("---Residual exact solution---\n");
-//	ComputeResidual(x, y, z, (double)kk, x_orig, f, g, RelRes);
+	ComputeResidual(x, y, z, (double)kk, x_orig, f, g, RelRes);
 	printf("-----------\n");
 	printf("Residual in 3D with PML |A * x_sol - f| = %e\n", RelRes);
 	printf("-----------\n");
 
-//	reducePML3D(x, y, z, size, g, size_nopml, g_nopml);
+	reducePML3D(x, y, z, size, g, size_nopml, g_nopml);
 
-//	RelRes = dznrm2(&size_nopml, g_nopml, &ione);
+	RelRes = dznrm2(&size_nopml, g_nopml, &ione);
 	printf("-----------\n");
 	printf("Residual in 3D psys dom  |A * x_sol - f| = %e\n", RelRes);
 	printf("-----------\n");
@@ -333,14 +336,17 @@ int main()
 	// ------------ FGMRES-------------
 	all_time = omp_get_wtime();
 
-	FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol);
+	//FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol);
+	BCGSTAB(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol);
+	// BcgSTAB 
 
 	all_time = omp_get_wtime() - all_time;
 
 	//-------------------------------------------
 	printf("Time: %lf\n", all_time);
 	printf("size = %d size_no_pml = %d\n", size, size_nopml);
-
+	
+	// 4.89e-11 - за 25 итераций
 
 #ifdef HOMO
 
@@ -350,7 +356,8 @@ int main()
 	NullifySource2D(x, y, &x_orig[z.n / 2 * size2D], size2D / 2, 1);
 #endif
 
-//#define OUTPUT
+#define OUTPUT
+#define GNUPLOT
 
 #if 0
 	// for printing with gnuplot (1D projections in sponge direction)
@@ -378,9 +385,7 @@ int main()
 			gnuplot1D(str1, str2, pml_flag, 0, z);
 		}
 	}
-#endif
 
-#if 0
 	printf("Print 1D projections...\n");
 	for (int k = 0; k < z.n; k++)
 	{
@@ -435,9 +440,9 @@ int main()
 	norm_im = RelError(dlange, size_nopml, 1, x_sol_im, x_orig_im, size_nopml, thresh);
 	norm = RelError(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
 
-	printf("norm_re = %lf\n", norm_re, thresh);
-	printf("norm_im = %lf\n", norm_im, thresh);
-	printf("norm_full = %lf\n", norm, thresh);
+	printf("norm_re = %e\n", norm_re, thresh);
+	printf("norm_im = %e\n", norm_im, thresh);
+	printf("norm_full = %e\n", norm, thresh);
 #else
 	check_test_3Dsolution_in1D(x.n_nopml, y.n_nopml, z.n_nopml, x_sol_nopml, x_orig_nopml, thresh);
 #endif
@@ -471,7 +476,7 @@ int main()
 
 	printf("----------------------------------------------\n");
 
-//#define GNUPLOT
+#define GNUPLOT
 
 #ifdef GNUPLOT
 	pml_flag = true;

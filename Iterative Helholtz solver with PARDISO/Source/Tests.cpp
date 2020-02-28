@@ -15,23 +15,23 @@ The interface is declared in TestSuite.h
 
 void Test2DHelmholtzHODLR()
 {
-	int n1 = 200;		    // number of point across the directions
-	int n2 = 200;
+	int n1 = 400;		    // number of point across the directions
+	int n2 = 400;
 
-	int smallsize = 50;
+	int smallsize = 60;
 
 	size_m x, y, z;
 
 	x.pml_pts = 20;
 	y.pml_pts = 20;
 
-	x.n = n1 - 1 + 2 * x.pml_pts;
-	y.n = n2 - 1 + 2 * y.pml_pts;
+	x.n = n1 + 2 * x.pml_pts;
+	y.n = n2 + 2 * y.pml_pts;
 
 	int n = x.n;
 
 	int size2D = x.n * y.n;		// size of vector x and f: n1 * n2
-	double thresh = 1e-4;	// stop level of algorithm by relative error
+	double thresh = 1e-1;	// stop level of algorithm by relative error
 
 	int ItRef = 200;		// Maximal number of iterations in refinement
 	char bench[255] = "print_time"; // parameter into solver to show internal results
@@ -53,11 +53,11 @@ void Test2DHelmholtzHODLR()
 	x.n_nopml = x.n - 2 * x.pml_pts;
 	y.n_nopml = y.n - 2 * y.pml_pts;
 
-	x.l = LENGTH_X + (double)(2 * x.pml_pts * LENGTH_X) / (x.n_nopml + 1);
-	y.l = LENGTH_Y + (double)(2 * y.pml_pts * LENGTH_Y) / (y.n_nopml + 1);
+	x.l = LENGTH_X + (double)(2 * x.pml_pts * LENGTH_X) / (x.n_nopml);
+	y.l = LENGTH_Y + (double)(2 * y.pml_pts * LENGTH_Y) / (y.n_nopml);
 
-	x.h = x.l / (x.n + 1);  // x.n + 1 grid points of the whole domain
-	y.h = y.l / (y.n + 1);  // x.n - 1 - inner points
+	x.h = x.l / (x.n);  // x.n + 1 grid points of the whole domain
+	y.h = y.l / (y.n);  // x.n - 1 - inner points
 #endif
 	int size2D_nopml = x.n_nopml * y.n_nopml;
 
@@ -114,8 +114,9 @@ void Test2DHelmholtzHODLR()
 #endif
 
 	printf("Run in parallel on %d threads\n", nthr);
-
 	printf("Grid steps: hx = %lf hy = %lf\n", x.h, y.h);
+
+	//system("pause");
 
 #ifndef STRUCT_CSR
 	// Generation matrix of coefficients, vector of solution (to compare with obtained) and vector of RHS
@@ -143,7 +144,7 @@ void Test2DHelmholtzHODLR()
 
 	printf("Generate CSR matrix for kwave2 = (%lf, %lf)\n", kwave_beta2.real(), kwave_beta2.imag());
 	timer = omp_get_wtime();
-	GenSparseMatrixOnline2DwithPML(-1, x, y, D2csr, kwave_beta2, freqs);
+	GenSparseMatrixOnline2DwithPMLFast(-1, x, y, D2csr, kwave_beta2, freqs);
 	timer = omp_get_wtime() - timer;
 	printf("Time for CSR constructing: %lf\n", timer);
 
@@ -171,7 +172,7 @@ void Test2DHelmholtzHODLR()
 #endif
 	free_arr(B_mat);
 
-	//	Test_CompareColumnsOfMatrix(n1, n2, n3, D, ldd, B, Dcsr, thresh);
+	//Test_CompareColumnsOfMatrix(n1, n2, n3, D, ldd, B, Dcsr, thresh);
 	//Test_TransferBlock3Diag_to_CSR(n1, n2, Dcsr, x_orig, f, thresh);
 #endif
 
@@ -222,14 +223,19 @@ void Test2DHelmholtzHODLR()
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
 
-
 #ifdef STRUCT_CSR
-	//Test_DirFactFastDiagStructOnlineHODLR(x, y, Gstr, B, kwave_beta2, thresh, smallsize);
-	//Test_DirFactFastDiagStructOnline(x, y, Gstr, B, thresh, smallsize);
-	//Test_DirSolveFactDiagStructConvergence(x, y, z, Gstr, thresh, smallsize);
-	//Test_DirSolveFactDiagStructBlockRanks(x, y, Gstr);
-	//Test_NonZeroElementsInFactors(x, y, Gstr, B, thresh, smallsize);
 
+#ifdef TESTS
+	system("pause");
+	Test_DirFactFastDiagStructOnlineHODLR(x, y, Gstr, B, kwave_beta2, thresh, smallsize);
+	system("pause");
+	Test_DirSolveFactDiagStructBlockRanks(x, y, Gstr);
+	system("pause");
+	Test_NonZeroElementsInFactors(x, y, Gstr, B, thresh, smallsize);
+
+	//Test_DirSolveFactDiagStructConvergence(x, y, z, Gstr, thresh, smallsize);	
+#endif
+	
 	for (int i = y.n - 1; i >= 0; i--)
 		FreeNodes(n, Gstr[i], smallsize);
 
@@ -282,6 +288,9 @@ void Test2DHelmholtzHODLR()
 
 	printf("Computing error ||x_{exact}-x_{PRD}||/||x_{exact}||\n");
 	NullifySource2D(x, y, x_sol_prd, src, 1);
+	//check_norm_circle2D(x, y, x_orig, x_sol_prd, sourcePML, thresh);
+	//TestCircleNorm2D(x, y, x_orig, x_sol_prd, sourcePML, thresh);
+
 	reducePML2D(x, y, size2D, x_sol_prd, size2D_nopml, x_sol_prd_nopml);
 
 	norm = RelError(zlange, size2D_nopml, 1, x_sol_prd_nopml, x_orig_nopml, size2D_nopml, thresh);
@@ -289,6 +298,7 @@ void Test2DHelmholtzHODLR()
 	if (norm < thresh) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, thresh);
 	else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, thresh);
 
+	//TestDispersion(x, y, x_sol_prd_nopml, x_orig_nopml);
 
 #ifndef ONLINE
 	free_arr(D);
@@ -298,6 +308,106 @@ void Test2DHelmholtzHODLR()
 	free_arr(x_sol);
 	free_arr(f);
 
+}
+
+void TestDispersion(size_m x, size_m y, dtype *x_sol_prd_nopml, dtype *x_orig_nopml)
+{
+	dtype* x_sol1D_ex = alloc_arr<dtype>(x.n_nopml);
+	dtype* x_sol1D_prd = alloc_arr<dtype>(x.n_nopml);
+	double* x_diff_real = alloc_arr<double>(x.n_nopml);
+	double* x_diff_imag = alloc_arr<double>(x.n_nopml);
+
+	// output 1D - Z direction
+	char str1[255], str2[255], str3[255], str4[255];
+	int size2D_nopml = x.n_nopml * y.n_nopml;
+	bool pml_flag = true;
+
+	for (int j = 0; j < y.n_nopml; j++)
+	{
+		if (j == y.n_nopml / 2 || j == y.n_nopml / 4 || j == y.n_nopml * 3 / 4)
+		{
+			sprintf(str1, "Charts2D_test/projX/model_pml1Dx_sec%d_h%d", j, (int)x.h);
+			sprintf(str2, "Charts2D_test/projX/model_pml1Dx_sol_sec%d_h%d", j, (int)x.h);
+
+			sprintf(str3, "Charts2D_test/projX/model_pml1Dx_diff_sec%d_h%d", j, (int)x.h);
+			sprintf(str4, "Charts2D_test/projX/model_pml1Dx_diff_out_sec%d_h%d", j, (int)x.h);
+
+			for (int i = 0; i < x.n_nopml; i++)
+			{
+				x_sol1D_ex[i] = x_orig_nopml[i + x.n_nopml * j];
+				x_sol1D_prd[i] = x_sol_prd_nopml[i + x.n_nopml * j];
+				x_diff_real[i] = x_sol1D_ex[i].real() - x_sol1D_prd[i].real();
+				x_diff_imag[i] = x_sol1D_ex[i].imag() - x_sol1D_prd[i].imag();
+			}
+
+			output1D(str1, pml_flag, x, x_sol1D_ex, x_sol1D_prd);
+			gnuplot1D(str1, str2, pml_flag, 0, x);
+
+			output1D(str3, pml_flag, x, x_diff_real, x_diff_imag);
+			gnuplot1D_simple(str3, str4, pml_flag, 0, x);
+		}
+	}
+}
+
+void TestCircleNorm2D(size_m x, size_m y, dtype *x_orig, dtype *x_sol, point sourcePML, double thresh)
+{
+	int l = x.n / 2 - x.pml_pts;
+	double *norms1 = alloc_arr<double>(l);
+	double *norms2 = alloc_arr<double>(l);
+	printf("Square: 0 < x < %lf, 0 < y < %lf\n", x.l, y.l);
+	printf("Center: (%lf, %lf)\n", sourcePML.x, sourcePML.y);
+	printf("Range from center (0, 0): from 0 < x < %lf\n", l * x.h);
+
+	system("pause");
+	for (int i = 0; i < l; i++)
+	{
+		norms1[i] = check_norm_circle2D(x, y, i, l, x_orig, x_sol, sourcePML, thresh);
+		norms2[i] = check_norm_circle2D(x, y, 0, i + 1, x_orig, x_sol, sourcePML, thresh);
+	}
+
+	system("pause");
+	FILE *fout = fopen("BetasDown.dat", "w");
+	for (int i = 0; i < l; i++)
+		fprintf(fout, "%lf %12.10lf\n", i * x.h, norms1[i]);
+	fclose(fout);
+
+	fout = fopen("BetasUp.dat", "w");
+	for (int i = 0; i < l; i++)
+		fprintf(fout, "%lf %12.10lf\n", i * x.h, norms2[i]);
+	fclose(fout);
+
+	// normalized betas
+	double norm_orig = zlange("Frob", &x.n, &y.n, x_orig, &x.n, NULL);
+	double norm_sol  = zlange("Frob", &x.n, &y.n, x_sol, &x.n, NULL);
+
+	dtype *x_sol_norm = alloc_arr<dtype>(x.n * y.n);
+
+#pragma omp parallel for
+	for (int j = 0; j < y.n; j++)
+#pragma omp simd
+		for (int i = 0; i < x.n; i++)
+			x_sol_norm[i + x.n * j] = x_sol[i + x.n * j]  * norm_orig / norm_sol;
+
+	printf("norm_orig = %lf\n", norm_orig);
+	printf("norm_sol = %lf\n", norm_sol);
+	
+	system("pause");
+
+	for (int i = 0; i < l; i++)
+	{
+		norms1[i] = check_norm_circle2D(x, y, i, l, x_orig, x_sol_norm, sourcePML, thresh);
+		norms2[i] = check_norm_circle2D(x, y, 0, i + 1, x_orig, x_sol_norm, sourcePML, thresh);
+	}
+
+	fout = fopen("BetasDown_norm.dat", "w");
+	for (int i = 0; i < l; i++)
+		fprintf(fout, "%lf %12.10lf\n", i * x.h, norms1[i]);
+	fclose(fout);
+
+	fout = fopen("BetasUp_norm.dat", "w");
+	for (int i = 0; i < l; i++)
+		fprintf(fout, "%lf %12.10lf\n", i * x.h, norms2[i]);
+	fclose(fout);
 }
 
 void Test_TransferBlock3Diag_to_CSR(size_m x, size_m y, size_m z, zcsr* Dcsr, dtype* x_orig, dtype *f, double eps)
@@ -615,35 +725,7 @@ void TestSymmSparseMatrixOnline2DwithPML(size_m x, size_m y, size_m z, zcsr *Acs
 			dtype alp = alpha(x, j1) * alpha(y, k1);
 #endif
 			
-			if (l1 == l2)
-			{
-				mat2D[nelems].val = Acsr->values[nelems] / alp;
-				mat2D[nelems].i = l1;
-				mat2D[nelems].j = l2;
-				nelems++;
-			}
-			else if (l1 == l2 - 1 && (l1 + 1) % x.n != 0)
-			{
-				mat2D[nelems].val = Acsr->values[nelems] / alp;
-				mat2D[nelems].i = l1;
-				mat2D[nelems].j = l2;
-				nelems++;
-			}
-			else if (l1 == l2 + 1 && l1 % x.n != 0)
-			{
-				mat2D[nelems].val = Acsr->values[nelems] / alp;
-				mat2D[nelems].i = l1;
-				mat2D[nelems].j = l2;
-				nelems++;
-			}
-			else if (l1 == l2 - x.n)
-			{
-				mat2D[nelems].val = Acsr->values[nelems] / alp;
-				mat2D[nelems].i = l1;
-				mat2D[nelems].j = l2;
-				nelems++;
-			}
-			else if (l1 == l2 + x.n)
+			if (CheckDiag5Pts(x, y, l1, l2) != DIAG5::not_a_diag)
 			{
 				mat2D[nelems].val = Acsr->values[nelems] / alp;
 				mat2D[nelems].i = l1;
@@ -665,7 +747,80 @@ void TestSymmSparseMatrixOnline2DwithPML(size_m x, size_m y, size_m z, zcsr *Acs
 				break;
 			}
 
-	printf("Norm of SYMMETRY = %e, counts: %d vs %d\n", dznrm2(&Acsr->non_zeros, diff, &ione), nelems, nelems2);
+	printf("Norm of SYMMETRY = %e, counts: %d vs %d\n", dznrm2(&nelems, diff, &ione), nelems, nelems2);
+
+	free(mat2D);
+	free(diff);
+}
+
+void TestSymmSparseMatrixOnline2DwithPML9Pts(size_m x, size_m y, size_m z, zcsr *Acsr)
+{
+	double size = x.n * y.n;
+	int nelems = 0, nelems2 = 0;
+	int ione = 1;
+	int j1, k1;
+	int j2, k2;
+
+	//-----------------------//
+	int error;
+	sparse_struct* handle = (sparse_struct*)malloc(sizeof(sparse_struct));
+
+	sparse_matrix_checker_init(handle);
+
+	handle->n = size;
+	handle->csr_ia = Acsr->ia;
+	handle->csr_ja = Acsr->ja;
+	handle->indexing = MKL_ONE_BASED;
+	handle->matrix_structure = MKL_GENERAL_STRUCTURE;
+	handle->matrix_format = MKL_CSR;
+	handle->message_level = MKL_PRINT;
+	handle->print_style = MKL_C_STYLE;
+
+	error = sparse_matrix_checker(handle);
+
+	printf("Error of constructing: %d\n", error);
+
+	//------------------------------//
+
+	matrix *mat2D = (matrix*)malloc(Acsr->non_zeros * sizeof(matrix));
+	dtype *diff = (dtype*)malloc(Acsr->non_zeros * sizeof(dtype));
+
+#if 1
+	for (int l1 = 0; l1 < size; l1++)
+	{
+		take_coord2D(x.n, y.n, l1, j1, k1);
+		for (int l2 = 0; l2 < size; l2++)
+		{
+			take_coord2D(x.n, y.n, l2, j2, k2);
+#ifdef SYMMETRY
+			dtype alp = 1;
+#else
+			dtype alp = alpha(x, j1) * alpha(y, k1);
+#endif
+
+			if (CheckDiag9Pts(x, y, l1, l2) != DIAG9::not_a_diag)
+			{
+				mat2D[nelems].val = Acsr->values[nelems] / alp;
+				mat2D[nelems].i = l1;
+				mat2D[nelems].j = l2;
+				nelems++;
+			}
+
+		}
+	}
+#endif
+
+	for (int k = 0; k < nelems; k++)
+		for (int l = 0; l < nelems; l++)
+			if (mat2D[l].i == mat2D[k].j && mat2D[l].j == mat2D[k].i)
+			{
+				diff[k] = mat2D[l].val - mat2D[k].val;
+				nelems2++;
+				//printf("val[%d][%d] = %lf vs val[%d][%d] = %lf\n", mat2D[l].i, mat2D[l].j, mat2D[l].val.real(), mat2D[k].i, mat2D[k].j, mat2D[k].val.real());
+				break;
+			}
+
+	printf("Norm of SYMMETRY = %e, counts: %d vs %d\n", dznrm2(&nelems, diff, &ione), nelems, nelems2);
 
 	free(mat2D);
 	free(diff);
@@ -1068,7 +1223,7 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y, size_m x_lg, size_m y_
 
 	norm = RelError(zlange, size2D_nopml, 1, x_sol_prd_nopml, x_sol_ex_nopml, size2D_nopml, thresh);
 	
-	check_norm_circle2D(x, y, x_orig, x_sol, src, thresh);
+	check_norm_circle2D(x, y, x.pml_pts, x.n - x.pml_pts, x_orig, x_sol, src, thresh);
 
 	char str[255];
 	sprintf(str, "sol2D_N%d.dat", x.n_nopml + 1);
@@ -1357,7 +1512,7 @@ double Test2DLaplaceLevander4thKernelExactSolutionOnly(size_m x, size_m y)
 
 	norm = RelError(zlange, size2D_nopml, 1, x_sol_prd_nopml, x_sol_ex_nopml, size2D_nopml, thresh);
 
-	check_norm_circle2D(x, y, x_orig, x_sol, src, thresh);
+	check_norm_circle2D(x, y, x.pml_pts, x.n - x.pml_pts, x_orig, x_sol, src, thresh);
 
 	char str[255];
 	sprintf(str, "sol2Dex_N%d.dat", x.n_nopml + 1);
@@ -1392,12 +1547,12 @@ void Test2DHelmholtzLevander4th()
 	printf("------------------\n--------Test Helmholtz-------\n---------------\n");
 	size_m x, y;
 
-	x.pml_pts = y.pml_pts = 40;
+	x.pml_pts = y.pml_pts =	0;
 	x.spg_pts = y.spg_pts = 0;
 
 	double norm, prev = 1;
 
-	for (int n = 200; n <= 200; n *= 2)
+	for (int n = 50; n <= 800; n *= 2)
 	{
 		x.n = n - 1 + 2 * x.pml_pts;
 		y.n = n - 1 + 2 * y.pml_pts;
@@ -1420,9 +1575,57 @@ void Test2DHelmholtzLevander4th()
 }
 
 
+void Test2DHelmholtzTuning9Pts()
+{
+	printf("------------------\n--------Test Helmholtz-------\n---------------\n");
+	size_m x, y;
+
+	x.pml_pts = y.pml_pts = 0;
+	x.spg_pts = y.spg_pts = 0;
+
+	double *norm = alloc_arr<double>(2);
+
+	FILE *fout = fopen("2D_Helmholtz_FullTuning_results_N50_2.dat", "w");
+	for (double a = 0.0; a < 1.01; a += 0.1)
+		for (double c = 0.0; c < 1.01; c += 0.01)
+			for (double d = 0.0; d < 1.01; d += 0.01)
+			{
+				for (int n = 50, i = 0; n <= 100; n += 50, i++)
+				{
+					x.n = n - 1 + 2 * x.pml_pts;
+					y.n = n - 1 + 2 * y.pml_pts;
+
+					x.n_nopml = x.n - 2 * x.pml_pts;
+					y.n_nopml = y.n - 2 * y.pml_pts;
+
+					x.l = LENGTH_X + (double)(2 * x.pml_pts * LENGTH_X) / (x.n_nopml + 1);
+					y.l = LENGTH_Y + (double)(2 * y.pml_pts * LENGTH_Y) / (y.n_nopml + 1);
+
+					x.h = x.l / (x.n + 1);  // x.n + 1 grid points of the whole domain
+					y.h = y.l / (y.n + 1);  // x.n - 1 - inner points
+
+					x.ta = a;
+					x.tc = c;
+					x.td = d;
+					norm[i] = Test2DHelmholtzLevander4thKernel(x, y);
+				}
+				printf("a = %4.2lf, c = %4.2lf, d = %4.2lf, norm50 = %lf, norm100 = %lf, order = %lf\n",
+					a, c, d, norm[0], norm[1], norm[0] / norm[1]);
+
+				fprintf(fout, "a = %4.2lf, c = %4.2lf, d = %4.2lf, norm50 = %lf, norm100 = %lf, order = %lf\n",
+					a, c, d, norm[0], norm[1], norm[0] / norm[1]);
+			}
+
+	free_arr(norm);
+	fclose(fout);
+}
+
+
 double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 {
+#ifdef PRINT_TEST
 	printf("-----------Test 2D Helmholtz--------\n");
+#endif
 	// Calling the solver
 	int size2D = x.n * y.n;
 	int size2D_nopml = x.n_nopml * y.n_nopml;
@@ -1431,7 +1634,9 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 	int *perm = alloc_arr<int>(size2D);
 	size_t *pt = alloc_arr<size_t>(64);
 
+#ifdef PRINT_TEST
 	printf("pardisoinit...\n");
+#endif
 	pardisoinit(pt, &mtype, iparm);
 
 	int maxfct = 1;
@@ -1443,11 +1648,11 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 
 	// Memory for 2D CSR matrix
 	zcsr *D2csr;
-	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
+	int non_zeros_in_2Dblock5diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
 	int non_zeros_in_2Dblock9diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n) + 4 * (x.n - 1) * (y.n - 1);
 	int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
 
-	int non_zeros = non_zeros_in_2Dblock13diag;
+	int non_zeros = non_zeros_in_2Dblock9diag;
 
 	D2csr = (zcsr*)malloc(sizeof(zcsr));
 	D2csr->values = alloc_arr<dtype>(non_zeros);
@@ -1458,14 +1663,15 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 
 	point sourcePML = { x.l / 2.0, y.l / 2.0 };
 
-	double lambda = (double)(c_z) / nu;
-	double ppw = lambda / x.h;
+	//double lambda = (double)(c_z) / nu;
+	//double ppw = lambda / x.h;
 
-	printf("ppw = %lf\n", ppw);
+#ifdef PRINT_TEST
 	printf("Lx = %lf, Ly = %lf\n", x.l, y.l);
 	printf("PML_x = %lf, PML_y = %lf\n", x.pml_pts * x.h, y.pml_pts * y.h);
 	printf("Hx = %lf, Hy = %lf\n", x.h, y.h);
 	printf("SOURCE in 2D WITH PML AT: (%lf, %lf)\n", sourcePML.x, sourcePML.y);
+#endif
 	int src = 0;
 
 	char *str1, *str2, *str3;
@@ -1474,6 +1680,7 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 	str3 = alloc_arr<char>(255);
 	bool pml_flag = false;
 	size_m z;
+	double time = 0;
 
 
 	int count = 0;
@@ -1500,23 +1707,45 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 	SetFrequency("NO_FFT", x, y, z, y.n / 2, kwave_beta2);
 
 	// источник в каждой задаче в середине 
+#ifdef PRINT_TEST
 	printf("Gen Matrix for kwave2 = (%lf, %lf)\n", kwave_beta2.real(), kwave_beta2.imag());
-	GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, D2csr, kwave_beta2, freqs);
+	printf("ppw = %lf\n", 2.0 * PI / sqrt(kwave_beta2.real()) / x.h);
+#endif
+	//GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, D2csr, kwave_beta2, freqs);
+	//GenSparseMatrixOnline2DwithPMLFast(-1, x, y, D2csr, kwave_beta2, freqs);
+	//GenSparseMatrixOnline2DwithPML(-1, x, y, D2csr, kwave_beta2, freqs);
+	//GenSparseMatrixOnline2DwithPMLand9Points(-1, x, y, z, D2csr, kwave_beta2, freqs, 0.0);
+	GenSparseMatrixOnline2DwithPMLand9Pts(-1, x, y, D2csr, kwave_beta2, freqs);
 
 	// Gen RHS and exact solution; check residual |A * u - f|
+#ifdef PRINT_TEST
 	printf("Gen RHS and check Residual\n");
+#endif
 	GenRHSandSolution2DComplexWaveNumber(x, y, D2csr, x_sol_ex, f2D, kwave_beta2, sourcePML, src);
 
+	printf("Test symmetry...\n");
+    TestSymmSparseMatrixOnline2DwithPML9Pts(x, y, z, D2csr);
+
 	// normalization of rhs
+#ifdef PRINT_TEST
 	printf("Pardiso solve\n");
+#endif
+	time = omp_get_wtime();
 	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f2D, x_sol_prd, &error);
+	time = omp_get_wtime() - time;
+
+	phase = -1;
+	pardiso(pt, &maxfct, &mnum, &mtype, &phase, &size2D, D2csr->values, D2csr->ia, D2csr->ja, perm, &rhs, iparm, &msglvl, f2D, x_sol_prd, &error);
+#ifdef PRINT_TEST
+	printf("Pardiso time = %lf\n", time);
 	if (error != 0) printf("!!!PARDISO ERROR!!!\n");
+#endif
 
 	double eps = 0.01; // 1 percent
 
-	sprintf(str1, "Charts2D_v3/model_pml_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
-	sprintf(str2, "Charts2D_v3/model_pml_ex_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
-	sprintf(str3, "Charts2D_v3/model_pml_pard_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
+//	sprintf(str1, "Charts2D_v3/model_pml_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
+//	sprintf(str2, "Charts2D_v3/model_pml_ex_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
+//	sprintf(str3, "Charts2D_v3/model_pml_pard_%lf_%lf__%lf", kwave_beta2.real(), kwave_beta2.imag(), x.h);
 
 	pml_flag = false;
 
@@ -1527,11 +1756,12 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 				i, j, i + x.n * j, i * x.h, j * y.h);
 #endif
 
-	NullifySource2D(x, y, x_sol_ex, src, 5);
-	NullifySource2D(x, y, x_sol_prd, src, 5);
+	NullifySource2D(x, y, x_sol_ex, src, 1);
+	NullifySource2D(x, y, x_sol_prd, src, 1);
 
-	check_norm_circle2D(x, y, x_sol_ex, x_sol_prd, sourcePML, thresh);
+	//check_norm_circle2D(x, y, x.pml_pts, x.n-x.pml_pts, x_sol_ex, x_sol_prd, sourcePML, thresh);
 
+#if 0
 	output2D(str1, pml_flag, x, y, x_sol_ex, x_sol_prd);
 	gnuplot2D(str1, str2, pml_flag, 3, x, y);
 	gnuplot2D(str1, str3, pml_flag, 5, x, y);
@@ -1555,15 +1785,43 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 	}
 	output1D(str1, pml_flag, y, x_sol1D_ex, x_sol1D_prd);
 	gnuplot1D(str1, str2, pml_flag, 0, y);
+#endif
 
 	// check norm solution
 	reducePML2D(x, y, size2D, x_sol_ex, size2D_nopml, x_sol_ex_nopml);
 	reducePML2D(x, y, size2D, x_sol_prd, size2D_nopml, x_sol_prd_nopml);
 
 	norm = RelError(zlange, size2D_nopml, 1, x_sol_prd_nopml, x_sol_ex_nopml, size2D_nopml, thresh);
+
+#ifdef PRINT_TEST
 	printf("Norm 2D solution ||x_sol - x_ex|| / ||x_ex|| = %lf\n", norm);
+#endif
 
 	//	check_exact_sol_Hankel(alpha_k, kwave2, x, y, x_sol_prd_nopml, thresh);
+
+	free_arr(x_sol_ex); 
+	free_arr(x_sol_prd);
+	free_arr(f2D);
+	free_arr(freqs);
+
+	free_arr(x_sol_ex_nopml);
+	free_arr(x_sol_prd_nopml);
+
+	free_arr(x_sol1D_ex); 
+	free_arr(x_sol1D_prd);
+
+	free_arr(D2csr->values);
+	free_arr(D2csr->ia);
+	free_arr(D2csr->ja);
+	free(D2csr);
+
+	free_arr(iparm);
+	free_arr(perm); 
+	free_arr(pt);
+
+	free_arr(str1);
+	free_arr(str2);
+	free_arr(str3);
 
 	return norm;
 }

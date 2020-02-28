@@ -2830,26 +2830,29 @@ void Test_NonZeroElementsInFactors(size_m x, size_m y, cmnode **Gstr, dtype* B, 
 	long long non_zeros_exact = 0;
 	long long non_zeros_HSS = 0;
 
-	non_zeros_exact = (x.n * x.n) * y.n + 2 * x.n * (y.n - 1);
+	//non_zeros_exact = (x.n * x.n) * y.n + 2 * x.n * (y.n - 1);
+	non_zeros_exact = (x.n * x.n) * y.n;
 
 	for(int k = 0; k < y.n; k++)
 		non_zeros_HSS += CountElementsInMatrixTree(x.n, Gstr[k]);
 
-	non_zeros_HSS += 2 * (y.n - 1) * x.n;
+	//non_zeros_HSS += 2 * (y.n - 1) * x.n;
 
-	int compr_size = x.n / smallsize;
-	int compr_level = log(compr_size) / log(2);
+	int compr_size = ceil((double)x.n / smallsize);
+	int compr_level = ceil(log(compr_size) / log(2));
 	int loc_size = x.n;
 	long long zeros_ideal = 0;
 
+	printf("Compression level: %d, Compression size: %d\n", compr_level, compr_size);
 	for (int j = 0; j < compr_level; j++)
 	{
 		loc_size = ceil(loc_size / 2.0);
-		compr_size = ceil(x.n / loc_size);
+		compr_size = ceil((double)x.n / loc_size);
 		zeros_ideal += (loc_size * loc_size * compr_size) * y.n;
+		printf("loc_size: %d, compr_size: %d, zeros_ideal: %d\n", loc_size, compr_size, zeros_ideal);
 	}
 
-	printf("Compression level: %d Compression size: %d\n", compr_level, compr_size);
+	printf("Compression level: %d, Compression size: %d\n", compr_level, compr_size);
 	printf("non_zeros_exact: %ld\nnon_zeros_HSS: %ld\n", non_zeros_exact, non_zeros_HSS);
 	printf("coefficient of compression: %lf (ideal: %lf)\n",  (double)non_zeros_exact / non_zeros_HSS, (double)non_zeros_exact/(non_zeros_exact - zeros_ideal));
 	

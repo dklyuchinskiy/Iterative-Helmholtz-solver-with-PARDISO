@@ -55,6 +55,9 @@ struct size_m
 	int pml_pts;
 	int spg_pts;
 	int n_nopml;
+	double ta;
+	double tc;
+	double td;
 };
 
 struct point 
@@ -102,6 +105,30 @@ struct person
 	char lname[20];
 };
 
+enum class DIAG5
+{
+	m_two = -2,
+	m_one,
+	zero,
+	one,
+	two,
+	not_a_diag
+};
+
+enum class DIAG9
+{
+	m_four = -4,
+	m_three,
+	m_two,
+	m_one,
+	zero,
+	one,
+	two,
+	three,
+	four,
+	not_a_diag
+};
+
 
 enum class DIAG13
 {	
@@ -128,10 +155,11 @@ enum class DIAG13
 #define PML
 #define GMRES_SIZE 128
 
-#define HODLR
+//#define HODLR
 #define HOMO
-#define SYMMETRY
+//#define SYMMETRY
 //#define CHECK_ACCURACY
+#define PRINT_TEST
 
 //#define ORDER4
 #define PML_PTS 0
@@ -160,6 +188,11 @@ enum class DIAG13
 #define LENGTH_X LENGTH
 #define LENGTH_Y LENGTH
 #define LENGTH_Z LENGTH
+
+// test article
+//#define LENGTH_X 2000
+//#define LENGTH_Y 800
+//#define LENGTH_Z LENGTH
 #endif
 
 #if 0
@@ -198,7 +231,7 @@ enum class DIAG13
 #define kk ((omega) / (c_z))
 
 #ifdef HOMO
-#define NITER 6
+#define NITER 4
 #else
 #define NITER 12
 #endif
@@ -233,7 +266,7 @@ T* alloc_arr(long long int n)
 {
 	T *f = (T*)malloc(n * sizeof(T));
 
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for simd schedule(simd:static)
 	for (long long int i = 0; i < n; i++)
 		f[i] = 0.0;
 

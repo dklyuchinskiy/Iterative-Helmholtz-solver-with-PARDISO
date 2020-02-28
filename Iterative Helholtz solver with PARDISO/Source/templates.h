@@ -29,6 +29,7 @@ void GenMatrixandRHSandSolution2(size_m x, size_m y, size_m z, double *D, int ld
 
 // Support
 
+dtype ratio_dot(int size, dtype alpha, dtype beta, dtype *s1, dtype *s2, dtype *s3);
 double random(double min, double max);
 double F_ex(size_m xx, size_m yy, size_m zz, double x, double y, double z);
 double u_ex(size_m xx, size_m yy, size_m zz, double x, double y, double z);
@@ -54,6 +55,7 @@ void NormalizeVector(int size, dtype* v, dtype* out, double& norm);
 void GenRHSandSolutionViaSound3D(size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f, point source);
 dtype u_ex_complex_sound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
 void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double& diff_sol);
+void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, dtype *f, double thresh, double& diff_sol);
 void check_norm_circle(size_m x, size_m y, size_m z, const dtype* x_orig_nopml, const dtype* x_sol_nopml, point source, double thresh);
 void print_2Dcsr_mat(size_m x, size_m y, zcsr* D2csr);
 void print_2Dcsr_mat2(size_m x, size_m y, zcsr* D2csr);
@@ -64,13 +66,21 @@ void SetRHS3DForTest(size_m xx, size_m yy, size_m zz, dtype* f, point source, in
 void Copy2DCSRMatrix(int size2D, int nonzeros, zcsr* &A, zcsr* &B);
 void GenSparseMatrixOnline2DwithPMLand9Points(int w, size_m x, size_m y, size_m z, zcsr* Acsr, dtype kwave_beta2, int* freqs, double sigma);
 void GenSparseMatrixOnline2DwithPMLand13Pts(int w, size_m x, size_m y, zcsr* Acsr, dtype kwave_beta2, int* freqs);
+void GenSparseMatrixOnline2DwithPMLand9Pts(int w, size_m x, size_m y, zcsr* Acsr, dtype kwave_beta2, int* freqs);
 dtype beta2D_pml(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, int j);
 dtype beta2D_pml_9pts(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, int j, double sigma);
+dtype beta2D_pml_9pts_opt(size_m x, size_m y, int diag_case, dtype kwave_beta2, int i, int j, double a, double c, double d);
 dtype beta2D_pml_13pts(size_m x, size_m y, DIAG13 diag_case, dtype kwave_beta2, int i, int j);
 double IntegralNorm2D(size_m x, size_m y, char type, double* v);
 double IntegralNorm3D(size_m x, size_m y, size_m z, dtype* v);
 void SetPml2D(int blk3D, int blk2D, size_m x, size_m y, size_m z, int n, dtype* alpX, dtype* alpY, dtype *alpZ);
 void SetPml3D(int blk3D, size_m x, size_m y, size_m z, int n, dtype* alpX, dtype* alpY, dtype* alpZ);
+DIAG5 CheckDiag5Pts(size_m x, size_m y, int l1, int l2);
+DIAG9 CheckDiag9Pts(size_m x, size_m y, int l1, int l2);
+
+void output1D(char *str, bool pml_flag, size_m x, double* x_re, double* x_im);
+void gnuplot1D_simple(char *splot, char *sout, bool pml_flag, int col, size_m x);
+double check_norm_circle2D(size_m xx, size_m yy, int start, int end, dtype* x_orig, dtype* x_sol, point source, double thresh);
 
 void print_map(const map<vector<int>, dtype>& SD);
 void print_csr(int n, dcsr* A);
@@ -85,7 +95,6 @@ map<vector<int>, double> concat_maps(const map<vector<int>, double>& map1, const
 
 dtype zdot(int size, dtype* v1, dtype* v2);
 void ComputeResidual(size_m x, size_m y, size_m z, double kw, const dtype* u, const dtype *f, dtype* f_res, double &RelRes);
-void check_norm_circle2D(size_m xx, size_m yy, dtype* x_orig, dtype* x_sol, point source, double thresh);
 void AdjustRHS(size_m x, size_m y, dtype *f);
 
 void ResidCSR(size_m x, size_m y, size_m z, zcsr* Dcsr, dtype* x_sol, dtype *f, dtype* g, double &RelRes);
