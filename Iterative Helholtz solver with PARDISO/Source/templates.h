@@ -78,6 +78,8 @@ void SetPml3D(int blk3D, size_m x, size_m y, size_m z, int n, dtype* alpX, dtype
 DIAG5 CheckDiag5Pts(size_m x, size_m y, int l1, int l2);
 DIAG9 CheckDiag9Pts(size_m x, size_m y, int l1, int l2);
 
+void ModifyNumericalSolution(int size_nopml, dtype *x_sol_nopml, dtype* x_orig_nopml);
+void ReadSolution(int size, dtype *x_sol, char *);
 void output1D(char *str, bool pml_flag, size_m x, double* x_re, double* x_im);
 void gnuplot1D_simple(char *splot, char *sout, bool pml_flag, int col, size_m x);
 double check_norm_circle2D(size_m xx, size_m yy, int start, int end, dtype* x_orig, dtype* x_sol, point source, double thresh);

@@ -2971,9 +2971,10 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 	system("pause");
 #endif
 
-#define MANUFACTORED_SOLUTION
 	dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *x_orig_nopml = alloc_arr<dtype>(size_nopml);
+
+///#define MANUFACTORED_SOLUTION
 
 #ifdef MANUFACTORED_SOLUTION
 	dtype *x_wave = alloc_arr<dtype>(size);
@@ -3261,6 +3262,37 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 	free_arr(x_orig_im);
 	free_arr(x_sol_re);
 	free_arr(x_sol_im);
+}
+
+void ModifyNumericalSolution(int size_nopml, dtype *x_sol_nopml, dtype* x_orig_nopml)
+{
+	int ione = 1;
+	dtype s1, s2;
+	zdotc(&s1, &size_nopml, x_sol_nopml, &ione, x_orig_nopml, &ione);
+	zdotc(&s2, &size_nopml, x_orig_nopml, &ione, x_orig_nopml, &ione);
+
+	dtype s = s1 / s2;
+
+	printf("Scalar (x_n, x_t) / (x_t, x_t) = (%lf, %lf)\n", s.real(), s.imag());
+	zscal(&size_nopml, &s, x_sol_nopml, &ione);
+}
+
+
+void ReadSolution(int size_nopml, dtype *x_sol, char *name)
+{
+	FILE *fin = fopen(name, "r");
+	int i = 0;
+	double real, imag;
+
+	while (!feof(fin))
+	{
+		fscanf(fin, "%lf %lf", &real, &imag);
+		x_sol[i++] = dtype{ real, imag };
+	}
+
+	if (i != size_nopml) printf("Reading error! Read = %d, Needed = %d", i, size_nopml);
+
+	fclose(fin);
 }
 
 void GenSparseMatrixOnline3DwithPML(size_m x, size_m y, size_m z, dtype* B, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, zcsr* Acsr, double eps)
