@@ -39,7 +39,7 @@ int main()
 #ifndef PERF
 	TestAll();
 #endif
-
+	
 	//Test2DLaplaceLevander4th(); // laplace + manufactored laplace and helmholtz
 	//Test2DHelmholtzLevander4th(); // exact helm
 	//Test2DHelmholtzTuning9Pts();
@@ -181,7 +181,6 @@ int main()
 #endif
 
 
-
 	printf("FGMRES number of iterations: %d\n", niter + 1);
 
 
@@ -236,7 +235,10 @@ int main()
 	dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *f_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *g_nopml = alloc_arr<dtype>(size_nopml);
-	
+
+
+	dtype *x_sol_nopml_direct = alloc_arr<dtype>(size_nopml);
+	//ReadSolution(size_nopml, x_sol_nopml_direct, "file.txt");
 
 	x_nopml.l = y_nopml.l = z_nopml.l = (double)(LENGTH);
 	x_nopml.h = x_nopml.l / (double)(x_nopml.n + 1);  // x.n + 1 grid points of the whole domain
@@ -436,9 +438,12 @@ int main()
 	check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, niter, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
 	check_norm_circle(x_nopml, y_nopml, z_nopml, x_orig_nopml, x_sol_nopml, source, thresh);
 
+	ModifyNumericalSolution(size_nopml, x_sol_nopml, x_orig_nopml);
+	NullifySource2D(x_nopml, y_nopml, &x_sol_nopml_direct[z_nopml.n / 2 * size2D_nopml], size2D_nopml / 2, 1);
+
 	norm_re = RelError(dlange, size_nopml, 1, x_sol_re, x_orig_re, size_nopml, thresh);
 	norm_im = RelError(dlange, size_nopml, 1, x_sol_im, x_orig_im, size_nopml, thresh);
-	norm = RelError(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
+	norm    = RelError(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
 
 	printf("norm_re = %e\n", norm_re, thresh);
 	printf("norm_im = %e\n", norm_im, thresh);
