@@ -271,7 +271,7 @@ T* alloc_arr(long long int n)
 {
 	T *f = (T*)malloc(n * sizeof(T));
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (long long int i = 0; i < n; i++)
 		f[i] = 0.0;
 

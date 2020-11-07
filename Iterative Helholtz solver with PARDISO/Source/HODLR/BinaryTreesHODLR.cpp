@@ -306,11 +306,11 @@ void LowRankApproxStruct(int n2, int n1 /* size of A21 = A */,
 		}
 		Astr->p = j + 1;
 #ifndef FULL_SVD
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < n2; i++)
 			A[i + lda * j] *= S[j];
 #else
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < n2; i++)
 			U[i + ldu * j] *= S[j];
 
@@ -823,7 +823,7 @@ void UnsymmLUfact(int n, cumnode* Astr, int *ipiv, int smallsize, double eps, ch
 		zlaswp(&Astr->A21->p, Astr->A21->U, &n2, &ione, &n2, &ipiv[n1], &ione);
 
 		// Adjust pivot indexes to level up
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = n1; i < n; i++)
 			ipiv[i] += n1;
 	}
@@ -889,7 +889,7 @@ void SymLUfactLowRankStruct(int n, cumnode* Astr, int *ipiv, int smallsize, doub
 		zlaswp(&Astr->A21->p, Astr->A21->U, &n2, &ione, &n2, &ipiv[n1], &ione);
 
 		// Adjust pivot indexes to level up
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = n1; i < n; i++)
 			ipiv[i] += n1;
 	}

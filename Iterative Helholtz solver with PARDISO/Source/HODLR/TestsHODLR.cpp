@@ -673,8 +673,8 @@ void Test_DiagMultStruct(int n, double eps, char *method, int smallsize)
 	free_arr(d);
 }
 
-/* Тест на сравнение результатов умножения Y = H * X сжимаемой матрицы H на произвольную X.
-Сравниваются результаты со сжатием и без */
+/* \D2\E5\F1\F2 \ED\E0 \F1\F0\E0\E2\ED\E5\ED\E8\E5 \F0\E5\E7\F3\EB\FC\F2\E0\F2\EE\E2 \F3\EC\ED\EE\E6\E5\ED\E8\FF Y = H * X \F1\E6\E8\EC\E0\E5\EC\EE\E9 \EC\E0\F2\F0\E8\F6\FB H \ED\E0 \EF\F0\EE\E8\E7\E2\EE\EB\FC\ED\F3\FE X.
+\D1\F0\E0\E2\ED\E8\E2\E0\FE\F2\F1\FF \F0\E5\E7\F3\EB\FC\F2\E0\F2\FB \F1\EE \F1\E6\E0\F2\E8\E5\EC \E8 \E1\E5\E7 */
 void Test_RecMultLStruct(int n, int k, double eps, char *method, int smallsize)
 {
 	//printf("*****Test for RecMultLStruct  n = %d k = %d ******* ", n, k);
@@ -777,8 +777,8 @@ void Test_UnsymmRecMultLStruct(int n, int k, double eps, char *method, int small
 	free_arr(Y1);
 }
 
-/*Тест на сравнение результатов умножения Y = X * H сжимаемой матрицы H на произвольную X.
-Сравниваются результаты со сжатием и без
+/*\D2\E5\F1\F2 \ED\E0 \F1\F0\E0\E2\ED\E5\ED\E8\E5 \F0\E5\E7\F3\EB\FC\F2\E0\F2\EE\E2 \F3\EC\ED\EE\E6\E5\ED\E8\FF Y = X * H \F1\E6\E8\EC\E0\E5\EC\EE\E9 \EC\E0\F2\F0\E8\F6\FB H \ED\E0 \EF\F0\EE\E8\E7\E2\EE\EB\FC\ED\F3\FE X.
+\D1\F0\E0\E2\ED\E8\E2\E0\FE\F2\F1\FF \F0\E5\E7\F3\EB\FC\F2\E0\F2\FB \F1\EE \F1\E6\E0\F2\E8\E5\EC \E8 \E1\E5\E7
 (k x n) * (n x n) */
 void Test_UnsymmRecMultRStruct(int n, int k, double eps, char *method, int smallsize)
 {
@@ -850,7 +850,7 @@ void Test_AddStruct(int n, dtype alpha, dtype beta, double eps, char *method, in
 	Hilbert(n, n, H1, ldh);
 	Hilbert(n, n, H1c, ldh);
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int j = 0; j < n; j++)
 		for (int i = 0; i < n; i++)
 		{
@@ -920,7 +920,7 @@ void Test_UnsymmAddStruct(int n, dtype alpha, dtype beta, double eps, char *meth
 	Hilbert3(n, n, H1, ldh);
 	Hilbert3(n, n, H1c, ldh);
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int j = 0; j < n; j++)
 		for (int i = 0; i < n; i++)
 		{
@@ -996,11 +996,11 @@ void Test_SymCompUpdate2Struct(int n, int k, dtype alpha, double eps, char* meth
 	Clear(k, k, Y, ldy);
 	Clear(n, k, V, ldv);
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < k; i++)
 		Y[i + ldy * i] = i + 1;
 
-#pragma omp parallel for simd schedule(simd:static)
+#pragma omp parallel for simd schedule(static)
 	for (int j = 0; j < k; j++)
 		for (int i = 0; i < n; i++)
 			V[i + ldv * j] = (i + j + 1);
@@ -1675,7 +1675,7 @@ void Test_ApplyToA12(int m, int n, double eps, char* method, int smallsize)
 	UnsymmRecCompressStruct(n, LU, n, LUstr, smallsize, eps, method);
 	CopyLfactor(n, LUstr, Lstr, smallsize);
 
-	//(правильный тест с пивотингом)
+	//(\EF\F0\E0\E2\E8\EB\FC\ED\FB\E9 \F2\E5\F1\F2 \F1 \EF\E8\E2\EE\F2\E8\ED\E3\EE\EC)
 	// ipiv -> ipiv2
 #ifdef PRINT
 	printf("\nGet Nleaves\n");
@@ -1761,7 +1761,7 @@ void Test_ApplyToA12Ver2(int m, int n, double eps, char* method, int smallsize)
 	UnsymmRecCompressStruct(n, LU, n, LUstr, smallsize, eps, method);
 	CopyLfactor(n, LUstr, Lstr, smallsize);
 
-	//(правильный тест с пивотингом)
+	//(\EF\F0\E0\E2\E8\EB\FC\ED\FB\E9 \F2\E5\F1\F2 \F1 \EF\E8\E2\EE\F2\E8\ED\E3\EE\EC)
 	// ipiv -> ipiv2
 #ifdef PRINT
 	printf("\nGet Nleaves\n");
