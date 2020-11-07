@@ -8,7 +8,9 @@ declaration of used structures
 
 typedef double rtype;
 typedef std::complex<double> dtype;
+typedef std::complex<float> stype;
 #define MKL_Complex16 dtype
+#define MKL_Complex8 stype
 
 #if defined(_WIN32) || defined(WIN32)
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\mkl\include\mkl.h"
@@ -158,8 +160,9 @@ enum class DIAG13
 //#define HODLR
 #define HOMO
 //#define SYMMETRY
-//#define CHECK_ACCURACY
-#define PRINT_TEST
+//#define CHECK_ACCURACY // 2D problems
+//#define PRINT_TEST
+#define RES_EXIT	1e-8
 
 //#define ORDER4
 #define PML_PTS 0
@@ -225,7 +228,9 @@ enum class DIAG13
 //#define beta_eq 0.005
 //#define beta_eq 0.0
 
-#define beta_eq 0.5
+//#define beta_eq 0.5
+
+#define PRINT
 
 #define omega 2.0 * (PI) * (nu)
 #define kk ((omega) / (c_z))

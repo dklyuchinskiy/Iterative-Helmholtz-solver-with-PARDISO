@@ -149,7 +149,7 @@ void SymUpdate5Subroutine(int n2, int n1, dtype alpha, cmnode* Astr, const dtype
 
 // Solver
 void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, dtype *f, zcsr* Dcsr, double thresh, int smallsize, int ItRef, char *bench,
-	cmnode** &Gstr, dtype *x_sol, int &success, double &RelRes, int &itcount);
+	cmnode** &Gstr, dtype *x_sol, int &success, double &RelRes, int &itcount, double beta_eq);
 void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, dtype beta2, dtype *work, int lwork, double thresh, int smallsize);
 void DirSolveFastDiagStruct(int n1, int n2, cmnode* *Gstr, dtype *B, const dtype *f, dtype *x, dtype *work, int lwork, double eps, int smallsize);
 

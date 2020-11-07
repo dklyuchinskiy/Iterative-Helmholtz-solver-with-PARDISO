@@ -18,6 +18,8 @@ void Test2DHelmholtzHODLR()
 	int n1 = 400;		    // number of point across the directions
 	int n2 = 400;
 
+	double beta_eq = 0.5;
+
 	int smallsize = 60;
 
 	size_m x, y, z;
@@ -107,7 +109,7 @@ void Test2DHelmholtzHODLR()
 	int src = 0;
 
 	// set frequency
-	SetFrequency("NO_FFT", x, y, z, y.n / 2, kwave_beta2);
+	SetFrequency("NO_FFT", x, y, z, y.n / 2, kwave_beta2, beta_eq);
 
 #ifdef _OPENMP
 	nthr = omp_get_max_threads();
@@ -193,7 +195,7 @@ void Test2DHelmholtzHODLR()
 #ifndef ONLINE
 	Block3DSPDSolveFastStruct(x, y, D, ldd, B, f, Dcsr, thresh, smallsize, ItRef, bench, Gstr, x_sol, success, RelRes, itcount);
 #else
-	Block3DSPDSolveFastStruct(x, y, NULL, ldd, B, f, D2csr, thresh, smallsize, ItRef, "print_time", Gstr, x_sol, success, RelRes, itcount);
+	Block3DSPDSolveFastStruct(x, y, NULL, ldd, B, f, D2csr, thresh, smallsize, ItRef, "print_time", Gstr, x_sol, success, RelRes, itcount, beta_eq);
 #endif
 	timer = omp_get_wtime() - timer;
 	printf("Time HSS solver: %lf\n", timer);
@@ -438,7 +440,7 @@ void Test_TransferBlock3Diag_to_CSR(size_m x, size_m y, size_m z, zcsr* Dcsr, dt
 	free_arr(g);
 }
 
-void TestInverseTraversal(size_m x, size_m y, size_m z, const point source, const dtype *x_sol, const dtype *f_orig, double thresh)
+void TestInverseTraversal(size_m x, size_m y, size_m z, const point source, const dtype *x_sol, const dtype *f_orig, double thresh, double beta_eq)
 {
 	// Test for postorder traversal of the algorithm
 
@@ -506,7 +508,7 @@ void TestInverseTraversal(size_m x, size_m y, size_m z, const point source, cons
 	//	output2D(str1, false, x, y, sound2D, sound2D);
 
 		// Gen DeltaL function
-	GenerateDeltaL(x, y, z, sound3D, sound2D, deltaL);
+	GenerateDeltaL(x, y, z, sound3D, sound2D, deltaL, beta_eq);
 
 	char str2[255] = "sound_speed_deltaL";
 	//	output(str2, false, x, y, z, sound3D, deltaL);
@@ -652,7 +654,7 @@ void TestInverseTraversal(size_m x, size_m y, size_m z, const point source, cons
 	}
 
 	// (I - deltaL * L^{-1}) * g = f_sol
-	ApplyCoeffMatrixA_CSR(x, y, z, iparm, perm, pt, D2csr, g, deltaL, f_sol, thresh);
+	ApplyCoeffMatrixA_CSR(x, y, z, iparm, perm, pt, D2csr, g, deltaL, f_sol, beta_eq, thresh);
 
 	dtype *f_orig_nopml = alloc_arr<dtype>(size_nopml);
 	dtype *f_sol_nopml = alloc_arr<dtype>(size_nopml);
@@ -831,6 +833,8 @@ void Test2DLaplaceLevander4th()
 {
 	printf("------------------\n--------Test Laplace--------\n---------------\n");
 	
+	double beta_eq = 0.5;
+
 	int nsize = 6;
 	size_m *x = alloc_arr2<size_m>(nsize * sizeof(size_m));
 	size_m *y = alloc_arr2<size_m>(nsize * sizeof(size_m));
@@ -867,7 +871,7 @@ void Test2DLaplaceLevander4th()
 	y_ex.h = y_ex.l / (y_ex.n + 1);
 
 	//Test2DLaplaceLevander4thKernelExactSolutionOnly(x_ex, y_ex);
-	Test2DLaplaceLevander4thKernelGenNumSolutionLowGrid(x_ex, y_ex, x_sol);
+	Test2DLaplaceLevander4thKernelGenNumSolutionLowGrid(x_ex, y_ex, x_sol, beta_eq);
 	//--------------------------------------
 #endif
 	for (int n = 50, i = 0; n <= 200; n *= 2, i++)
@@ -884,7 +888,7 @@ void Test2DLaplaceLevander4th()
 		x[i].h = x[i].l / (x[i].n + 1);
 		y[i].h = y[i].l / (y[i].n + 1);
 
-		norm = Test2DLaplaceLevander4thKernel(x[i], y[i], x_ex, y_ex, x_sol);
+		norm = Test2DLaplaceLevander4thKernel(x[i], y[i], x_ex, y_ex, x_sol, beta_eq);
 		printf("Size = %d, norm = %e, scale = %lf\n", n, norm, prev / norm);
 		prev = norm;
 
@@ -1026,7 +1030,7 @@ dtype Test2DLaplaceRHS(size_m xx, size_m yy, double x, double y, point src, dtyp
 #endif
 
 
-double Test2DLaplaceLevander4thKernel(size_m x, size_m y, size_m x_lg, size_m y_lg, dtype* x_sol_low_grid)
+double Test2DLaplaceLevander4thKernel(size_m x, size_m y, size_m x_lg, size_m y_lg, dtype* x_sol_low_grid, double beta_eq)
 {
 	// 2D test
 	printf("-----------------TEST FOR h = %lf----------------\n", x.h);
@@ -1271,7 +1275,7 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y, size_m x_lg, size_m y_
 	return norm;
 }
 
-double Test2DLaplaceLevander4thKernelGenNumSolutionLowGrid(size_m x, size_m y, dtype *x_sol)
+double Test2DLaplaceLevander4thKernelGenNumSolutionLowGrid(size_m x, size_m y, dtype *x_sol, double beta_eq)
 {
 	// 2D test
 	printf("-----------------TEST FOR h = %lf----------------\n", x.h);
@@ -1374,7 +1378,7 @@ double Test2DLaplaceLevander4thKernelGenNumSolutionLowGrid(size_m x, size_m y, d
 	return norm;
 }
 
-double Test2DLaplaceLevander4thKernelExactSolutionOnly(size_m x, size_m y)
+double Test2DLaplaceLevander4thKernelExactSolutionOnly(size_m x, size_m y, double beta_eq)
 {
 	// 2D test
 	printf("-----------------TEST FOR h = %lf----------------\n", x.h);
@@ -1546,6 +1550,7 @@ void Test2DHelmholtzLevander4th()
 {
 	printf("------------------\n--------Test Helmholtz-------\n---------------\n");
 	size_m x, y;
+	double beta_eq = 0.5;
 
 	x.pml_pts = y.pml_pts =	0;
 	x.spg_pts = y.spg_pts = 0;
@@ -1566,7 +1571,7 @@ void Test2DHelmholtzLevander4th()
 		x.h = x.l / (x.n + 1);  // x.n + 1 grid points of the whole domain
 		y.h = y.l / (y.n + 1);  // x.n - 1 - inner points
 
-		norm = Test2DHelmholtzLevander4thKernel(x, y);
+		norm = Test2DHelmholtzLevander4thKernel(x, y, beta_eq);
 		printf("Size = %d, norm = %e, scale = %lf\n", n, norm, prev / norm);
 		prev = norm;
 		x.pml_pts *= 2;
@@ -1579,6 +1584,7 @@ void Test2DHelmholtzTuning9Pts()
 {
 	printf("------------------\n--------Test Helmholtz-------\n---------------\n");
 	size_m x, y;
+	double beta_eq = 0.5;
 
 	x.pml_pts = y.pml_pts = 0;
 	x.spg_pts = y.spg_pts = 0;
@@ -1607,7 +1613,7 @@ void Test2DHelmholtzTuning9Pts()
 					x.ta = a;
 					x.tc = c;
 					x.td = d;
-					norm[i] = Test2DHelmholtzLevander4thKernel(x, y);
+					norm[i] = Test2DHelmholtzLevander4thKernel(x, y, beta_eq);
 				}
 				printf("a = %4.2lf, c = %4.2lf, d = %4.2lf, norm50 = %lf, norm100 = %lf, order = %lf\n",
 					a, c, d, norm[0], norm[1], norm[0] / norm[1]);
@@ -1621,7 +1627,7 @@ void Test2DHelmholtzTuning9Pts()
 }
 
 
-double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
+double Test2DHelmholtzLevander4thKernel(size_m x, size_m y, double beta_eq)
 {
 #ifdef PRINT_TEST
 	printf("-----------Test 2D Helmholtz--------\n");
@@ -1704,7 +1710,7 @@ double Test2DHelmholtzLevander4thKernel(size_m x, size_m y)
 
 	//double ppw = c / nu / x.h;
 
-	SetFrequency("NO_FFT", x, y, z, y.n / 2, kwave_beta2);
+	SetFrequency("NO_FFT", x, y, z, y.n / 2, kwave_beta2, beta_eq);
 
 	// источник в каждой задаче в середине 
 #ifdef PRINT_TEST

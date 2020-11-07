@@ -2498,7 +2498,7 @@ void LowRankToUnsymmHSS(int n, int r, dtype *U, int ldu, dtype *VT, int ldvt, cu
 // Solver
 
 void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, dtype *f, zcsr* Dcsr, double thresh, int smallsize, int ItRef, char *bench,
-	/* output */ 	cmnode** &Gstr, dtype *x_sol, int &success, double &RelRes, int &itcount)
+	/* output */ 	cmnode** &Gstr, dtype *x_sol, int &success, double &RelRes, int &itcount, double beta_eq)
 {
 #ifndef ONLINE
 	if (D == NULL)
@@ -2516,7 +2516,7 @@ void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, 
 	// set frequency
 	dtype kwave_beta2;
 	size_m z;	
-	SetFrequency("NO_FFT", x, y, z, y.n / 2, kwave_beta2);
+	SetFrequency("NO_FFT", x, y, z, y.n / 2, kwave_beta2, beta_eq);
 	
 	int lwork = size + n;
 	dtype *work = alloc_arr<dtype>(lwork);

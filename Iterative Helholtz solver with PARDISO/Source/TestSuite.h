@@ -44,10 +44,10 @@ void Test_TransferBlock3Diag_to_CSR(size_m x, size_m y, size_m z, zcsr* Dcsr, dt
 void Test_PMLBlock3Diag_in_CSR(size_m x, size_m y, size_m z, /* in */ zcsr* Dcsr, zcsr *Dcsr_nopml, /*out */ zcsr* Dcsr_reduced, double eps);
 void Test2DLaplaceLevander4th();
 void Test2DHelmholtzLevander4th();
-double Test2DLaplaceLevander4thKernel(size_m x, size_m y, size_m x_lg, size_m y_lg, dtype* x_sol);
-double Test2DHelmholtzLevander4thKernel(size_m x, size_m y);
-double Test2DLaplaceLevander4thKernelExactSolutionOnly(size_m x, size_m y);
-double Test2DLaplaceLevander4thKernelGenNumSolutionLowGrid(size_m x, size_m y, dtype* x_sol);
+double Test2DLaplaceLevander4thKernel(size_m x, size_m y, size_m x_lg, size_m y_lg, dtype* x_sol, double beta_eq);
+double Test2DHelmholtzLevander4thKernel(size_m x, size_m y, double beta_eq);
+double Test2DLaplaceLevander4thKernelExactSolutionOnly(size_m x, size_m y, double beta_eq);
+double Test2DLaplaceLevander4thKernelGenNumSolutionLowGrid(size_m x, size_m y, dtype* x_sol, double beta_eq);
 
 // FFT
 void Test_FFT1D_Real(int n /* grid points in 1 dim */, double eps);
@@ -64,7 +64,7 @@ void TestNormalizedVector(int n, dtype* vect, double eps);
 void TestFGMRES();
 void Test1DHelmholtz(int n1, int n2, int n3, dtype* u_sol, double thresh, char *str);
 void TestSymmSparseMatrixOnline2DwithPML(size_m x, size_m y, size_m z, zcsr *D2csr_zero);
-void TestInverseTraversal(size_m x, size_m y, size_m z, const point source, const dtype *x_sol, const dtype *f_orig, double thresh);
+void TestInverseTraversal(size_m x, size_m y, size_m z, const point source, const dtype *x_sol, const dtype *f_orig, double thresh, double beta_eq);
 
 // HODLR
 void Test2DHelmholtzHODLR();

@@ -54,8 +54,8 @@ void print_vec(int size, int *vec1, double *vec2, char *name);
 void NormalizeVector(int size, dtype* v, dtype* out, double& norm);
 void GenRHSandSolutionViaSound3D(size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f, point source);
 dtype u_ex_complex_sound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
-void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double& diff_sol);
-void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, dtype *f, double thresh, double& diff_sol);
+void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double& diff_sol, double beta_eq);
+void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, dtype *f, double thresh, double& diff_sol, double beta_eq);
 void check_norm_circle(size_m x, size_m y, size_m z, const dtype* x_orig_nopml, const dtype* x_sol_nopml, point source, double thresh);
 void print_2Dcsr_mat(size_m x, size_m y, zcsr* D2csr);
 void print_2Dcsr_mat2(size_m x, size_m y, zcsr* D2csr);
@@ -124,11 +124,12 @@ map<vector<int>, dtype> BlockRowMat_to_CSR(int blk, int n1, int n2, int n3, dtyp
 //void construct_block_row(int m, int n, dtype* BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, dtype* AR, int ldar);
 void shift_values(int rows, int *ia, int shift_non_zeros, int non_zeros, int *ja, int shift_columns);
 void GenRHSandSolution2DComplexWaveNumber(size_m x, size_m y, zcsr* D2csr, dtype* u_ex2D, dtype* f2D, dtype kwave2, point sourcePML, int &src);
-
+void ReadBinSolution(long int nmodel, stype *sol, char *title);
+void output2D_float(char *str, bool pml_flag, size_m x, size_m y, stype* x_orig, stype* x_pard);;
 void Get1DSrc(size_m x, point source, int &l);
 void Get2DSrc(size_m x, size_m y, point source, int &l);
 void Get3DSrc(size_m x, size_m y, size_m z, point source, int &l);
-void SetFrequency(char *str, size_m x, size_m y, size_m z, int k, dtype &kwave_beta2);
+void SetFrequency(char *str, size_m x, size_m y, size_m z, int k, dtype &kwave_beta2, double beta_eq);
 void count_dense_elements(int m, int n, double *A, int lda, int& non_zeros);
 void SolvePardiso3D(size_m x, size_m y, size_m z, zcsr* Dcsr, dtype* x_pard, dtype* f, double thresh);
 dtype my_exp(double val);
@@ -145,7 +146,7 @@ void gnuplot2D(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m
 void gnuplot1D(char *splot, char *sout, bool pml_flag, int col, size_m x);
 void PrintProjection1D(size_m x, size_m y, dtype *x_sol_ex, dtype *x_sol_prd, int freq);
 dtype alpha(size_m xyz, double i);
-dtype beta(size_m, size_m y, size_m z, int diag_case, int i, int j, int k);
+dtype beta(size_m, size_m y, size_m z, int diag_case, int i, int j, int k, double beta_eq);
 void check_exact_sol_Hankel(dtype alpha_k, double k2, size_m y, size_m z, dtype* x_sol_prd, double eps);
 dtype Hankel(double x);
 dtype Hankel(dtype z);
@@ -160,17 +161,19 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound, point source);
 void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D, point source);
 dtype MakeSound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
 double Runge(size_m x1, size_m x2, size_m x3, size_m y1, size_m y2, size_m y3, size_m z1, size_m z2, size_m z3, char *str1, char *str2, char *str3, int dim);
-dtype MakeSound2D(size_m xx, size_m yy, double x, double y, point source);
-void GenerateDeltaL(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D, dtype* deltaL);
+dtype MakeSound2D(size_m xx, size_m yy, double x, double y, point source, double beta_eq);
+void GenerateDeltaL(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D, dtype* deltaL, double beta_eq);
 void HeteroSoundSpeed2DExtensionToPML(size_m x, size_m y, dtype *sound2D);
-void Solve1DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f1D, dtype *x_sol1D, double thresh);
-void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_sol2D, double thresh);
-dtype beta2D(size_m x, size_m y, int diag_case, int i, int j);
-dtype beta1D(size_m x, int diag_case, double k2, int i);
+void Solve1DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f1D, dtype *x_sol1D, double thresh, double beta_eq);
+void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_sol2D, double thresh, double beta_eq);
+dtype beta2D(size_m x, size_m y, int diag_case, int i, int j, double beta_eq);
+dtype beta1D(size_m x, int diag_case, double k2, int i, double beta_eq);
 void NullifySource2D(size_m x, size_m y, dtype *u, int src, int npoints);
 void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double spg, const dtype* x_orig_nopml, const dtype* x_sol_nopml,
 	double* x_orig_re, double* x_orig_im, double *x_sol_re, double *x_sol_im);
 void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, dtype kwave_beta2, int* freqs);
+double check_norm_circle_3D(size_m xx, size_m yy, size_m zz, int start, int end, const dtype* x_orig, const dtype* x_sol, point source, double thresh);
+void compute_and_print_circle_norm(size_m x, size_m y, size_m z, dtype *x_orig, dtype *x_sol, point source, double thresh);
 
 //FFT
 void MyFFT1D_ForwardReal(int n, double *f, dtype*f_MYFFT);
@@ -194,8 +197,8 @@ void GenRHSandSolution2D_Syntetic(size_m x, size_m y, zcsr *Dcsr, dtype *u, dtyp
 void GenExact1DHelmholtz(int n, size_m x, dtype *x_sol_ex, double k, point sourcePML);
 
 //
-void Solve3DSparseUsingFT_CSR(size_m x, size_m y, size_m z, int *iparm, int *perm, size_t *pt, zcsr** &D2csr, const dtype *f, dtype* x_sol, double thresh);
-void ApplyCoeffMatrixA_CSR(size_m x, size_m y, size_m z, int *iparm, int *perm, size_t *pt, zcsr** &D2csr, const dtype *w, const dtype* deltaL, dtype* g, double thresh);
+void Solve3DSparseUsingFT_CSR(size_m x, size_m y, size_m z, int *iparm, int *perm, size_t *pt, zcsr** &D2csr, const dtype *f, dtype* x_sol, double beta_eq, double thresh);
+void ApplyCoeffMatrixA_CSR(size_m x, size_m y, size_m z, int *iparm, int *perm, size_t *pt, zcsr** &D2csr, const dtype *w, const dtype* deltaL, dtype* g, double beta_eq, double thresh);
 void OpTwoMatrices(int m, int n, const dtype *Y1, const dtype *Y2, dtype *Yres, int ldy, char sign);
 void SetRHS1D(size_m xx, dtype* fD, point source, int& l);
 void SetRHS2D(size_m xx, size_m yy, dtype* fD, point source, int& l);
