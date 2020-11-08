@@ -555,6 +555,53 @@ double check_norm_circle_3D(size_m xx, size_m yy, size_m zz, int start_x, int en
 	return norm;
 }
 
+double check_norm_circle_3D_nopml(size_m xx, size_m yy, size_m zz, int start_x, int end_x, const dtype* x_orig_nopml, const dtype* x_sol_nopml, point source, double thresh)
+{
+	int n1 = xx.n_nopml;
+	int n2 = yy.n_nopml;
+	int n3 = zz.n_nopml;
+
+	int size2D = n1 * n2;
+	int size = size2D * n3;
+
+	double x, y, z;
+	//double r0 = 5 * xx.h;
+	double r;
+	//	double r_max = xx.l - 10 * xx.h;
+	double norm;
+
+	double r0 = start_x * xx.h;
+	double r_max = end_x * xx.h;
+
+	dtype* x_sol_circ = alloc_arr<dtype>(size);
+	dtype* x_orig_circ = alloc_arr<dtype>(size);
+
+	for (int k = 0; k < n3; k++)
+		for (int j = 0; j < n2; j++)
+			for (int i = 0; i < n1; i++)
+			{
+				x = (i + 1) * xx.h - source.x;
+				y = (j + 1) * yy.h - source.y;
+				z = (k + 1) * zz.h - source.z;
+				r = sqrt(x * x + y * y + z * z);
+				if (r >= r0 && r <= r_max)
+				{
+					x_sol_circ[i + n1 * j + size2D * k] = x_sol_nopml[i + n1 * j + size2D * k];
+					x_orig_circ[i + n1 * j + size2D * k] = x_orig_nopml[i + n1 * j + size2D * k];
+				}
+			}
+
+	norm = RelError(zlange, size, 1, x_sol_circ, x_orig_circ, size, thresh);
+
+	printf("Square: 0 < x < %lf, 0 < y < %lf, 0 < z < %lf.\n", xx.l, yy.l, zz.l);
+	printf("Norm in circle: %lf < r < %lf: %lf\n", r0, r_max, norm);
+
+	free_arr(x_sol_circ);
+	free_arr(x_orig_circ);
+
+	return norm;
+}
+
 double check_norm_circle2D(size_m xx, size_m yy, int start, int end, dtype* x_orig, dtype* x_sol, point source, double thresh)
 {
 	int n1 = xx.n;
@@ -714,6 +761,27 @@ void GenRHSandSolutionViaSound3D(size_m x, size_m y, size_m z, /* output */ dtyp
 #endif
 
 
+	printf("RHS and solution are constructed\n");
+}
+
+void GenRHSandSolutionViaSound3D_Hetero(char *file, size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f, point source)
+{
+	int size2D = x.n * y.n;
+	int size = size2D * z.n;
+	int l = 0;
+
+	SetRHS3D(x, y, z, f, source, l);
+
+	FILE *in = fopen(file, "r");
+
+	// approximation of inner points values
+#pragma omp parallel for schedule(dynamic)
+	for (int k = 0; k < z.n; k++)
+		for (int j = 0; j < y.n; j++)
+			for (int i = 0; i < x.n; i++)
+				fscanf(in, "%lf\n", u[k * size2D + j * x.n + i]);
+
+	fclose(in);
 	printf("RHS and solution are constructed\n");
 }
 
@@ -996,6 +1064,100 @@ double Runge(size_m x1, size_m x2, size_m x3,
 	return f1 / f2;
 }
 
+double Beta3D(size_m x1, size_m x2,
+	size_m y1, size_m y2,
+	size_m z1, size_m z2,
+	char *str1, char *str2, int dim, int grid)
+{	
+	printf("Count BETA_3D order for N = %d and N = %d \n", grid, 2 * grid);
+	// the lowest size (50 from line 50, 100, 200)
+	int size1, size2;
+	point source = { 0.5, 0.5 };
+	double thresh = 0.5;
+
+	if (dim == 3)
+	{
+		x1.n_nopml = y1.n_nopml = z1.n_nopml = grid - 1;
+		x2.n_nopml = y2.n_nopml = z2.n_nopml = 2 * grid - 1;
+
+		size1 = x1.n_nopml * y1.n_nopml * z1.n_nopml;
+		size2 = x2.n_nopml * y2.n_nopml * z2.n_nopml;
+	}
+	else if (dim == 2)
+	{
+		size1 = x1.n_nopml * y1.n_nopml;
+		size2 = x2.n_nopml * y2.n_nopml;
+	}
+	else
+	{
+		size1 = x1.n_nopml;
+		size2 = x2.n_nopml;
+	}
+	FILE* file1, *file2;
+	file1 = fopen(str1, "r");
+	file2 = fopen(str2, "r");
+	double a, b;
+	double f1, f2;
+	int ione = 1;
+
+	dtype *sol2h = alloc_arr<dtype>(size1); int lda2h = x1.n_nopml;
+	dtype *solh = alloc_arr<dtype>(size2); int ldah = x2.n_nopml;
+
+	for (int i = 0; i < size1; i++)
+	{
+		fscanf(file1, "%lf %lf\n", &a, &b);
+		sol2h[i] = dtype{ a, b };
+		//sol2h[i] = dtype{ 0, 0 };
+	}
+	//printf("LAST 1 = %lf", sol2h[size1 - 1].real(), sol2h[size1 - 1].imag());
+
+	for (int i = 0; i < size2; i++)
+	{
+		fscanf(file2, "%lf  %lf\n", &a, &b);
+		solh[i] = dtype{ a, b };
+	}
+	//printf("LAST 2 = %lf", solh[size2 - 1].real(), solh[size2 - 1].imag());
+
+	f1 = dznrm2(&size1, sol2h, &ione);
+	f2 = dznrm2(&size2, solh, &ione);
+
+	//printf("Runge (||u1|| - ||u2||) / (||u2|| - ||u3||) = %lf\n", (f1 - f2) / (f2 - f3));
+
+	int step1 = (x2.n_nopml + 1) / (x1.n_nopml + 1);
+	int step2 = (x2.n_nopml + 1) / (x2.n_nopml + 1);
+
+	printf("step1 = %d step2 = %d\n", step1, step2);
+
+	dtype *sol2h_red = alloc_arr<dtype>(size1);
+	dtype *solh_red = alloc_arr<dtype>(size1); 
+
+		for (int k = 0; k < z1.n_nopml; k++)
+			for (int j = 0; j < y1.n_nopml; j++)
+				for (int i = 0; i < x1.n_nopml; i++)
+					sol2h_red[i + x1.n_nopml * j + x1.n_nopml * y1.n_nopml * k] = sol2h[step2 * (i + 1) - 1 + x1.n_nopml * (step2 * (j + 1) - 1) + x1.n_nopml * y1.n_nopml * (step2 * (k + 1) - 1)];
+
+		for (int k = 0; k < z1.n_nopml; k++)
+			for (int j = 0; j < y1.n_nopml; j++)
+				for (int i = 0; i < x1.n_nopml; i++)
+					solh_red[i + x1.n_nopml * j + x1.n_nopml * y1.n_nopml * k] = solh[step1 * (i + 1) - 1 + x2.n_nopml * (step1 * (j + 1) - 1) + x2.n_nopml * y2.n_nopml * (step1 * (k + 1) - 1)];
+
+		printf("compute_and_print_circle_norm_nopml\n");
+		// 0, 1, 2, 3, 4, 5, 6 vs 1, 3, 5, 7, 9, 11
+		compute_and_print_circle_norm_nopml(x1, y1, z1, solh_red, sol2h_red, source, thresh);
+
+	free_arr(sol2h_red);
+	free_arr(solh_red);
+	free_arr(sol2h);
+	free_arr(solh);
+
+	fclose(file1);
+	fclose(file2);
+
+	//printf("Norm3D ||u(2h) - u(h/2)|| / || u(h/2) || = %e\n", f1);
+
+	return f1 / f2;
+}
+
 void compute_and_print_circle_norm(size_m x, size_m y, size_m z, dtype *x_orig, dtype *x_sol, point source, double thresh)
 {
 	double *norm_arr = alloc_arr<double>(x.n);
@@ -1016,6 +1178,32 @@ void compute_and_print_circle_norm(size_m x, size_m y, size_m z, dtype *x_orig, 
 		set output 'beta_3D_norm2_Nx%dNy%d_SPG%d.png' \n \
 		plot \'%s\' u 1:2 w linespoints pt 7 pointsize 1 notitle\n\n \
 		exit\n", x.n, y.n, z.spg_pts, str_norm);
+
+	fclose(fp);
+	system("beta_3D_norm2.plt");
+}
+
+void compute_and_print_circle_norm_nopml(size_m x, size_m y, size_m z, dtype *x_orig_nopml, dtype *x_sol_nopml, point source, double thresh)
+{
+	double *norm_arr = alloc_arr<double>(x.n_nopml);
+	char str_norm[255];
+
+	sprintf(str_norm, "beta_3D_norm2_Nx%dNy%d_SPG%d.dat", x.n_nopml, y.n_nopml, z.spg_pts);
+
+	FILE *beta_norm2 = fopen(str_norm, "w");
+	for (int i = 2; i < x.n_nopml; i++)
+	{
+		norm_arr[i] = check_norm_circle_3D_nopml(x, y, z, 2, i, x_orig_nopml, x_sol_nopml, source, thresh);
+		fprintf(beta_norm2, "%lf %lf\n", i * x.h, norm_arr[i]);
+	}
+	fclose(beta_norm2);
+	free(norm_arr);
+
+	FILE *fp = fopen("beta_3D_norm2.plt", "w");
+	fprintf(fp, "set term png font \"Times - Roman, 16\"\n \
+		set output 'beta_3D_norm2_Nx%dNy%d_SPG%d.png' \n \
+		plot \'%s\' u 1:2 w linespoints pt 7 pointsize 1 notitle\n\n \
+		exit\n", x.n_nopml, y.n_nopml, z.spg_pts, str_norm);
 
 	fclose(fp);
 	system("beta_3D_norm2.plt");

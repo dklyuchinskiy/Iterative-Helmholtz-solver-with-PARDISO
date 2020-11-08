@@ -174,6 +174,14 @@ void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double sp
 void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, dtype kwave_beta2, int* freqs);
 double check_norm_circle_3D(size_m xx, size_m yy, size_m zz, int start, int end, const dtype* x_orig, const dtype* x_sol, point source, double thresh);
 void compute_and_print_circle_norm(size_m x, size_m y, size_m z, dtype *x_orig, dtype *x_sol, point source, double thresh);
+void GenRHSandSolutionViaSound3D_Hetero(size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f, point source);
+double check_norm_circle_3D_nopml(size_m xx, size_m yy, size_m zz, int start_x, int end_x, const dtype* x_orig_nopml, const dtype* x_sol_nopml, point source, double thresh);
+void compute_and_print_circle_norm_nopml(size_m x, size_m y, size_m z, dtype *x_orig_nopml, dtype *x_sol_nopml, point source, double thresh);
+
+double Beta3D(size_m x1, size_m x2,
+	size_m y1, size_m y2,
+	size_m z1, size_m z2,
+	char *str1, char *str2, int dim, int grid);
 
 //FFT
 void MyFFT1D_ForwardReal(int n, double *f, dtype*f_MYFFT);

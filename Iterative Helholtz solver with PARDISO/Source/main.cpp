@@ -236,7 +236,7 @@ int main()
 			printf("FGMRES = %lf GB\n", total);
 #endif
 
-#define TEST1D
+//#define TEST1D
 
 #ifdef TEST1D
 			dtype *f1D = alloc_arr<dtype>(x.n);
@@ -244,7 +244,7 @@ int main()
 			Solve1DSparseHelmholtz(x, y, z, f1D, x_sol1D, thresh, beta_eq);
 #endif
 
-#define TEST2D
+//#define TEST2D
 
 #ifdef TEST2D
 			dtype *f2D = alloc_arr<dtype>(x.n * y.n);
@@ -315,9 +315,11 @@ int main()
 		// ------------
 		// f(h) - f(h/2)
 
-#if 0
 			bool make_runge_count;
-#define MAKE_RUNGE_3D
+			bool make_beta3D_count;
+
+//#define MAKE_RUNGE_3D
+
 #ifdef MAKE_RUNGE_3D
 			make_runge_count = true;
 #else
@@ -329,11 +331,35 @@ int main()
 			{
 				order = Runge(x, x, x, y, y, y, z, z, z, "sol3D_N50.dat", "sol3D_N100.dat", "sol3D_N200.dat", 3);
 				printf("ratio = %lf, order Runge = %lf\n", order, log(order) / log(2.0));
+				system("pause");
+				return 0;
 			}
 
-			system("pause");
-			return 0;
+#define MAKE_BETA_3D
+
+#ifdef MAKE_BETA_3D
+			make_beta3D_count = true;
+#else
+			make_beta3D_count = false;
 #endif
+
+
+			if (make_beta3D_count)
+			{
+				size_m x1, y1, z1;
+				size_m x2, y2, z2;
+				x1.h = x.h;
+				y1.h = y.h;
+				z1.h = z.h;
+				z1.spg_pts = z.spg_pts;
+				z2.spg_pts = z.spg_pts;
+				
+				if (x.n_nopml == 49) order = Beta3D(x1, x2, y1, y2, z1, z2, "sol3D_N50.dat", "sol3D_N100.dat", 3, 50);
+				if (x.n_nopml == 99) order = Beta3D(x1, x2, y1, y2, z1, z2, "sol3D_N100.dat", "sol3D_N200.dat", 3, 100);
+
+				system("pause");
+				return 0;
+			}
 
 			point source = { x.l / 2.0, y.l / 2.0, z.l / 2.0 };
 
@@ -492,6 +518,15 @@ int main()
 			check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, niter, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
 			compute_and_print_circle_norm(x, y, z, x_orig, x_sol, source, thresh);
 
+			char str[255];
+			sprintf(str, "sol3D_N%d.dat", x.n_nopml + 1);
+			FILE *file = fopen(str, "w");
+
+			for (int i = 0; i < size_nopml; i++)
+				fprintf(file, "%18.16lf %18.16lf\n", x_sol_nopml[i].real(), x_sol_nopml[i].imag());
+
+			fclose(file);
+
 			//printf("Computing error ||x_{exact}-x_{comp_fft}||/||x_{exact}||\n");
 #ifndef TEST_HELM_1D
 			//check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, niter, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
@@ -640,9 +675,9 @@ int main()
 			reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 			reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
-			//#define MAKE_RUNGE_3D
+//#define MAKE_RUNGE_3D
 
-#ifndef MAKE_RUNGE_3D
+#if !defined(MAKE_RUNGE_3D) && !defined(MAKE_BETA_3D)
 			RelRes = dznrm2(&size_nopml, x_sol_nopml, &ione);
 			printf("norm x_sol = %lf\n", RelRes);
 
@@ -657,6 +692,9 @@ int main()
 
 			//return 0;
 #endif
+
+#define MAKE_BETA_3D
+
 
 #define OUTPUT
 #ifdef OUTPUT
