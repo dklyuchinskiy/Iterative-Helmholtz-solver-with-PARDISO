@@ -158,11 +158,11 @@ enum class DIAG13
 #define GMRES_SIZE 128
 
 //#define HODLR
-#define HOMO
+//#define HOMO
 //#define SYMMETRY
 //#define CHECK_ACCURACY // 2D problems
 //#define PRINT_TEST
-#define RES_EXIT	1e-8
+#define RES_EXIT	1e-6
 
 //#define ORDER4
 #define PML_PTS 0

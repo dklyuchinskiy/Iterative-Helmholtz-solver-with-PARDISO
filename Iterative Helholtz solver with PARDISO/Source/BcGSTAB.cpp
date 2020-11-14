@@ -407,10 +407,10 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 #endif
 
 		norm = dznrm2(&size, w, &ione);
-		//printf("norm ||Ax0|| = %lf\n", norm);
+		printf("norm ||Ax0|| = %lf\n", norm);
 
 		norm = dznrm2(&size, f, &ione);
-		//printf("norm ||f|| = %lf\n", norm);
+		printf("norm ||f|| = %lf\n", norm);
 
 		zcopy(&size, f, &ione, r0, &ione);
 		zaxpy(&size, &mone, w, &ione, r0, &ione); // r0: = f - Ax0
@@ -420,7 +420,7 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 		zdscal(&size, &dlin, r0st, &ione);   // r0st = 2 * r0
 
 		norm = dznrm2(&size, r0, &ione);
-		//printf("norm ||r0|| = %lf\n", norm);
+		printf("norm ||r0|| = %lf\n", norm);
 
 		//norm = RelError(zlange, size, 1, r0, f, size, thresh);
 		//printf("r0 = f - Ax0, norm ||r0 - f|| = %lf\n", norm);
@@ -531,8 +531,8 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 			printf("Residual in 3D phys domain |x_sol - x_orig| / |x_orig| = %e\n", norm);
 			printf("-----------\n");
 #endif
-			//fprintf(output, "%d %e %lf\n", j, RelRes, norm);
-			fprintf(output, "%d %17.15lf\n", j, norm);
+			fprintf(output, "%d %e %lf\n", j, RelRes, norm);
+			//fprintf(output, "%d %17.15lf\n", j, norm);
 
 			check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, j, 0, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
 
@@ -549,7 +549,9 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 			MultVectorConst<dtype>(size_nopml, x_sol_nopml, 1.0, x_sol_prev_nopml);
 			printf("norm |u_k+1 - u_k|= %e\n", diff_sol);
 #endif
+#ifdef HOMO
 			if (RelRes < RES_EXIT) break;
+#endif
 #ifdef PRINT
 			printf("--------------------------------------------------------------------------------\n");
 #endif

@@ -122,12 +122,14 @@ void Clear(int m, int n, dtype* A, int lda)
 void NormalizeVector(int size, dtype* v, dtype* out, double &norm)
 {
 	int ione = 1;
-	norm = dznrm2(&size, v, &ione);
+	double loc_norm = dznrm2(&size, v, &ione);
 
 	// Compute 
 #pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < size; i++)
-		out[i] = v[i] / norm;
+		out[i] = v[i] / loc_norm;
+
+	norm = loc_norm;
 }
 
 void GenerateDiagonal1DBlock(double w, int part_of_field, size_m x, size_m y, size_m z, dtype *DD, int lddd,
@@ -1286,6 +1288,7 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 					sound3D[k * n + j * Nx + i] = MakeSound3D(x, y, z, (i + 1) * x.h, (j + 1) * y.h, (k + 1) * z.h, source);
 #endif
 
+#if 0
 	char str[255]; sprintf(str, "SoundSpeed3D_N%d.dat", x.n);
 	FILE* file = fopen(str, "w");
 
@@ -1295,6 +1298,7 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 				fprintf(file, "sound[%d][%d][%d] = %lf\n", i, j, k, sound3D[k * n + j * Nx + i].real());
 
 	fclose(file);
+#endif
 }
 
 void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D, point source)

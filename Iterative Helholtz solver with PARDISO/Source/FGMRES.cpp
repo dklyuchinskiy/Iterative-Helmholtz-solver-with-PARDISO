@@ -88,7 +88,9 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	//	output(str2, false, x, y, z, sound3D, deltaL)
 
 	printf("-----Step 1. Memory allocation for 2D problems\n");
-
+	printf("size3D = %d\n", size);
+	if (size > 2147483647) printf("!!! OVERFLOW !!!\n");
+	system("pause");
 	zcsr *D2csr_zero;
 	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
 	int non_zeros_in_2Dblock9diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n) + 4 * (x.n - 1) * (y.n - 1);
@@ -137,7 +139,9 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 
 	time = omp_get_wtime();
 	//TestSymmSparseMatrixOnline2DwithPML(x, y, z, D2csr_zero);
+#if 0
 	TestSymmSparseMatrixOnline2DwithPML9Pts(x, y, z, D2csr_zero);
+#endif
 	time = omp_get_wtime() - time;
 #endif
 
@@ -310,7 +314,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	dtype *x_init = alloc_arr<dtype>(size);
 
 	// matrix of Krylov basis
-	dtype* V = alloc_arr<dtype>(size * (m + 1)); int ldv = size;
+	dtype* V = alloc_arr<dtype>((size_t)size * (m + 1)); int ldv = size;
 	dtype* w = alloc_arr<dtype>(size);
 
 	// residual vector
@@ -340,6 +344,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 #endif
 
 #define TEST_L0
+
 	// test
 #ifdef TEST_L0
 	dtype *f_sol = alloc_arr<dtype>(size);
@@ -399,7 +404,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 
 		// 2. The main iterations of algorithm
 		printf("-----Step 2. Iterations-----\n");
-		for (int j = 0; j < m; j++)
+		for (size_t j = 0; j < (size_t)m; j++)
 		{
 			printf("---------------------\nIteration = %d\n---------------------\n", j);
 			// Compute w[j] := A * v[j]
@@ -561,6 +566,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			diff_sol = RelError(zlange, size_nopml, 1, x_sol_nopml, x_sol_prev_nopml, size_nopml, thresh);
 			MultVectorConst<dtype>(size_nopml, x_sol_nopml, 1.0, x_sol_prev_nopml);
 			printf("norm |u_k+1 - u_k|= %e\n", diff_sol);
+			fprintf(output, "%d %e\n", j, diff_sol);
+			if (diff_sol < RES_EXIT) break;
 #endif
 
 #ifdef HOMO
