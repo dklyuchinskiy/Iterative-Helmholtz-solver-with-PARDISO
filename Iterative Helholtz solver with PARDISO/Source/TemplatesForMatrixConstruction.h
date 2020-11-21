@@ -93,6 +93,27 @@ RealType RelError(RealType(*LANGE)(const char *, const int*, const int*, const M
 	//else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
 }
 
+template <typename MatrixType, typename RealType>
+RealType RelErrorNorm1(RealType(*LANGE)(const char*, const int*, const int*, const MatrixType*, const int*, RealType*),
+	int m, int n, const MatrixType* Hrec, const MatrixType* Hinit, int ldh, RealType eps)
+{
+	RealType norm = 0;
+	MatrixType* Hdiff = alloc_arr<MatrixType>(m * n);
+
+	// Norm of residual
+	for (int j = 0; j < n; j++)
+#pragma omp simd
+		for (int i = 0; i < m; i++)
+			Hdiff[i + ldh * j] = Hrec[i + ldh * j] - Hinit[i + ldh * j];
+
+	norm = LANGE("1", &m, &n, Hdiff, &ldh, NULL);
+	norm = norm / LANGE("1", &m, &n, Hinit, &ldh, NULL);
+
+	free_arr(Hdiff);
+
+	return norm;
+}
+
 template <typename MatrixType>
 double RelError2(double(*LANGE)(const char *, const int*, const int*, const MatrixType*, const int*, double *),
 	int m, int n, const MatrixType *Hrec, int ldh1, const MatrixType *Hinit, int ldh2, double eps)

@@ -83,6 +83,7 @@ void ReadSolution(int size, dtype *x_sol, char *);
 void output1D(char *str, bool pml_flag, size_m x, double* x_re, double* x_im);
 void gnuplot1D_simple(char *splot, char *sout, bool pml_flag, int col, size_m x);
 double check_norm_circle2D(size_m xx, size_m yy, int start, int end, dtype* x_orig, dtype* x_sol, point source, double thresh);
+double check_norm_circle_3D(int job, size_m xx, size_m yy, size_m zz, int start_x, int end_x, const dtype* x_orig, const dtype* x_sol, point source, double thresh);
 
 void print_map(const map<vector<int>, dtype>& SD);
 void print_csr(int n, dcsr* A);
@@ -172,7 +173,6 @@ void NullifySource2D(size_m x, size_m y, dtype *u, int src, int npoints);
 void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double spg, const dtype* x_orig_nopml, const dtype* x_sol_nopml,
 	double* x_orig_re, double* x_orig_im, double *x_sol_re, double *x_sol_im);
 void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, dtype kwave_beta2, int* freqs);
-double check_norm_circle_3D(size_m xx, size_m yy, size_m zz, int start, int end, const dtype* x_orig, const dtype* x_sol, point source, double thresh);
 void compute_and_print_circle_norm(size_m x, size_m y, size_m z, dtype *x_orig, dtype *x_sol, point source, double thresh);
 void GenRHSandSolutionViaSound3D_Hetero(size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f, point source);
 double check_norm_circle_3D_nopml(size_m xx, size_m yy, size_m zz, int start_x, int end_x, const dtype* x_orig_nopml, const dtype* x_sol_nopml, point source, double thresh);

@@ -485,8 +485,8 @@ void PrintProjection1D(size_m x, size_m y, dtype *x_ex, dtype *x_prd, int freq)
 	{
 		if (j == y.n / 2)
 		{
-			sprintf(str1, "Charts3D/projX/model_pml1Dx_freq%d_sec%d_h%d", freq, j, (int)x.h);
-			sprintf(str2, "Charts3D/projX/model_pml1Dx_diff_freq%d_sec%d_h%d", freq, j, (int)x.h);
+			sprintf(str1, "Charts3D/%d/projX/model_pml1Dx_freq%d_sec%d_h%d", x.n_nopml + 1, freq, j, (int)x.h);
+			sprintf(str2, "Charts3D/%d/projX/model_pml1Dx_diff_freq%d_sec%d_h%d", x.n_nopml + 1, freq, j, (int)x.h);
 
 			output1D(str1, pml_flag, x, &x_ex[x.n * j], &x_prd[x.n * j]);
 			gnuplot1D(str1, str2, pml_flag, 0, x);
@@ -494,8 +494,8 @@ void PrintProjection1D(size_m x, size_m y, dtype *x_ex, dtype *x_prd, int freq)
 	}
 
 	// output 1D - Y direction
-	sprintf(str1, "Charts3D/projY/model_pml1Dy_freq%d_sec%d_h%d", freq, x.n / 2, (int)x.h);
-	sprintf(str2, "Charts3D/projY/model_pml1Dy_diff_freq%d_sec%d_h%d", freq, x.n / 2, (int)x.h);
+	sprintf(str1, "Charts3D/%d/projY/model_pml1Dy_freq%d_sec%d_h%d", y.n_nopml + 1, freq, x.n / 2, (int)x.h);
+	sprintf(str2, "Charts3D/%d/projY/model_pml1Dy_diff_freq%d_sec%d_h%d", y.n_nopml + 1, freq, x.n / 2, (int)x.h);
 
 	for (int j = 0; j < y.n; j++)
 	{
@@ -510,7 +510,7 @@ void PrintProjection1D(size_m x, size_m y, dtype *x_ex, dtype *x_prd, int freq)
 	free_arr(x_sol1D_prd);
 }
 
-double check_norm_circle_3D(size_m xx, size_m yy, size_m zz, int start_x, int end_x, const dtype* x_orig, const dtype* x_sol, point source, double thresh)
+double check_norm_circle_3D(int job, size_m xx, size_m yy, size_m zz, int start_x, int end_x, const dtype* x_orig, const dtype* x_sol, point source, double thresh)
 {
 	int n1 = xx.n;
 	int n2 = yy.n;
@@ -546,7 +546,12 @@ double check_norm_circle_3D(size_m xx, size_m yy, size_m zz, int start_x, int en
 				}
 			}
 
-	norm = RelError(zlange, size, 1, x_sol_circ, x_orig_circ, size, thresh);
+	if (job == 2) {
+		norm = RelError(zlange, size, 1, x_sol_circ, x_orig_circ, size, thresh);
+	}
+	else {
+		norm = RelErrorNorm1(zlange, size, 1, x_sol_circ, x_orig_circ, size, thresh);
+	}
 
 	printf("Square: 0 < x < %lf, 0 < y < %lf, 0 < z < %lf.\n", xx.l, yy.l, zz.l);
 	printf("Norm in circle: %lf < r < %lf: %lf\n", r0, r_max, norm);
@@ -1164,16 +1169,18 @@ void compute_and_print_circle_norm(size_m x, size_m y, size_m z, dtype *x_orig, 
 {
 	double *norm_arr = alloc_arr<double>(x.n);
 	char str_norm[255];
+	char str_norm2[255];
+
+	//--------------------- beta2 -----------------------
 	sprintf(str_norm, "beta_3D_norm2_Nx%dNy%d_SPG%d.dat", x.n, y.n, z.spg_pts);
 
 	FILE *beta_norm2 = fopen(str_norm, "w");
 	for (int i = 2; i < x.n - x.pml_pts; i++)
 	{
-		norm_arr[i] = check_norm_circle_3D(x, y, z, 2, i, x_orig, x_sol, source, thresh);
+		norm_arr[i] = check_norm_circle_3D(2, x, y, z, 2, i, x_orig, x_sol, source, thresh);
 		fprintf(beta_norm2, "%lf %lf\n", i * x.h, norm_arr[i]);
 	}
 	fclose(beta_norm2);
-	free(norm_arr);
 
 	FILE *fp = fopen("beta_3D_norm2.plt", "w");
 	fprintf(fp, "set term png font \"Times - Roman, 16\"\n \
@@ -1183,6 +1190,28 @@ void compute_and_print_circle_norm(size_m x, size_m y, size_m z, dtype *x_orig, 
 
 	fclose(fp);
 	system("beta_3D_norm2.plt");
+
+	//--------------------- beta1 ---------------------
+	sprintf(str_norm2, "beta_3D_norm1_Nx%dNy%d_SPG%d.dat", x.n, y.n, z.spg_pts);
+
+	FILE* beta_norm1 = fopen(str_norm, "w");
+	for (int i = 2; i < x.n - x.pml_pts; i++)
+	{
+		norm_arr[i] = check_norm_circle_3D(1, x, y, z, 2, i, x_orig, x_sol, source, thresh);
+		fprintf(beta_norm1, "%lf %lf\n", i * x.h, norm_arr[i]);
+	}
+	fclose(beta_norm1);
+	free(norm_arr);
+
+	fp = fopen("beta_3D_norm1.plt", "w");
+	fprintf(fp, "set term png font \"Times - Roman, 16\"\n \
+		set output 'beta_3D_norm1_Nx%dNy%d_SPG%d.png' \n \
+		plot \'%s\' u 1:2 w linespoints pt 7 pointsize 1 notitle\n\n \
+		exit\n", x.n, y.n, z.spg_pts, str_norm);
+
+	fclose(fp);
+	system("beta_3D_norm1.plt");
+
 }
 
 void compute_and_print_circle_norm_nopml(size_m x, size_m y, size_m z, dtype *x_orig_nopml, dtype *x_sol_nopml, point source, double thresh)

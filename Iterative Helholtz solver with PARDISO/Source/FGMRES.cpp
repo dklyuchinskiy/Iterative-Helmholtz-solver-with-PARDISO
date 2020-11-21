@@ -566,16 +566,14 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			diff_sol = RelError(zlange, size_nopml, 1, x_sol_nopml, x_sol_prev_nopml, size_nopml, thresh);
 			MultVectorConst<dtype>(size_nopml, x_sol_nopml, 1.0, x_sol_prev_nopml);
 			printf("norm |u_k+1 - u_k|= %e\n", diff_sol);
-			fprintf(output, "%d %e\n", j, diff_sol);
-			if (diff_sol < RES_EXIT) break;
+			fprintf(output, "%d %e %lf\n", j, RelRes, diff_sol);
+			//if (diff_sol < RES_EXIT) break;
 #endif
-
-#ifdef HOMO
 			if (RelRes < RES_EXIT) break;
-#endif
+
 			printf("--------------------------------------------------------------------------------\n");
 		}
-
+		fclose(output);
 		// For the next step
 		zcopy(&size, x0, &ione, x_init, &ione);
 #endif

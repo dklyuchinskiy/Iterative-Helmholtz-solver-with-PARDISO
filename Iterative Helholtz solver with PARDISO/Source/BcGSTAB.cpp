@@ -45,7 +45,7 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 #if 1
 	FILE *output;
 	char str0[255];
-	sprintf(str0, "convergence_N%d_Lx%d_FREQ%d_SPG%6.lf_BETA%5.3lf.dat", x.n_nopml, (int)LENGTH_X, (int)nu, z.h * 2 * z.spg_pts, beta_eq);
+	sprintf(str0, "convergence_N%d_Lx%d_FREQ%d_SPG%5.lf_BETA%5.3lf.dat", x.n_nopml, (int)LENGTH_X, (int)nu, z.h * 2 * z.spg_pts, beta_eq);
 	output = fopen(str0, "w");
 #endif
 
@@ -482,7 +482,7 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 			//ApplyCoeffMatrixA_CSR(x, y, z, iparm, perm, pt, D2csr, x0, deltaL, g, beta_eq, thresh);
 			//Solve3DSparseUsingFT_CSR(x, y, z, iparm, perm, pt, D2csr, g, w, beta_eq, thresh);
 
-			Multiply3DSparseUsingFT(x, y, z, iparm, perm, pt, D2csr, x_sol, g, thresh);
+			Multiply3DSparseUsingFT(x, y, z, iparm, perm, pt, D2csr, x0, g, thresh);
 			ApplyCoeffMatrixA_CSR(x, y, z, iparm, perm, pt, D2csr, g, deltaL, w, beta_eq, thresh);
 #else
 			ApplyCoeffMatrixA_HODLR(x, y, z, Gstr, B, solves, x0, deltaL, w, thresh, smallsize);
@@ -493,9 +493,9 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 		//	printf("-----------\n");
 		//	printf("Residual in 3D with PML |(I - deltaL * L^{-1}) * x_sol - f| = %lf\n", RelRes);
 		//	printf("-----------\n");
-
 			reducePML3D(x, y, z, size, w, size_nopml, Ax0_nopml);
 			RelRes = dznrm2(&size_nopml, Ax0_nopml, &ione);
+
 
 #ifdef PRINT
 			printf("-----------\n");
@@ -548,15 +548,14 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 			diff_sol = RelError(zlange, size_nopml, 1, x_sol_nopml, x_sol_prev_nopml, size_nopml, thresh);
 			MultVectorConst<dtype>(size_nopml, x_sol_nopml, 1.0, x_sol_prev_nopml);
 			printf("norm |u_k+1 - u_k|= %e\n", diff_sol);
+			fprintf(output, "%d %e %lf\n", j, RelRes, diff_sol);
 #endif
-#ifdef HOMO
 			if (RelRes < RES_EXIT) break;
-#endif
 #ifdef PRINT
 			printf("--------------------------------------------------------------------------------\n");
 #endif
 		}
-
+		fclose(output);
 		// For the next step
 		zcopy(&size, x0, &ione, x_init, &ione);
 #endif

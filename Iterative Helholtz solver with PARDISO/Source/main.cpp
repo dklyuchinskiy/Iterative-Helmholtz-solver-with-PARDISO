@@ -186,7 +186,7 @@ int main()
 			//int niter = 8;// for freq = 4 but n = 50 and BCGStab
 							// FGMRES: freq = 4, n = 50, niter = 8
 
-			int niter = 50; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
+			int niter = 100; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
 
 #ifdef PRINT
 			printf("Frequency nu = %d\n", nu);
@@ -356,6 +356,7 @@ int main()
 				
 				if (x.n_nopml == 49) order = Beta3D(x1, x2, y1, y2, z1, z2, "sol3D_N50.dat", "sol3D_N100.dat", 3, 50);
 				if (x.n_nopml == 99) order = Beta3D(x1, x2, y1, y2, z1, z2, "sol3D_N100.dat", "sol3D_N200.dat", 3, 100);
+				if (x.n_nopml == 199) order = Beta3D(x1, x2, y1, y2, z1, z2, "sol3D_N200.dat", "sol3D_N400.dat", 3, 200);
 
 				system("pause");
 				return 0;
@@ -416,8 +417,8 @@ int main()
 			// ------------ FGMRES-------------
 			all_time = omp_get_wtime();
 
-			FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
-			//BCGSTAB(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
+			//FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
+			BCGSTAB(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
 			// BcgSTAB 
 
 			all_time = omp_get_wtime() - all_time;
@@ -442,7 +443,7 @@ int main()
 //#define OUTPUT
 //#define GNUPLOT
 
-#if 0
+#if 1
 			// for printing with gnuplot (1D projections in sponge direction)
 			dtype* z_sol1D_ex = alloc_arr<dtype>(z.n);
 			dtype* z_sol1D_prd = alloc_arr<dtype>(z.n);
@@ -456,8 +457,8 @@ int main()
 			{
 				if (j == y.n / 2 || j == y.n / 4 || j == y.n * 3 / 4)
 				{
-					sprintf(str1, "Charts3D/projZ/model_pml1Dz_sec%d_h%d", j, (int)z.h);
-					sprintf(str2, "Charts3D/projZ/model_pml1Dz_diff_sec%d_h%d", j, (int)z.h);
+					sprintf(str1, "Charts3D/%d/projZ/model_pml1Dz_sec%d_h%d", z.n_nopml + 1, j, (int)z.h);
+					sprintf(str2, "Charts3D/%d/projZ/model_pml1Dz_diff_sec%d_h%d", z.n_nopml + 1, j, (int)z.h);
 
 					for (int k = 0; k < z.n; k++)
 					{
@@ -515,6 +516,7 @@ int main()
 			double *x_orig_im = alloc_arr<double>(size_nopml);
 			double *x_sol_im = alloc_arr<double>(size_nopml);
 
+			printf("Final norm check and print circle norm...\n");
 			check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, niter, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
 			compute_and_print_circle_norm(x, y, z, x_orig, x_sol, source, thresh);
 
@@ -676,6 +678,7 @@ int main()
 			reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
 //#define MAKE_RUNGE_3D
+//#define MAKE_BETA_3Ds
 
 #if !defined(MAKE_RUNGE_3D) && !defined(MAKE_BETA_3D)
 			RelRes = dznrm2(&size_nopml, x_sol_nopml, &ione);
@@ -693,10 +696,9 @@ int main()
 			//return 0;
 #endif
 
-#define MAKE_BETA_3D
+//#define OUTPUT
+//#define GNUPLOT
 
-
-#define OUTPUT
 #ifdef OUTPUT
 			printf("Output results to file...\n");
 
@@ -706,7 +708,6 @@ int main()
 			output(file1, pml_flag, x, y, z, x_orig_nopml, x_sol_nopml, diff_sol);
 #endif
 
-#define GNUPLOT
 #ifdef GNUPLOT
 			printf("Printing with GNUPLOT...\n");
 			pml_flag = true;
