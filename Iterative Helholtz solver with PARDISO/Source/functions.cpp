@@ -600,7 +600,7 @@ double check_norm_circle_3D_nopml(size_m xx, size_m yy, size_m zz, int start_x, 
 
 	norm = RelError(zlange, size, 1, x_sol_circ, x_orig_circ, size, thresh);
 
-	printf("Square: 0 < x < %lf, 0 < y < %lf, 0 < z < %lf.\n", xx.l, yy.l, zz.l);
+	printf("Square NOPML: 0 < x < %lf, 0 < y < %lf, 0 < z < %lf.\n", LENGTH_X, LENGTH_Y, LENGTH_Z);
 	printf("Norm in circle: %lf < r < %lf: %lf\n", r0, r_max, norm);
 
 	free_arr(x_sol_circ);
@@ -1074,12 +1074,12 @@ double Runge(size_m x1, size_m x2, size_m x3,
 double Beta3D(size_m x1, size_m x2,
 	size_m y1, size_m y2,
 	size_m z1, size_m z2,
-	char *str1, char *str2, int dim, int grid)
+	char *str1, char *str2, int dim, int grid, point source)
 {	
 	printf("Count BETA_3D order for N = %d and N = %d \n", grid, 2 * grid);
 	// the lowest size (50 from line 50, 100, 200)
 	int size1, size2;
-	point source = { 0.5, 0.5 };
+	//point source = { 0.5, 0.5, 0.5 };
 	double thresh = 0.5;
 
 	if (dim == 3)

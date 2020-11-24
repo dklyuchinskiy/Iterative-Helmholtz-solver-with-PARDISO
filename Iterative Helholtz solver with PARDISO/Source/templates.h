@@ -181,7 +181,7 @@ void compute_and_print_circle_norm_nopml(size_m x, size_m y, size_m z, dtype *x_
 double Beta3D(size_m x1, size_m x2,
 	size_m y1, size_m y2,
 	size_m z1, size_m z2,
-	char *str1, char *str2, int dim, int grid);
+	char *str1, char *str2, int dim, int grid, point source);
 
 //FFT
 void MyFFT1D_ForwardReal(int n, double *f, dtype*f_MYFFT);

@@ -573,7 +573,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 
 			printf("--------------------------------------------------------------------------------\n");
 		}
-		fclose(output);
+	
 		// For the next step
 		zcopy(&size, x0, &ione, x_init, &ione);
 #endif
@@ -591,7 +591,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		}
 #endif
 	} // End of iterations
-
+	fclose(output);
 #ifdef COMP_RESID
 	ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);
 

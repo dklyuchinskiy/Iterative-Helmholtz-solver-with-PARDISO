@@ -37,7 +37,7 @@ int main()
 //	for (double beta_eq = 0.05; beta_eq <= 1.01; beta_eq += 0.05)
 	//	for (int spg_pts = 20; spg_pts <= 100; spg_pts += 20)
 		{
-			int spg_pts = 50;
+			int spg_pts = 100;
 			double beta_eq = 0.5;
 
 			printf("*********************************************\n");
@@ -151,6 +151,8 @@ int main()
 			x.h = x.l / (x.n + 1);  // x.n + 1 grid points of the whole domain
 			y.h = y.l / (y.n + 1);  // x.n - 1 - inner points
 			z.h = z.l / (z.n + 1);  // 2 points - for the boundaries
+
+			point source = { x.l / 2.0, y.l / 2.0, z.l / 2.0 };
 
 #ifdef PRINT_INIT
 			printf("Size of domain: Lx = %lf, Ly = %lf, Lz = %lf\n", x.l, y.l, z.l);
@@ -335,7 +337,7 @@ int main()
 				return 0;
 			}
 
-//#define MAKE_BETA_3D
+#define MAKE_BETA_3D
 
 #ifdef MAKE_BETA_3D
 			make_beta3D_count = true;
@@ -346,23 +348,25 @@ int main()
 
 			if (make_beta3D_count)
 			{
+				point source_nopml = { LENGTH_X / 2.0, LENGTH_Y / 2.0, LENGTH_Z / 2.0 };
 				size_m x1, y1, z1;
 				size_m x2, y2, z2;
+				x1.l = x.l;
+				y1.l = y.l;
+				z1.l = z.l;
 				x1.h = x.h;
 				y1.h = y.h;
 				z1.h = z.h;
 				z1.spg_pts = z.spg_pts;
 				z2.spg_pts = z.spg_pts;
 				
-				if (x.n_nopml == 49) order = Beta3D(x1, x2, y1, y2, z1, z2, "sol3D_N50.dat", "sol3D_N100.dat", 3, 50);
-				if (x.n_nopml == 99) order = Beta3D(x1, x2, y1, y2, z1, z2, "sol3D_N100.dat", "sol3D_N200.dat", 3, 100);
-				if (x.n_nopml == 199) order = Beta3D(x1, x2, y1, y2, z1, z2, "sol3D_N200.dat", "sol3D_N400.dat", 3, 200);
+				if (x.n_nopml == 49) order = Beta3D(x1, x2, y1, y2, z1, z2, "sol3D_N50.dat", "sol3D_N100.dat", 3, 50, source_nopml);
+				if (x.n_nopml == 99) order = Beta3D(x1, x2, y1, y2, z1, z2, "sol3D_N100.dat", "sol3D_N200.dat", 3, 100, source_nopml);
+				if (x.n_nopml == 199) order = Beta3D(x1, x2, y1, y2, z1, z2, "sol3D_N200.dat", "sol3D_N400.dat", 3, 200, source_nopml);
 
 				system("pause");
 				return 0;
 			}
-
-			point source = { x.l / 2.0, y.l / 2.0, z.l / 2.0 };
 
 			// Generation of vector of solution (to compare with obtained) and vector of RHS
 #ifdef PRINT
@@ -443,7 +447,7 @@ int main()
 //#define OUTPUT
 //#define GNUPLOT
 
-#if 1
+#if 0
 			// for printing with gnuplot (1D projections in sponge direction)
 			dtype* z_sol1D_ex = alloc_arr<dtype>(z.n);
 			dtype* z_sol1D_prd = alloc_arr<dtype>(z.n);
