@@ -37,7 +37,7 @@ int main()
 //	for (double beta_eq = 0.05; beta_eq <= 1.01; beta_eq += 0.05)
 	//	for (int spg_pts = 20; spg_pts <= 100; spg_pts += 20)
 		{
-			int spg_pts = 100;
+			int spg_pts = 25;
 			double beta_eq = 0.5;
 
 			printf("*********************************************\n");
@@ -101,9 +101,9 @@ int main()
 
 			x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-			int n1 = 199 + 2 * x.pml_pts;		    // number of point across the directions
-			int n2 = 199 + 2 * y.pml_pts;
-			int n3 = 199 + 2 * z.spg_pts;
+			int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
+			int n2 = 99 + 2 * y.pml_pts;
+			int n3 = 99 + 2 * z.spg_pts;
 			int n = n1 * n2;		// size of blocks
 			int NB = n3;			// number of blocks
 
@@ -188,7 +188,7 @@ int main()
 			//int niter = 8;// for freq = 4 but n = 50 and BCGStab
 							// FGMRES: freq = 4, n = 50, niter = 8
 
-			int niter = 100; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
+			int niter = 10; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
 
 #ifdef PRINT
 			printf("Frequency nu = %d\n", nu);
@@ -199,14 +199,16 @@ int main()
 			printf("ppw: %lf\n", ppw);
 #endif
 #else
-			printf("Sound speed: min = %lf, max = %lf\n", x.pml_pts * x.h * (C1 + C2) + z.spg_pts * z.h * C3, (x.l - x.pml_pts * x.h) * (C1 + C2) + (z.l - z.spg_pts * z.h) * C3);
+			double sound_min = x.pml_pts * x.h * (C1 + C2) + z.spg_pts * z.h * C3;
+			double sound_max = (x.l - x.pml_pts * x.h) * (C1 + C2) + (z.l - z.spg_pts * z.h) * C3;
+			printf("Sound speed: min = %lf, max = %lf\nRatio: %lf\n", sound_min, sound_max, sound_max / sound_min );
 #endif
 
 
-			printf("FGMRES number of iterations: %d\n", niter + 1);
+			printf("Number of iterations: %d\n", niter + 1);
 
 
-			//system("pause");
+			system("pause");
 			int n_nopml = x.n_nopml * y.n_nopml;
 			int size_nopml = n_nopml * z.n_nopml;
 			int size2D_nopml = n_nopml;
@@ -337,7 +339,7 @@ int main()
 				return 0;
 			}
 
-#define MAKE_BETA_3D
+//#define MAKE_BETA_3D
 
 #ifdef MAKE_BETA_3D
 			make_beta3D_count = true;

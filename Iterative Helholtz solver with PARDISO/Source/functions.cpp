@@ -267,6 +267,18 @@ void reducePML3D(size_m x, size_m y, size_m z, int size1, const dtype *vect, int
 #endif
 }
 
+void nullifyPML3D(size_m x, size_m y, size_m z, int size1, dtype* vect)
+{
+	int i = 0, j = 0, k = 0;
+	int numb = 0;
+
+	for (int l = 0; l < size1; l++)
+	{
+		take_coord3D(x.n, y.n, z.n, l, i, j, k);
+		if ((i < x.pml_pts && j < y.pml_pts && k < z.spg_pts) || (i >= (x.n - x.pml_pts) && j >= (y.n - y.pml_pts) && k >= (z.n - z.spg_pts))) vect[l] = dtype{ 0, 0 };
+	}
+}
+
 void reducePML3D_FT(size_m x, size_m y, size_m z, int size1, dtype *vect, int size2, dtype *vect_red)
 {
 	int i = 0, j = 0, k = 0;

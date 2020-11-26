@@ -3,7 +3,7 @@
 #include "TestSuite.h"
 
 
-void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, dtype *f, double thresh, double &diff_sol, double beta_eq)
+void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, const dtype* x_orig, const dtype *f, double thresh, double &diff_sol, double beta_eq)
 {
 #ifdef PRINT
 	printf("-------------BCGSTAB-----------\n");
@@ -18,8 +18,10 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 	int iter = 0;
 	int ione = 1;
 	double norm = 0;
+	double norm_f = 0;
 	double norm_r0 = 0;
 	double beta = 0;
+	double Res;
 	double RelRes;
 	int i1, j1, k1;
 
@@ -390,7 +392,7 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 	for (int i = 0; i < size; i++)
 		x_init[i] = 0;
 
-	for (int restart = 0; restart < 1; restart++)
+	for (int restart = 0; restart < 3; restart++)
 	{
 #ifdef PRINT
 		printf("------RESTART = %d------\n", restart);
@@ -398,6 +400,7 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 		// 1. First step. Compute r_0 and its norm
 
 		zcopy(&size, x_init, &ione, x0, &ione);
+		nullifyPML3D(x, y, z, size, x0);
 
 		// Multiply matrix A in CSR format by vector x_0 to obtain f1
 #ifndef HODLR
@@ -409,19 +412,24 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 		norm = dznrm2(&size, w, &ione);
 		printf("norm ||Ax0|| = %lf\n", norm);
 
-		norm = dznrm2(&size, f, &ione);
-		printf("norm ||f|| = %lf\n", norm);
+		norm_f = dznrm2(&size, f, &ione);
+		printf("norm ||f|| = %lf\n", norm_f);
 
 		zcopy(&size, f, &ione, r0, &ione);
 		zaxpy(&size, &mone, w, &ione, r0, &ione); // r0: = f - Ax0
+
+		norm = dznrm2(&size, r0, &ione);
+
+		reducePML3D(x, y, z, size, r0, size_nopml, Ax0_nopml);
+		norm = dznrm2(&size_nopml, Ax0_nopml, &ione);
+		printf("norm ||Ax0 - f|| = ||r0|| = %e\n", norm);
+
 		zcopy(&size, r0, &ione, p0, &ione);     // p0 = r0
 		zcopy(&size, r0, &ione, r0st, &ione);   // r0st = r0
 		double dlin = 2.0;
 		zdscal(&size, &dlin, r0st, &ione);   // r0st = 2 * r0
 
-		norm = dznrm2(&size, r0, &ione);
-		printf("norm ||r0|| = %lf\n", norm);
-
+		system("pause");
 		//norm = RelError(zlange, size, 1, r0, f, size, thresh);
 		//printf("r0 = f - Ax0, norm ||r0 - f|| = %lf\n", norm);
 
@@ -494,12 +502,13 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 		//	printf("Residual in 3D with PML |(I - deltaL * L^{-1}) * x_sol - f| = %lf\n", RelRes);
 		//	printf("-----------\n");
 			reducePML3D(x, y, z, size, w, size_nopml, Ax0_nopml);
-			RelRes = dznrm2(&size_nopml, Ax0_nopml, &ione);
-
+			Res = dznrm2(&size_nopml, Ax0_nopml, &ione);
+			RelRes = Res / norm_f;
 
 #ifdef PRINT
 			printf("-----------\n");
-			printf("Residual in 3D phys domain |(I - deltaL * L^{-1}) * x_sol - f| = %e\n", RelRes);
+			printf("Residual in 3D phys domain |(I - deltaL * L^{-1}) * x_sol - f| = %e\n", Res);
+			printf("Relative residual in 3D phys domain |(I - deltaL * L^{-1}) * x_sol - f| = %e\n", RelRes);
 #endif
 
 			// 6. Solve L_0 ^(-1) * x_gmres = x_sol
@@ -548,15 +557,15 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 			diff_sol = RelError(zlange, size_nopml, 1, x_sol_nopml, x_sol_prev_nopml, size_nopml, thresh);
 			MultVectorConst<dtype>(size_nopml, x_sol_nopml, 1.0, x_sol_prev_nopml);
 			printf("norm |u_k+1 - u_k|= %e\n", diff_sol);
-			fprintf(output, "%d %e %lf\n", j, RelRes, diff_sol);
+			fprintf(output, "%d %e %e %lf\n", j, Res, RelRes, diff_sol);
 #endif
-			if (RelRes < RES_EXIT) break;
+			if (Res < RES_EXIT) break;
 #ifdef PRINT
 			printf("--------------------------------------------------------------------------------\n");
 #endif
 		}
 		// For the next step
-		zcopy(&size, x0, &ione, x_init, &ione);
+		zcopy(&size, g, &ione, x_init, &ione);
 #endif
 
 #ifdef COMP_RESID

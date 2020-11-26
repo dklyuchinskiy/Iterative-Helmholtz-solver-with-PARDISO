@@ -181,7 +181,9 @@ enum class DIAG13
 // velocity model
 #define C1 0.1
 #define C2 0.4
-#define C3 0.7
+#define C3 0.0
+
+//#define C3 0.7
 
 #if 0
 #define LENGTH_X 5120
