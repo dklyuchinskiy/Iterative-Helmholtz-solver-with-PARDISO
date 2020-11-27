@@ -1329,7 +1329,7 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 					sound3D[k * n + j * Nx + i] = MakeSound3D(x, y, z, (i + 1) * x.h, (j + 1) * y.h, (k + 1) * z.h, source);
 #endif
 
-#if 0
+#if 1
 	char str[255]; sprintf(str, "SoundSpeed3D_N%d.dat", x.n);
 	FILE* file = fopen(str, "w");
 
@@ -1354,7 +1354,7 @@ void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2
 	char str[255]; sprintf(str, "SoundSpeed2D_N%d.dat", x.n);
 	FILE *file = fopen(str, "w");
 
-#if 1
+#if 0
 	for (int j = y.pml_pts; j < Ny - y.pml_pts; j++)
 		for (int i = x.pml_pts; i < Nx - x.pml_pts; i++)
 		{
@@ -1371,12 +1371,27 @@ void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2
 			fprintf(file, "sound[%d][%d] = %lf\n", i, j, sound2D[j * Nx + i].real());
 		}
 #else
+	dtype integral_sum = 0;
+
+	for (int j = y.pml_pts; j < Ny - y.pml_pts; j++)
+		for (int i = x.pml_pts; i < Nx - x.pml_pts; i++)
+		{
+			for (int k = z.spg_pts; k < Nz - z.spg_pts; k++)
+			{
+				integral_sum += 1.0 / (sound3D[k * n + j * Nx + i] * sound3D[k * n + j * Nx + i]);
+			}
+			integral_sum /= (Nz - 2 * z.spg_pts);
+			sound2D[j * Nx + i] = sqrt(1.0 / integral_sum);
+			fprintf(file, "sound[%d][%d] = %lf %lf\n", i, j, sound2D[j * Nx + i].real(), sound2D[j * Nx + i].imag());
+		}
+#endif
+	/*
 #pragma omp parallel for schedule(dynamic)
 		for (int j = 0; j < Ny; j++)
 			for (int i = 0; i < Nx; i++)
 				sound2D[j * Nx + i] = MakeSound2D(x, y, (i + 1) * x.h, (j + 1) * y.h, source);
-#endif
-	
+		*/
+
 		fclose(file);
 }
 

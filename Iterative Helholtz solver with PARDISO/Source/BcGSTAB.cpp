@@ -47,7 +47,10 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 #if 1
 	FILE *output;
 	char str0[255];
-	sprintf(str0, "convergence_N%d_Lx%d_FREQ%d_SPG%5.lf_BETA%5.3lf.dat", x.n_nopml, (int)LENGTH_X, (int)nu, z.h * 2 * z.spg_pts, beta_eq);
+	char conv_str[255];
+	sprintf(conv_str, "convergence_N%d_PML%d_Lx%d_FREQ%d_SPG%d_BETA%lf_BCG_het", x.n_nopml, x.pml_pts, LENGTH_X, nu, z.spg_pts, beta_eq);
+	sprintf(str0, "%s.dat", conv_str);
+	//sprintf(str0, "convergence_N%d_Lx%d_FREQ%d_SPG%5.lf_BETA%5.3lf.dat", x.n_nopml, (int)LENGTH_X, (int)nu, z.h * 2 * z.spg_pts, beta_eq);
 	output = fopen(str0, "w");
 #endif
 
@@ -392,7 +395,7 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 	for (int i = 0; i < size; i++)
 		x_init[i] = 0;
 
-	for (int restart = 0; restart < 3; restart++)
+	for (int restart = 0; restart < 1; restart++)
 	{
 #ifdef PRINT
 		printf("------RESTART = %d------\n", restart);
@@ -601,6 +604,16 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 	free_arr(f_rsd);
 	free_arr(f_rsd_nopml);
 #endif
+
+	FILE *conv = fopen("conv.plt", "w");
+
+	fprintf(conv, "set term png font \"Times - Roman, 16\" \n \
+		set output '%s.png' \n \
+		plot '%s.dat' u 1:2 w linespoints pt 7 pointsize 1 notitle", conv_str, conv_str);
+
+	fclose(conv);
+
+	system("conv.plt");
 
 	free(D2csr_zero->values);
 	free(D2csr_zero->ia);

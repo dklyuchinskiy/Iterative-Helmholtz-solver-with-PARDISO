@@ -188,7 +188,7 @@ int main()
 			//int niter = 8;// for freq = 4 but n = 50 and BCGStab
 							// FGMRES: freq = 4, n = 50, niter = 8
 
-			int niter = 10; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
+			int niter = 100; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
 
 #ifdef PRINT
 			printf("Frequency nu = %d\n", nu);
