@@ -55,7 +55,7 @@ void NormalizeVector(int size, dtype* v, dtype* out, double& norm);
 void GenRHSandSolutionViaSound3D(size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f, point source);
 dtype u_ex_complex_sound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
 void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double& diff_sol, double beta_eq);
-void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype* x_sol, const dtype* x_orig, const dtype* f, double thresh, double& diff_sol, double beta_eq);
+void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype* x_sol, dtype* x_orig, const dtype* f, double thresh, double& diff_sol, double beta_eq);
 void check_norm_circle(size_m x, size_m y, size_m z, const dtype* x_orig_nopml, const dtype* x_sol_nopml, point source, double thresh);
 void print_2Dcsr_mat(size_m x, size_m y, zcsr* D2csr);
 void print_2Dcsr_mat2(size_m x, size_m y, zcsr* D2csr);

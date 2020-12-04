@@ -3,7 +3,7 @@
 #include "TestSuite.h"
 
 
-void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, const dtype* x_orig, const dtype *f, double thresh, double &diff_sol, double beta_eq)
+void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double &diff_sol, double beta_eq)
 {
 #ifdef PRINT
 	printf("-------------BCGSTAB-----------\n");
@@ -48,7 +48,7 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 	FILE *output;
 	char str0[255];
 	char conv_str[255];
-	sprintf(conv_str, "convergence_N%d_PML%d_Lx%d_FREQ%d_SPG%d_BETA%lf_BCG_het", x.n_nopml, x.pml_pts, LENGTH_X, nu, z.spg_pts, beta_eq);
+	sprintf(conv_str, "convergence_N%d_PML%d_Lx%d_FREQ%d_SPG%d_BETA%lf_BCGSTAB", x.n_nopml, x.pml_pts, LENGTH_X, nu, z.spg_pts, beta_eq);
 	sprintf(str0, "%s.dat", conv_str);
 	//sprintf(str0, "convergence_N%d_Lx%d_FREQ%d_SPG%5.lf_BETA%5.3lf.dat", x.n_nopml, (int)LENGTH_X, (int)nu, z.h * 2 * z.spg_pts, beta_eq);
 	output = fopen(str0, "w");
@@ -190,8 +190,8 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 		if (nu == 2) ratio = 15;
 		else ratio = 3;
 
-		//if (kww < ratio * k2)
-		if (1)
+		if (kww < ratio * k2)
+		//if (1)
 		{
 			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } -kww;
 #ifdef PRINT
@@ -543,7 +543,7 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 			printf("Residual in 3D phys domain |x_sol - x_orig| / |x_orig| = %e\n", norm);
 			printf("-----------\n");
 #endif
-			fprintf(output, "%d %e %lf\n", j, RelRes, norm);
+			fprintf(output, "%d %e %e %lf\n", j, Res, RelRes, norm);
 			//fprintf(output, "%d %17.15lf\n", j, norm);
 
 			check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, j, 0, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);

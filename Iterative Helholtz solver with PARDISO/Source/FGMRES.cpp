@@ -37,12 +37,14 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	double time;
 	double k2 = double(kk) * double(kk);
 	double kww;
+	double norm_f;
+	double Res;
 	int count = 0;
 	int ratio = 0;
 
 	FILE *output;
 	char str0[255];
-	sprintf(str0, "convergence_N%d_Lx%d_FREQ%d_SPG%6.lf_BETA%5.3lf.dat", x.n_nopml, (int)LENGTH_X, (int)nu, z.h * 2 * z.spg_pts, beta_eq);
+	sprintf(str0, "convergence_N%d_PML%d_Lx%d_FREQ%d_SPG%6.lf_BETA%5.3lf_FGMRES.dat", x.n_nopml, x.pml_pts, (int)LENGTH_X, (int)nu, z.h * 2 * z.spg_pts, beta_eq);
 	output = fopen(str0, "w");
 
 
@@ -179,8 +181,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		if (nu == 2) ratio = 15;
 		else ratio = 3;
 
-		//if (kww < ratio * k2)
-		if (1)
+		if (kww < ratio * k2)
+		//if (1)
 		{
 			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } -kww;
 			printf("Solved k = %d beta2 = (%lf, %lf)\n", k, kwave_beta2.real(), kwave_beta2.imag());
@@ -385,8 +387,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		norm = dznrm2(&size, w, &ione);
 		printf("norm ||Ax0|| = %lf\n", norm);
 
-		norm = dznrm2(&size, f, &ione);
-		printf("norm ||f|| = %lf\n", norm);
+		norm_f = dznrm2(&size, f, &ione);
+		printf("norm ||f|| = %lf\n", norm_f);
 
 		//Add_dense(size, ione, 1.0, f, size, -1.0, w, size, r0, size);
 		zcopy(&size, f, &ione, r0, &ione);
@@ -510,10 +512,12 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		//	printf("-----------\n");
 
 			reducePML3D(x, y, z, size, w, size_nopml, Ax0_nopml);
-			RelRes = dznrm2(&size_nopml, Ax0_nopml, &ione);
+			Res = dznrm2(&size_nopml, Ax0_nopml, &ione);
+			RelRes = Res / norm_f;
 
 			printf("-----------\n");
-			printf("Residual in 3D phys domain |(I - deltaL * L^{-1}) * x_sol - f| = %e\n", RelRes);
+			printf("Residual in 3D phys domain |(I - deltaL * L^{-1}) * x_sol - f| = %e\n", Res);
+			printf("Relative residual in 3D phys domain |(I - deltaL * L^{-1}) * x_sol - f| = %e\n", RelRes);
 
 			// 6. Solve L_0 ^(-1) * x_gmres = x_sol
 			printf("-----Step 5. Solve the last system-----\n");
@@ -551,7 +555,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			printf("Residual in 3D phys domain |x_sol - x_orig| / |x_orig| = %lf\n", norm);
 			printf("-----------\n");
 
-			fprintf(output, "%d %e %lf\n", j, RelRes, norm);
+			fprintf(output, "%d %e %e %lf\n", j, Res, RelRes, norm);
 
 			check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, j, 0, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
 
@@ -569,7 +573,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			fprintf(output, "%d %e %lf\n", j, RelRes, diff_sol);
 			//if (diff_sol < RES_EXIT) break;
 #endif
-			if (RelRes < RES_EXIT) break;
+			if (Res < RES_EXIT) break;
 
 			printf("--------------------------------------------------------------------------------\n");
 		}

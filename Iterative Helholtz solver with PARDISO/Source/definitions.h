@@ -158,7 +158,7 @@ enum class DIAG13
 #define GMRES_SIZE 128
 
 //#define HODLR
-//#define HOMO
+#define HOMO
 //#define SYMMETRY
 //#define CHECK_ACCURACY // 2D problems
 //#define PRINT_TEST
@@ -185,11 +185,14 @@ enum class DIAG13
 
 //#define C3 0.7
 
-#if 0
+#if 1
+
+// grid 80, 160, 320
 #define LENGTH_X 5120
 #define LENGTH_Y 5120
 #define LENGTH_Z 2560
 #else
+// grid 50, 100, 200
 #define LENGTH_X LENGTH
 #define LENGTH_Y LENGTH
 #define LENGTH_Z LENGTH

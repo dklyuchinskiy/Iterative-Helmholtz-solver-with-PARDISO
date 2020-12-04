@@ -1354,7 +1354,7 @@ void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2
 	char str[255]; sprintf(str, "SoundSpeed2D_N%d.dat", x.n);
 	FILE *file = fopen(str, "w");
 
-#if 0
+#if 1
 	for (int j = y.pml_pts; j < Ny - y.pml_pts; j++)
 		for (int i = x.pml_pts; i < Nx - x.pml_pts; i++)
 		{
