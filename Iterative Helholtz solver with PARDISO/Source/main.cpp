@@ -37,7 +37,7 @@ int main()
 //	for (double beta_eq = 0.05; beta_eq <= 1.01; beta_eq += 0.05)
 	//	for (int spg_pts = 20; spg_pts <= 100; spg_pts += 20)
 		{
-			int spg_pts = 10;
+			int spg_pts = 15;
 			double beta_eq = 0.5;
 
 			printf("*********************************************\n");
@@ -64,7 +64,7 @@ int main()
 
 #ifdef PML			   // 50 pts   - 7 % and 8 % if beta = 0.3 (ppw = 26)
 			//			- 5 % and 6 % if beta = 0.25
-			int pml_pts = 15; // 100 pts  - 10 % and 9 % if beta = 0.1
+			int pml_pts = 20; // 100 pts  - 10 % and 9 % if beta = 0.1
 							   //		      6 % and 7 % if beta = 0.2
 							   // 150 pts  - 20 % and 10 % if beta = 0.05;
 							   //          - 6 % and 3 % if beta = 0.1
@@ -101,9 +101,9 @@ int main()
 
 			x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-			int n1 = 79 + 2 * x.pml_pts;		    // number of point across the directions
-			int n2 = 79 + 2 * y.pml_pts;
-			int n3 = 39 + 2 * z.spg_pts;
+			int n1 = 49 + 2 * x.pml_pts;		    // number of point across the directions
+			int n2 = 49 + 2 * y.pml_pts;
+			int n3 = 49 + 2 * z.spg_pts;
 			int n = n1 * n2;		// size of blocks
 			int NB = n3;			// number of blocks
 
@@ -190,7 +190,7 @@ int main()
 			//int niter = 8;// for freq = 4 but n = 50 and BCGStab
 							// FGMRES: freq = 4, n = 50, niter = 8
 
-			int niter = 35; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
+			int niter = 50; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
 
 #ifdef PRINT
 			printf("Frequency nu = %d\n", nu);
@@ -425,8 +425,8 @@ int main()
 			// ------------ FGMRES-------------
 			all_time = omp_get_wtime();
 
-			FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
-			//BCGSTAB(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
+			//FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
+			BCGSTAB(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
 			// BcgSTAB 
 
 			all_time = omp_get_wtime() - all_time;
@@ -754,7 +754,7 @@ int main()
 
 		} // end of tuning loop
 
-	system("pause");
+	//system("pause");
 	return 0;
 }
 #endif

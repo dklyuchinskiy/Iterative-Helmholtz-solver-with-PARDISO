@@ -92,7 +92,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	printf("-----Step 1. Memory allocation for 2D problems\n");
 	printf("size3D = %d\n", size);
 	if (size > 2147483647) printf("!!! OVERFLOW !!!\n");
-	system("pause");
+	//system("pause");
 	zcsr *D2csr_zero;
 	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
 	int non_zeros_in_2Dblock9diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n) + 4 * (x.n - 1) * (y.n - 1);
@@ -181,11 +181,16 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		if (nu == 2) ratio = 15;
 		else ratio = 3;
 
+#ifdef SAVE_MEM
 		if (kww < ratio * k2)
-		//if (1)
+#else
+		if (1)
+#endif
 		{
 			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } -kww;
+#ifdef PRINT
 			printf("Solved k = %d beta2 = (%lf, %lf)\n", k, kwave_beta2.real(), kwave_beta2.imag());
+#endif
 			D2csr[k]->values = alloc_arr<dtype>(non_zeros);
 			D2csr[k]->ia = alloc_arr<int>(size2D + 1);
 			D2csr[k]->ja = alloc_arr<int>(non_zeros);
@@ -416,7 +421,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			ApplyCoeffMatrixA_HODLR(x, y, z, Gstr, B, solves, &V[ldv * j], deltaL, w, thresh, smallsize);
 #endif
 
-			for (int i = 0; i <= j; i++)
+			for (size_t i = 0; i <= j; i++)
 			{
 				// H[i + ldh * j] = (w_j * v_i) 
 				zdotc(&H[i + ldh * j], &size, w, &ione, &V[ldv * i], &ione);
@@ -570,7 +575,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			diff_sol = RelError(zlange, size_nopml, 1, x_sol_nopml, x_sol_prev_nopml, size_nopml, thresh);
 			MultVectorConst<dtype>(size_nopml, x_sol_nopml, 1.0, x_sol_prev_nopml);
 			printf("norm |u_k+1 - u_k|= %e\n", diff_sol);
-			fprintf(output, "%d %e %lf\n", j, RelRes, diff_sol);
+			fprintf(output, "%d %e %e %lf\n", j, Res, RelRes, diff_sol);
 			//if (diff_sol < RES_EXIT) break;
 #endif
 			if (Res < RES_EXIT) break;
@@ -581,6 +586,15 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		// For the next step
 		zcopy(&size, x0, &ione, x_init, &ione);
 #endif
+
+		FILE* conv = fopen("conv.plt", "w");
+		fprintf(conv, "set term png font \"Times - Roman, 16\" \n \
+		set output '%s.png' \n \
+		plot '%s' u 1:3 w linespoints pt 7 pointsize 1 notitle", str0, str0);
+
+		fclose(conv);
+
+		system("conv.plt");
 
 #ifdef COMP_RESID
 		//	if (j == m - 1)

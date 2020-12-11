@@ -190,8 +190,11 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 		if (nu == 2) ratio = 15;
 		else ratio = 3;
 
+#ifdef SAVE_MEM
 		if (kww < ratio * k2)
-		//if (1)
+#else
+		if (1)
+#endif
 		{
 			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } -kww;
 #ifdef PRINT

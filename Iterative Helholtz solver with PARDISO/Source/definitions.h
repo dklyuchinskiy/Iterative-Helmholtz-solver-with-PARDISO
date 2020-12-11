@@ -159,6 +159,7 @@ enum class DIAG13
 
 //#define HODLR
 #define HOMO
+//#define SAVE_MEM
 //#define SYMMETRY
 //#define CHECK_ACCURACY // 2D problems
 //#define PRINT_TEST
@@ -185,7 +186,7 @@ enum class DIAG13
 
 //#define C3 0.7
 
-#if 1
+#if 0
 
 // grid 80, 160, 320
 #define LENGTH_X 5120
