@@ -3817,6 +3817,41 @@ void GenSparseMatrixOnline1DwithPML(int w, size_m x, size_m y, size_m z, zcsr* A
 
 }
 
+map<vector<int>, dtype> dense_to_CSR(int m, int n, dtype *A, int lda, int *ia, int *ja, dtype *values)
+{
+	map<vector<int>, dtype> CSR;
+	vector<int> v(2, 0);
+	int k = 0;
+	int ik = 0;
+	int first_elem_in_row = 0;
+	for (int i = 0; i < m; i++)
+	{
+		first_elem_in_row = 0;
+		for (int j = 0; j < n; j++)
+		{
+			if (std::abs(A[i + lda * j]) != 0)
+			{
+				values[k] = A[i + lda * j];
+				if (first_elem_in_row == 0)
+				{
+					ia[ik] = k + 1;
+					ik++;
+					first_elem_in_row = 1;
+				}
+				ja[k] = j + 1;
+
+				v[0] = ia[ik - 1];
+				v[1] = ja[k];
+				CSR[v] = values[k];
+
+				k++;
+			}
+		}
+	}
+
+	return CSR;
+}
+
 map<vector<int>, dtype> BlockRowMat_to_CSR(int blk, int n1, int n2, int n3, dtype *BL, int ldbl, dtype *A, int lda, dtype *BR, int ldbr, zcsr* Acsr, int& non_zeros_on_prev_level)
 {
 	map<vector<int>, dtype> CSR_A;

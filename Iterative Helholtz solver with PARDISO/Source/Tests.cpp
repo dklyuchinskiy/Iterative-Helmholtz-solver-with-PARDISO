@@ -12,7 +12,7 @@ functions.cpp and BinaryTrees.cpp.
 The interface is declared in TestSuite.h
 ****************************************/
 
-
+#ifdef HODLR
 void Test2DHelmholtzHODLR()
 {
 	int n1 = 400;		    // number of point across the directions
@@ -311,6 +311,7 @@ void Test2DHelmholtzHODLR()
 	free_arr(f);
 
 }
+#endif
 
 void TestDispersion(size_m x, size_m y, dtype *x_sol_prd_nopml, dtype *x_orig_nopml)
 {
