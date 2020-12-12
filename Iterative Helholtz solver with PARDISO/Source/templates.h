@@ -78,6 +78,7 @@ void SetPml3D(int blk3D, size_m x, size_m y, size_m z, int n, dtype* alpX, dtype
 DIAG5 CheckDiag5Pts(size_m x, size_m y, int l1, int l2);
 DIAG9 CheckDiag9Pts(size_m x, size_m y, int l1, int l2);
 void nullifyPML3D(size_m x, size_m y, size_m z, int size1, dtype* vect);
+void HeteroSoundSpeed3DExtensionToPML(size_m x, size_m y, size_m z, dtype *sound3D);
 
 void ModifyNumericalSolution(int size_nopml, dtype *x_sol_nopml, dtype* x_orig_nopml);
 void ReadSolution(int size, dtype *x_sol, char *);

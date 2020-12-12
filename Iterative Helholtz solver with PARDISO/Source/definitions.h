@@ -60,6 +60,7 @@ struct size_m
 	double ta;
 	double tc;
 	double td;
+	double c1, c2, c3;
 };
 
 struct point 
@@ -158,7 +159,7 @@ enum class DIAG13
 #define GMRES_SIZE 128
 
 //#define HODLR
-#define HOMO
+//#define HOMO
 //#define SAVE_MEM
 //#define SYMMETRY
 //#define CHECK_ACCURACY // 2D problems
@@ -304,6 +305,14 @@ void MultVectorConst(int n, T* v1, T alpha, T* v2)
 #pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < n; i++)
 		v2[i] = v1[i] * alpha;
+}
+
+template<typename T>
+T* zero_out(long long int n, T* v)
+{
+#pragma omp parallel for simd schedule(static)
+	for (long long int i = 0; i < n; i++)
+		v[i] = 0.0;
 }
 
 

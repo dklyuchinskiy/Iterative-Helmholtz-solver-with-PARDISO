@@ -34,6 +34,18 @@ in sparse CSR format to save memory.
 #if 1
 int main()
 {
+	double eps = 1.0;
+	while (1.0 + eps / 2.0 > 1.0)
+			eps /= 2.0;
+
+	printf("Machine epsilon double = %e\n", eps);
+
+	long double eps2 = 1.0;
+	while (1.0 + eps2 / 2.0 > 1.0)
+		eps2 /= 2.0;
+
+	printf("Machine epsilon long double = %le\n", eps2);
+
 //	for (double beta_eq = 0.05; beta_eq <= 1.01; beta_eq += 0.05)
 	//	for (int spg_pts = 20; spg_pts <= 100; spg_pts += 20)
 		{
@@ -201,9 +213,8 @@ int main()
 			printf("ppw: %lf\n", ppw);
 #endif
 #else
-			double sound_min = x.pml_pts * x.h * (C1 + C2) + z.spg_pts * z.h * C3;
-			double sound_max = (x.l - x.pml_pts * x.h) * (C1 + C2) + (z.l - z.spg_pts * z.h) * C3;
-			printf("Sound speed: min = %lf, max = %lf\nRatio: %lf\n", sound_min, sound_max, sound_max / sound_min );
+			//double sound_min = x.pml_pts * x.h * C1 + y.pml_pts * y.h * C2 + z.spg_pts * z.h * C3;
+			//double sound_max = (x.l - x.pml_pts * x.h) * C1 + (y.l - y.pml_pts * y.h) * C2 + (z.l - z.spg_pts * z.h) * C3;
 #endif
 
 
@@ -341,7 +352,7 @@ int main()
 				return 0;
 			}
 
-//#define MAKE_BETA_3D
+#define MAKE_BETA_3D
 
 #ifdef MAKE_BETA_3D
 			make_beta3D_count = true;
@@ -523,7 +534,7 @@ int main()
 			double *x_sol_re = alloc_arr<double>(size_nopml);
 			double *x_orig_im = alloc_arr<double>(size_nopml);
 			double *x_sol_im = alloc_arr<double>(size_nopml);
-
+			system("pause");
 			printf("Final norm check and print circle norm...\n");
 			check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, niter, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
 			compute_and_print_circle_norm(x, y, z, x_orig, x_sol, source, thresh);
@@ -754,7 +765,7 @@ int main()
 
 		} // end of tuning loop
 
-	//system("pause");
+	system("pause");
 	return 0;
 }
 #endif

@@ -71,7 +71,7 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 	int error = 0;
 	int phase; // analisys + factorization
 	//--------------------------
-
+	//--------------------------
 #ifdef PRINT
 	printf("-----Step 0. Set sound speed and deltaL-----\n");
 #endif
@@ -81,10 +81,13 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 	// Gen velocity of sound in 3D domain
 	SetSoundSpeed3D(x, y, z, sound3D, source);
 
+	// Extension of 3D sound speed to PML zone
+	HeteroSoundSpeed3DExtensionToPML(x, y, z, sound3D);
+
 	// Gen velocity of sound in 3D domain
 	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
 
-	// Extension of sound speed to PML zone
+	// Extension of 2D sound speed to PML zone
 	HeteroSoundSpeed2DExtensionToPML(x, y, sound2D);
 
 	// Gen DeltaL function

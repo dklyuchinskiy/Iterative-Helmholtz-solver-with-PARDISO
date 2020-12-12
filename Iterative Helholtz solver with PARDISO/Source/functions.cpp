@@ -857,14 +857,19 @@ dtype MakeSound2D(size_m xx, size_m yy, double x, double y, point source, double
 
 dtype MakeSound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source)
 {
-	dtype c1 = (double)C1;
-	dtype c2 = (double)C2;
-	dtype c3 = (double)C3;
+	//dtype c1 = (double)C1;
+	//dtype c2 = (double)C2;
+	//dtype c3 = (double)C3;
+
+	double c1 = (double)C1;
+	double c2 = (double)C2;
+	double c3 = (double)C3;
+
 #ifdef HOMO
 	return c_z;
 #else
 	//return c_z + c1 * x + c2 * y + c3 * z;
-	return c1 * x + c2 * y + c3 * z;
+	return xx.c1 * x + xx.c2 * y + xx.c3;
 #endif
 }
 
@@ -1306,6 +1311,13 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 	int Nz = z.n;
 	printf("z.spg_pts = %d\n", z.spg_pts);
 
+	double c3 = 600;
+	double c2 = (1500 - c3) / y.l;
+	double c1 = (1800 - c3 - c2 * y.l) / x.l;
+
+	x.c1 = c1;
+	x.c2 = c2;
+	x.c3 = c3;
 #if 0
 	for (int k = 0; k < Nz; k++)
 	{
@@ -1324,12 +1336,19 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 	}
 #else
 	for (int k = 0; k < Nz; k++)
-			for (int j = 0; j < Ny; j++)
-				for (int i = 0; i < Nx; i++)
-					sound3D[k * n + j * Nx + i] = MakeSound3D(x, y, z, (i + 1) * x.h, (j + 1) * y.h, (k + 1) * z.h, source);
+			for (int j = y.pml_pts; j < Ny - y.pml_pts; j++)
+				for (int i = x.pml_pts; i < Nx - x.pml_pts; i++)
+					sound3D[k * n + j * Nx + i] = MakeSound3D(x, y, z, (i + 1 - x.pml_pts) * x.h, (j + 1 - y.pml_pts) * y.h, (k + 1 - z.pml_pts) * z.h, source);
 #endif
 
-#if 1
+	double sound_min = sound3D[z.spg_pts * n + y.pml_pts * Nx + x.pml_pts].real();
+	double sound_max = sound3D[(Nz - z.spg_pts - 1) * n + (Ny - y.pml_pts - 1) * Nx + (Nx - x.pml_pts - 1)].real();
+
+	printf("Sound speed: %lf * x + %lf * y + %lf\n", x.c1, x.c2, x.c3);
+	printf("Sound speed: min = %lf, max = %lf\nRatio: %lf\n", sound_min, sound_max, sound_max / sound_min);
+	system("pause");
+
+#if 0
 	char str[255]; sprintf(str, "SoundSpeed3D_N%d.dat", x.n);
 	FILE* file = fopen(str, "w");
 
@@ -2310,6 +2329,61 @@ void HeteroSoundSpeed2DExtensionToPML(size_m x, size_m y, dtype *sound2D)
 		for (int j = y.n - y.pml_pts; j < y.n; j++)
 			sound2D[i + x.n * j] = sound2D[ii + x.n * jj];
 	}
+
+}
+
+void HeteroSoundSpeed3DExtensionToPML(size_m x, size_m y, size_m z, dtype *sound3D)
+{
+	int ii = 0, jj = 0;
+	int size2D = x.n * y.n;
+
+	// left x PML
+	for (int k = 0; k < z.n; k++)
+	for (int j = 0; j < y.n; j++)
+	{
+		ii = x.pml_pts; jj = j;
+		for (int i = 0; i < x.pml_pts; i++)
+			sound3D[i + x.n * j + k * size2D] = sound3D[ii + x.n * jj + k * size2D];
+	}
+
+	// right x PML
+	for (int k = 0; k < z.n; k++)
+	for (int j = 0; j < y.n; j++)
+	{
+		ii = x.n - x.pml_pts - 1; jj = j;
+		for (int i = x.n - x.pml_pts; i < x.n; i++)
+			sound3D[i + x.n * j + k * size2D] = sound3D[ii + x.n * jj + k * size2D];
+	}
+
+	// upper y PML
+	for (int k = 0; k < z.n; k++)
+	for (int i = 0; i < x.n; i++)
+	{
+		jj = y.pml_pts; ii = i;
+		for (int j = 0; j < y.pml_pts; j++)
+			sound3D[i + x.n * j + k * size2D] = sound3D[ii + x.n * jj + k * size2D];
+	}
+
+	// lower y PML
+	for (int k = 0; k < z.n; k++)
+	for (int i = 0; i < x.n; i++)
+	{
+		jj = y.n - y.pml_pts - 1; ii = i;
+		for (int j = y.n - y.pml_pts; j < y.n; j++)
+			sound3D[i + x.n * j + k * size2D] = sound3D[ii + x.n * jj + k * size2D];
+	}
+
+#if 1
+	char str[255]; sprintf(str, "SoundSpeed3D_N%d.dat", x.n);
+	FILE* file = fopen(str, "w");
+
+	for (int k = 0; k < z.n; k++)
+		for (int j = 0; j < y.n; j++)
+			for (int i = 0; i < x.n; i++)
+				fprintf(file, "sound[%d][%d][%d] = %lf\n", i, j, k, sound3D[k * size2D + j * x.n + i].real());
+
+	fclose(file);
+#endif
 
 }
 
@@ -5250,6 +5324,11 @@ void Solve3DSparseUsingFT_CSR(size_m x, size_m y, size_m z, int *iparm, int *per
 			free(x_sol_prd_nopml);
 #endif
 		}
+		else
+		{
+			for (int i = 0; i < size2D; i++)
+				x_sol_prd[k * size2D + i] = 0;
+		}
 	}
 
 #ifdef PRINT
@@ -5510,6 +5589,11 @@ void Multiply3DSparseUsingFT(size_m x, size_m y, size_m z, int *iparm, int *perm
 			count++;
 			//pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &f_FFT[k * size2D], &x_sol_prd[k * size2D], &error);
 			mkl_zcsrgemv("no", &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &u_FFT[k * size2D], &f_sol_gemv[k * size2D]);
+		}
+		else
+		{
+			for (int i = 0; i < size2D; i++)
+				f_sol_gemv[k * size2D + i] = 0;
 		}
 	}
 	time = omp_get_wtime() - time;

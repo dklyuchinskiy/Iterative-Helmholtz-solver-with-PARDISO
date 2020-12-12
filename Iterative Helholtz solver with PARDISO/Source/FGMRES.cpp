@@ -536,12 +536,16 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			// 7. Test ||L0 * u_sol - w|| / ||w||
 			Multiply3DSparseUsingFT(x, y, z, iparm, perm, pt, D2csr, x_sol, f_sol, thresh);
 
+		//	zero_out<dtype>(size_nopml, f_sol_nopml);
+		//	zero_out<dtype>(size_nopml, x_gmres_nopml);
 			reducePML3D(x, y, z, size, f_sol, size_nopml, f_sol_nopml);
 			reducePML3D(x, y, z, size, x0, size_nopml, x_gmres_nopml);
 
 			norm = RelError(zlange, size_nopml, 1, f_sol_nopml, x_gmres_nopml, size_nopml, thresh);
 
-			printf("Residual in 3D phys domain |L0 * u_sol - x_gmres| / |x_gmres| = %e\n", norm);
+			printf("Residual in 3D phys domain |L0 * u_sol - x_gmres| / |x_gmres| = %e", norm);
+			if (norm < thresh) printf(" - TEST PASSED!\n");
+			else printf(" - TEST FAILED!!!\n");
 			printf("-----------\n");
 #endif
 
@@ -578,7 +582,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			fprintf(output, "%d %e %e %lf\n", j, Res, RelRes, diff_sol);
 			//if (diff_sol < RES_EXIT) break;
 #endif
-			if (Res < RES_EXIT) break;
+		//	if (Res < RES_EXIT) break;
 
 			printf("--------------------------------------------------------------------------------\n");
 		}
