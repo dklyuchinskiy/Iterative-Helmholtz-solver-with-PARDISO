@@ -352,7 +352,7 @@ int main()
 				return 0;
 			}
 
-#define MAKE_BETA_3D
+//#define MAKE_BETA_3D
 
 #ifdef MAKE_BETA_3D
 			make_beta3D_count = true;
