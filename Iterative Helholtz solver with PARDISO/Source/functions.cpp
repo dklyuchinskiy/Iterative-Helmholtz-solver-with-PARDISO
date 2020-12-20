@@ -1341,12 +1341,14 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 					sound3D[k * n + j * Nx + i] = MakeSound3D(x, y, z, (i + 1 - x.pml_pts) * x.h, (j + 1 - y.pml_pts) * y.h, (k + 1 - z.pml_pts) * z.h, source);
 #endif
 
+#ifndef HOMO
 	double sound_min = sound3D[z.spg_pts * n + y.pml_pts * Nx + x.pml_pts].real();
 	double sound_max = sound3D[(Nz - z.spg_pts - 1) * n + (Ny - y.pml_pts - 1) * Nx + (Nx - x.pml_pts - 1)].real();
 
 	printf("Sound speed: %lf * x + %lf * y + %lf\n", x.c1, x.c2, x.c3);
 	printf("Sound speed: min = %lf, max = %lf\nRatio: %lf\n", sound_min, sound_max, sound_max / sound_min);
 	system("pause");
+#endif
 
 #if 0
 	char str[255]; sprintf(str, "SoundSpeed3D_N%d.dat", x.n);
@@ -5443,7 +5445,7 @@ void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dt
 
 	//#define PRINT
 
-#ifdef PRINT
+#if 0
 	printf("check right-hand-side f\n");
 	for (int i = 0; i < size; i++)
 		if (abs(f_FFT[i]) != 0) printf("f_FFT[%d] = %lf %lf\n", i, f_FFT[i].real(), f_FFT[i].imag());

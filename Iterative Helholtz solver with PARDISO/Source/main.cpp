@@ -436,8 +436,8 @@ int main()
 			// ------------ FGMRES-------------
 			all_time = omp_get_wtime();
 
-			//FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
-			BCGSTAB(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
+			FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
+			//BCGSTAB(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
 			// BcgSTAB 
 
 			all_time = omp_get_wtime() - all_time;

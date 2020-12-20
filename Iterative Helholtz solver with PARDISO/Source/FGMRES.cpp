@@ -73,6 +73,9 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	// Gen velocity of sound in 3D domain
 	SetSoundSpeed3D(x, y, z, sound3D, source);
 
+	// Extension of 3D sound speed to PML zone
+	HeteroSoundSpeed3DExtensionToPML(x, y, z, sound3D);
+
 	// Gen velocity of sound in 3D domain
 	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
 
@@ -350,7 +353,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	dtype *x_sol_prev_nopml = alloc_arr<dtype>(size_nopml);
 #endif
 
-#define TEST_L0
+//#define TEST_L0
 
 	// test
 #ifdef TEST_L0
@@ -532,7 +535,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			Solve3DSparseUsingFT_HODLR(x, y, z, Gstr, B, solves, x0, x_sol, thresh, smallsize);
 #endif
 
-#ifdef TEST_L0
+#if defined(TEST_L0) && !defined(HODLR)
 			// 7. Test ||L0 * u_sol - w|| / ||w||
 			Multiply3DSparseUsingFT(x, y, z, iparm, perm, pt, D2csr, x_sol, f_sol, thresh);
 

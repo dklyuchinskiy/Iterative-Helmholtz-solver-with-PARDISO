@@ -2,7 +2,7 @@
 #include "TemplatesForMatrixConstruction.h"
 #include "TestSuite.h"
 
-
+#ifndef HODLR
 void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double &diff_sol, double beta_eq)
 {
 #ifdef PRINT
@@ -671,3 +671,4 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 	free(perm);
 	free(pt);
 }
+#endif
