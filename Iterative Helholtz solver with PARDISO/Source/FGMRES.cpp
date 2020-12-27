@@ -252,12 +252,16 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		}
 	}
 #else
-	int smallsize = 20;
+	int smallsize = x.n / 2 - 10;
 	dtype *B = alloc_arr<dtype>((size2D - x.n) * z.n); // for right diagonal
 	bool *solves = alloc_arr<bool>(z.n);
-	int lwork = x.n * x.n;
-	dtype *work = alloc_arr2<dtype>(lwork);
+	int lwork_HODLR = x.n * x.n;
+	dtype *work_HODLR = alloc_arr2<dtype>(lwork_HODLR);
 
+	printf("Size of 1D block: %d x %d\nSmallsize = %d\n", x.n, x.n, smallsize);
+	system("pause");
+
+	time = omp_get_wtime();
 	for (int k = 0; k < z.n; k++)
 	{
 #define MKL_FFT
@@ -278,14 +282,14 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		if (nu == 2) ratio = 15;
 		else ratio = 3;
 
-		//if (1)
-		if (kww < ratio * k2)
+		if (1)
+		//if (kww < ratio * k2)
 		{
 			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } -kww;
 			printf("Solved k = %d beta2 = (%lf, %lf)\n", k, kwave_beta2.real(), kwave_beta2.imag());
 
 			// Factorization of matrices
-			DirFactFastDiagStructOnline(x, y, Gstr[k], &B[k * (size2D - x.n)], kwave_beta2, work, lwork, thresh, smallsize);
+			DirFactFastDiagStructOnline(x, y, Gstr[k], &B[k * (size2D - x.n)], kwave_beta2, work_HODLR, lwork_HODLR, thresh, smallsize);
 			solves[k] = true;
 			count++;
 
@@ -298,6 +302,9 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		}
 		mem_pard = 0;
 	}
+	time = omp_get_wtime() - time;
+	printf("Time of factorization: %lf\n", time);
+	system("pause");
 #endif
 
 	double mem = 2.0 * non_zeros_in_2Dblock9diag / (1024 * 1024 * 1024);
@@ -374,6 +381,15 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	double norm_re;
 	double norm_im;
 
+	int lwork = -1;
+	int row_max = m + 1;
+	int col_max = m;
+
+	zgels("no", &row_max, &col_max, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
+
+	lwork = (int)work_size.real();
+	dtype *work = alloc_arr<dtype>(lwork);
+
 #pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < size; i++)
 		x_init[i] = 0;
@@ -417,6 +433,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		for (size_t j = 0; j < (size_t)m; j++)
 		{
 			printf("---------------------\nIteration = %d\n---------------------\n", j);
+			time = omp_get_wtime();
 			// Compute w[j] := A * v[j]
 #ifndef HODLR
 			ApplyCoeffMatrixA_CSR(x, y, z, iparm, perm, pt, D2csr, &V[ldv * j], deltaL, w, beta_eq, thresh);
@@ -477,29 +494,28 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			eBeta[0] = beta;
 
 			// Set working H because it is destroyed after GELS
-#pragma omp parallel for simd schedule(static)
+#pragma omp for simd
 			for (int i = 0; i < m * (m + 1); i++)
 				Hgels[i] = H[i];
 
 			// Query
-			int lwork = -1;
+			//int lwork = -1;
 			row_min = j + 2;
 			col_min = j + 1;
 
 			//	row_min = m + 1;
 			//	col_min = m;
 
-			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
+			//zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
 
-			lwork = (int)work_size.real();
-			dtype *work = alloc_arr<dtype>(lwork);
+			//lwork = (int)work_size.real();
+			//dtype *work = alloc_arr<dtype>(lwork);
 			// Run
 			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, work, &lwork, &info);
-			free_arr(work);
+			//free_arr(work);
 
 			RelRes = dznrm2(&col_min, eBeta, &ione);
 			printf("norm y_k[%d] = %e\n", j, RelRes);
-
 
 			// 4. Multiplication x_k = x_0 + V_k * y_k
 			printf("-----Step 4. Computing x_k-----\n");
@@ -588,6 +604,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		//	if (Res < RES_EXIT) break;
 
 			printf("--------------------------------------------------------------------------------\n");
+			time = omp_get_wtime() - time;
+			printf("Time of iteration = %lf\n", time);
 		}
 	
 		// For the next step
@@ -616,6 +634,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		}
 #endif
 	} // End of iterations
+	free_arr(work);
 	fclose(output);
 #ifdef COMP_RESID
 	ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);

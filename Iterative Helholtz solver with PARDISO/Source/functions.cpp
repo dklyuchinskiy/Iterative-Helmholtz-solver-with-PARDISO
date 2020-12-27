@@ -15,11 +15,6 @@ using namespace std;
 
 // Test for the whole solver
 
-int ind(int j, int n)
-{
-	return n * j;
-}
-
 int compare_str(int n, char *s1, char *s2)
 {
 	for (int i = 0; i < n; i++)
@@ -221,7 +216,7 @@ void GenRHS2DandSolutionSyntetic(int i, size_m y, size_m z, dcsr* D2csr, dtype* 
 // v[i] = D[i] * v[i]
 void DenseDiagMult(int n, dtype *diag, dtype *v, dtype *f)
 {
-#pragma omp parallel for schedule(static)
+#pragma omp for simd
 	for (int i = 0; i < n; i++)
 		f[i] = diag[i] * v[i];
 }
@@ -249,7 +244,7 @@ void reducePML3D(size_m x, size_m y, size_m z, int size1, const dtype *vect, int
 	{
 		printf("There is no PML 3D reduction\n");
 
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < size1; i++)
 			vect_red[i] = vect[i];
 
@@ -5414,10 +5409,13 @@ void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dt
 	MKL_LONG status;
 	double norm = 0;
 	int lwork = size2D + x.n;
+	int levels = ceil(log2(ceil((double)x.n / smallsize))) + 1;
+	int lwork1 = x.n * x.n / 2;
+	int lwork2 = 2 * x.n * 1 * levels;
 
 	dtype *x_sol_hss = alloc_arr2<dtype>(size);
 	dtype *f_FFT = alloc_arr2<dtype>(size);
-	dtype *work = alloc_arr2<dtype>(lwork);
+	dtype *work = alloc_arr2<dtype>(lwork + lwork1 + lwork2);
 
 	// f(x,y,z) -> fy(x,z) 
 	DFTI_DESCRIPTOR_HANDLE my_desc_handle;

@@ -20,7 +20,7 @@ void TestAll()
 
 	printf("***** TEST LIBRARY FUNCTIONS *******\n");
 	printf("****Complex precision****\n");
-#if 1
+#if 0
 	runner.RunTest(Shell_LowRankApprox, Test_LowRankApproxStruct, "Test_LowRankApprox");
 	runner.RunTest(Shell_SymRecCompress, Test_SymRecCompressStruct, "Test_SymRecCompress");
 	runner.RunTest(Shell_SymRecCompress, Test_UnsymmRecCompressStruct, "Test_UnsymmRecCompress");
@@ -60,6 +60,8 @@ void TestAll()
 	//	runner.RunTest(Shell_FFT1D_Complex, Test_Poisson_FT1D_Real, "Test_Poisson_FT1D_Real");
 	//  runner.RunTest(Shell_FFT1D_Complex, Test_Poisson_FT1D_Complex, "Test_Poisson_FT1D_Complex");
 #endif
+
+	runner.RunTest(Shell_RecMultL, Test_RecMultLStruct, "Test_RecMultL");
 
 	printf("********************\n");
 	printf("ALL TESTS: %d\nPASSED: %d \nFAILED: %d\n", runner.GetAll(), runner.GetPassed(), runner.GetFailed());
@@ -150,7 +152,7 @@ void Shell_RecMultL(ptr_test_mult_diag func, const string& test_name, int &numb,
 	int smallsize = 3;
 
 	for (double eps = 1e-2; eps > 1e-9; eps /= 10)
-		for (int n = 3; n <= 15; n++)
+		for (int n = 3; n <= 24; n++)
 			for (int k = 1; k <= 12; k++)
 			{
 				try
@@ -673,8 +675,6 @@ void Test_DiagMultStruct(int n, double eps, char *method, int smallsize)
 	free_arr(d);
 }
 
-/* \D2\E5\F1\F2 \ED\E0 \F1\F0\E0\E2\ED\E5\ED\E8\E5 \F0\E5\E7\F3\EB\FC\F2\E0\F2\EE\E2 \F3\EC\ED\EE\E6\E5\ED\E8\FF Y = H * X \F1\E6\E8\EC\E0\E5\EC\EE\E9 \EC\E0\F2\F0\E8\F6\FB H \ED\E0 \EF\F0\EE\E8\E7\E2\EE\EB\FC\ED\F3\FE X.
-\D1\F0\E0\E2\ED\E8\E2\E0\FE\F2\F1\FF \F0\E5\E7\F3\EB\FC\F2\E0\F2\FB \F1\EE \F1\E6\E0\F2\E8\E5\EC \E8 \E1\E5\E7 */
 void Test_RecMultLStruct(int n, int k, double eps, char *method, int smallsize)
 {
 	//printf("*****Test for RecMultLStruct  n = %d k = %d ******* ", n, k);
@@ -682,6 +682,12 @@ void Test_RecMultLStruct(int n, int k, double eps, char *method, int smallsize)
 	dtype *X = alloc_arr2<dtype>(n * k);
 	dtype *Y = alloc_arr2<dtype>(n * k); // init Y
 	dtype *Y1 = alloc_arr2<dtype>(n * k); // after multiplication woth compressed
+
+	int levels = ceil(log2(ceil((double)n / smallsize))) + 1;
+	int lwork1 = n * n / 2;
+	int lwork2 = 2 * n * k * levels;
+	dtype *work1 = alloc_arr2<dtype>(lwork1);
+	dtype *work2 = alloc_arr2<dtype>(lwork2);
 	char str[255];
 
 	double norm = 0;
@@ -708,7 +714,8 @@ void Test_RecMultLStruct(int n, int k, double eps, char *method, int smallsize)
 	SymRecCompressStruct(n, H, ldh, Hstr, smallsize, eps, method);
 
 	// RecMult Y1 = comp(H) * X
-	RecMultLStruct(n, k, Hstr, X, ldx, Y1, ldy, smallsize);
+	//RecMultLStruct(n, k, Hstr, X, ldx, Y1, ldy, work1, lwork1, work2, lwork2, smallsize);
+	RecMultLStructWork(n, k, Hstr, X, ldx, Y1, ldy, work1, lwork1, work2, lwork2, smallsize);
 
 	norm = rel_error_complex(n, k, Y1, Y, ldy, eps);
 	sprintf(str, "Struct: n = %d k = %d ", n, k);
@@ -724,6 +731,8 @@ void Test_RecMultLStruct(int n, int k, double eps, char *method, int smallsize)
 	free_arr(X);
 	free_arr(Y);
 	free_arr(Y1);
+	free_arr(work1);
+	free_arr(work2);
 }
 
 void Test_UnsymmRecMultLStruct(int n, int k, double eps, char *method, int smallsize)

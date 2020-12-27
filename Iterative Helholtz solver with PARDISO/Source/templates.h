@@ -90,7 +90,6 @@ double check_norm_circle_3D(int job, size_m xx, size_m yy, size_m zz, int start_
 void print_map(const map<vector<int>, dtype>& SD);
 void print_csr(int n, dcsr* A);
 int compare_str(int n, char *s1, char *s2);
-int ind(int j, int n);
 void take_coord3D(int n1, int n2, int n3, int l, int& i, int& j, int& k);
 void take_coord2D(int n1, int n2, int l, int& i, int& j);
 

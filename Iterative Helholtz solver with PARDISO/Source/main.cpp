@@ -34,6 +34,22 @@ in sparse CSR format to save memory.
 #if 1
 int main()
 {
+	//TestAll();
+	//system("pause");
+	//return;
+
+#ifdef _OPENMP
+	int nthr = omp_get_max_threads();
+	printf("Max_threads: %d threads\n", nthr);
+	//omp_set_dynamic(0);
+	nthr = 1;
+	omp_set_num_threads(nthr);
+	mkl_set_num_threads(nthr);
+	printf("Run in parallel on %d threads\n", nthr);
+#else
+	printf("Run sequential version on 1 thread\n");
+#endif
+	system("pause");
 	double eps = 1.0;
 	while (1.0 + eps / 2.0 > 1.0)
 			eps /= 2.0;
@@ -49,7 +65,7 @@ int main()
 //	for (double beta_eq = 0.05; beta_eq <= 1.01; beta_eq += 0.05)
 	//	for (int spg_pts = 20; spg_pts <= 100; spg_pts += 20)
 		{
-			int spg_pts = 15;
+			int spg_pts = 25;
 			double beta_eq = 0.5;
 
 			printf("*********************************************\n");
@@ -113,9 +129,9 @@ int main()
 
 			x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-			int n1 = 49 + 2 * x.pml_pts;		    // number of point across the directions
-			int n2 = 49 + 2 * y.pml_pts;
-			int n3 = 49 + 2 * z.spg_pts;
+			int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
+			int n2 = 99 + 2 * y.pml_pts;
+			int n3 = 99 + 2 * z.spg_pts;
 			int n = n1 * n2;		// size of blocks
 			int NB = n3;			// number of blocks
 
@@ -202,7 +218,7 @@ int main()
 			//int niter = 8;// for freq = 4 but n = 50 and BCGStab
 							// FGMRES: freq = 4, n = 50, niter = 8
 
-			int niter = 50; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
+			int niter = 20; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
 
 #ifdef PRINT
 			printf("Frequency nu = %d\n", nu);
@@ -310,18 +326,6 @@ int main()
 
 #ifndef PERF
 			system("pause");
-#endif
-
-#ifdef _OPENMP
-			int nthr = omp_get_max_threads();
-			printf("Max_threads: %d threads\n", nthr);
-			//omp_set_dynamic(0);
-			//nthr = 4;
-			//omp_set_num_threads(nthr);
-			//mkl_set_num_threads(4);
-			printf("Run in parallel on %d threads\n", nthr);
-#else
-			printf("Run sequential version on 1 thread\n");
 #endif
 
 #ifdef PRINT
@@ -539,6 +543,7 @@ int main()
 			check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, niter, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
 			compute_and_print_circle_norm(x, y, z, x_orig, x_sol, source, thresh);
 
+#if 0
 			char str[255];
 			sprintf(str, "sol3D_N%d.dat", x.n_nopml + 1);
 			FILE *file = fopen(str, "w");
@@ -547,7 +552,7 @@ int main()
 				fprintf(file, "%18.16lf %18.16lf\n", x_sol_nopml[i].real(), x_sol_nopml[i].imag());
 
 			fclose(file);
-
+#endif
 			//printf("Computing error ||x_{exact}-x_{comp_fft}||/||x_{exact}||\n");
 #ifndef TEST_HELM_1D
 			//check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, niter, ppw, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);

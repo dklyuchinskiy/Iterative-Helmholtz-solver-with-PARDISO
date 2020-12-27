@@ -150,6 +150,8 @@ enum class DIAG13
 	six
 };
 
+#define ind(x,y)        ((x) * (y))
+
 #include "HODLR/definitionsHODLR.h"
 
 #define PI 3.141592653589793238462643
@@ -159,9 +161,12 @@ enum class DIAG13
 #define GMRES_SIZE 128
 
 #define HODLR
+#ifdef HODLR
+#define SYMMETRY
+#endif
+
 #define HOMO
 //#define SAVE_MEM
-//#define SYMMETRY
 //#define CHECK_ACCURACY // 2D problems
 //#define PRINT_TEST
 #define RES_EXIT	1e-8
@@ -237,7 +242,7 @@ enum class DIAG13
 
 //#define beta_eq 0.5
 
-#define PRINT
+//#define PRINT
 
 #define omega 2.0 * (PI) * (nu)
 #define kk ((omega) / (c_z))
@@ -314,7 +319,6 @@ T* zero_out(long long int n, T* v)
 	for (long long int i = 0; i < n; i++)
 		v[i] = 0.0;
 }
-
 
 
 
