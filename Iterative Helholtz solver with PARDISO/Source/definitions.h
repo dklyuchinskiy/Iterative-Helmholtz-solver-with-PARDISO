@@ -163,6 +163,8 @@ enum class DIAG13
 #define HODLR
 #ifdef HODLR
 #define SYMMETRY
+#else
+#define PRINT
 #endif
 
 #define HOMO
@@ -241,8 +243,6 @@ enum class DIAG13
 //#define beta_eq 0.0
 
 //#define beta_eq 0.5
-
-//#define PRINT
 
 #define omega 2.0 * (PI) * (nu)
 #define kk ((omega) / (c_z))

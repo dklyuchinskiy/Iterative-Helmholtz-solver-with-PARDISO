@@ -142,7 +142,7 @@ int main()
 			int size = n * NB;		// size of vector x and f: n1 * n2 * n3
 			int size2D = n;
 			int smallsize = 1600;
-			double thresh = 1e-6;	// stop level of algorithm by relative error
+			double thresh = 1e-4;	// stop level of algorithm by relative error
 			int ItRef = 200;		// Maximal number of iterations in refirement
 			char bench[255] = "display"; // parameter into solver to show internal results
 			int sparse_size = n + 2 * (n - 1) + 2 * (n - n1);

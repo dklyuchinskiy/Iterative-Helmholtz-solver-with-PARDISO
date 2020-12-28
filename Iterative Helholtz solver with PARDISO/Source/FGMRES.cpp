@@ -252,7 +252,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		}
 	}
 #else
-	int smallsize = x.n / 2 - 10;
+	//int smallsize = x.n / 2 - 10;
+	int smallsize = 40;
 	dtype *B = alloc_arr<dtype>((size2D - x.n) * z.n); // for right diagonal
 	bool *solves = alloc_arr<bool>(z.n);
 	int lwork_HODLR = x.n * x.n;

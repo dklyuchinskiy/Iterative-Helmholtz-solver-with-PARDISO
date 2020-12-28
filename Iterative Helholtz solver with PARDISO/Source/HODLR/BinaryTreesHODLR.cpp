@@ -2761,14 +2761,15 @@ void DirSolveFastDiagStruct(int n1, int n2, cmnode* *Gstr, dtype *B, const dtype
 	int n = n1;
 	int nbr = n2;
 	int size2D = n * nbr;
+	int ione = 1;
+	dtype fone = { 1.0, 0.0 };
+	dtype mone = { -1.0, 0.0 };
 
 	// lwork = size + n
 	dtype *tb = work;
 	dtype *y = &work[size2D];
 
-#pragma omp for simd
-	for (int i = 0; i < n; i++)
-		tb[i] = f[i];
+	zcopy(&n, f, &ione, tb, &ione);
 
 	int levels = ceil(log2(ceil((double)n / smallsize))) + 1;
 	int lwork1 = n * n / 2;
@@ -2780,9 +2781,7 @@ void DirSolveFastDiagStruct(int n1, int n2, cmnode* *Gstr, dtype *B, const dtype
 		//RecMultLStruct(n, 1, Gstr[k - 1], &tb[ind(k - 1, n)], size2D, y, n, smallsize);
 		DenseDiagMult(n, &B[ind(k - 1, n)], y, y);
 
-#pragma omp for simd
-		for (int i = 0; i < n; i++)
-			tb[ind(k, n) + i] = f[ind(k, n) + i] - y[i];
+		OpTwoMatrices(n, 1, &f[ind(k, n)], y, &tb[ind(k, n)], n, '-');
 	}
 
 	RecMultLStructWork(n, 1, Gstr[nbr - 1], &tb[ind(nbr - 1, n)], size2D, &x[ind(nbr - 1, n)], size2D, &work[size2D + n], lwork1, &work[size2D + n + lwork1], lwork2, smallsize);
@@ -2792,9 +2791,7 @@ void DirSolveFastDiagStruct(int n1, int n2, cmnode* *Gstr, dtype *B, const dtype
 	{
 		DenseDiagMult(n, &B[ind(k, n)], &x[ind(k + 1, n)], y);
 
-#pragma omp for simd
-		for (int i = 0; i < n; i++)
-			y[i] = tb[ind(k, n) + i] - y[i];
+		zaxpby(&n, &fone, &tb[ind(k, n)], &ione, &mone, y, &ione);
 
 		RecMultLStructWork(n, 1, Gstr[k], y, n, &x[ind(k, n)], size2D, &work[size2D + n], lwork1, &work[size2D + n + lwork1], lwork2, smallsize);
 		//RecMultLStruct(n, 1, Gstr[k], y, n, &x[ind(k, n)], size2D, smallsize);
