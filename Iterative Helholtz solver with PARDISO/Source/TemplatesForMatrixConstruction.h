@@ -69,15 +69,14 @@ double rel_error(double (*LANGE)(const char *, const int*, const int*, const Mat
 	//else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
 }
 
-template <typename MatrixType>
-double RelError(double(*LANGE)(const char *, const int*, const int*, const MatrixType*, const int*, double *),
-	int m, int n, const MatrixType *Hrec, const MatrixType *Hinit, int ldh, double eps)
+template <typename MatrixType, typename RealType>
+RealType RelError(RealType(*LANGE)(const char *, const int*, const int*, const MatrixType*, const int*, RealType *),
+	int m, int n, const MatrixType *Hrec, const MatrixType *Hinit, int ldh, RealType eps)
 {
-	double norm = 0;
+	RealType norm = 0;
 	MatrixType *Hdiff = alloc_arr<MatrixType>(m * n);
 
 	// Norm of residual
-#pragma omp parallel for schedule(static)
 	for (int j = 0; j < n; j++)
 #pragma omp simd
 		for (int i = 0; i < m; i++)
@@ -92,6 +91,27 @@ double RelError(double(*LANGE)(const char *, const int*, const int*, const Matri
 
 	//if (norm < eps) printf("Norm %12.10e < eps %12.10lf: PASSED\n", norm, eps);
 	//else printf("Norm %12.10lf > eps %12.10lf : FAILED\n", norm, eps);
+}
+
+template <typename MatrixType, typename RealType>
+RealType RelErrorNorm1(RealType(*LANGE)(const char*, const int*, const int*, const MatrixType*, const int*, RealType*),
+	int m, int n, const MatrixType* Hrec, const MatrixType* Hinit, int ldh, RealType eps)
+{
+	RealType norm = 0;
+	MatrixType* Hdiff = alloc_arr<MatrixType>(m * n);
+
+	// Norm of residual
+	for (int j = 0; j < n; j++)
+#pragma omp simd
+		for (int i = 0; i < m; i++)
+			Hdiff[i + ldh * j] = Hrec[i + ldh * j] - Hinit[i + ldh * j];
+
+	norm = LANGE("1", &m, &n, Hdiff, &ldh, NULL);
+	norm = norm / LANGE("1", &m, &n, Hinit, &ldh, NULL);
+
+	free_arr(Hdiff);
+
+	return norm;
 }
 
 template <typename MatrixType>
@@ -173,6 +193,36 @@ void TestEqual(const t1& v1, const t2& v2, const string& hint = {})
 			os << " Hint: " << hint;
 		}
 	}
+}
+
+template<typename MatrixType>
+void DeleteBoundaries(int n1, int n2, int n3, long int size1, MatrixType *a, long int size2, MatrixType *b)
+{
+	int i = 0, j = 0, k = 0;
+	int numb = 0;
+
+	if (size1 == size2)
+	{
+		printf("There is no boundaries reduction\n");
+
+#pragma omp parallel for schedule(static)
+		for (int i = 0; i < size1; i++)
+			b[i] = a[i];
+
+		return;
+	}
+
+	for (int l = 0; l < size1; l++)
+	{
+		take_coord3D(n1, n2, n3, l, i, j, k);
+		if (i > 0 && j > 0 && k > 0 && i < (n1 - 1) && j < (n2 - 1) && k < (n3 - 1))
+			b[numb++] = a[l];
+	}
+
+#ifdef PRINT
+	if (numb != size2) printf("ERROR of reducing boundaries 3D: %d != %d\n", numb, size2);
+	else printf("Boundaries 3D are reduced successfully!\n");
+#endif
 }
 
 

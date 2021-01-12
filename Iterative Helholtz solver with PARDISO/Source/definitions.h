@@ -8,7 +8,9 @@ declaration of used structures
 
 typedef double rtype;
 typedef std::complex<double> dtype;
+typedef std::complex<float> stype;
 #define MKL_Complex16 dtype
+#define MKL_Complex8 stype
 
 #if defined(_WIN32) || defined(WIN32)
 #include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\mkl\include\mkl.h"
@@ -58,6 +60,7 @@ struct size_m
 	double ta;
 	double tc;
 	double td;
+	double c1, c2, c3;
 };
 
 struct point 
@@ -147,6 +150,8 @@ enum class DIAG13
 	six
 };
 
+#define ind(x,y)        ((x) * (y))
+
 #include "HODLR/definitionsHODLR.h"
 
 #define PI 3.141592653589793238462643
@@ -155,11 +160,18 @@ enum class DIAG13
 #define PML
 #define GMRES_SIZE 128
 
-//#define HODLR
+#define HODLR
+#ifdef HODLR
+#define SYMMETRY
+#else
+#define PRINT
+#endif
+
 #define HOMO
-//#define SYMMETRY
-//#define CHECK_ACCURACY
-#define PRINT_TEST
+//#define SAVE_MEM
+//#define CHECK_ACCURACY // 2D problems
+//#define PRINT_TEST
+#define RES_EXIT	1e-8
 
 //#define ORDER4
 #define PML_PTS 0
@@ -178,13 +190,18 @@ enum class DIAG13
 // velocity model
 #define C1 0.1
 #define C2 0.4
-#define C3 0.7
+#define C3 0.0
+
+//#define C3 0.7
 
 #if 0
+
+// grid 80, 160, 320
 #define LENGTH_X 5120
 #define LENGTH_Y 5120
 #define LENGTH_Z 2560
 #else
+// grid 50, 100, 200
 #define LENGTH_X LENGTH
 #define LENGTH_Y LENGTH
 #define LENGTH_Z LENGTH
@@ -225,7 +242,7 @@ enum class DIAG13
 //#define beta_eq 0.005
 //#define beta_eq 0.0
 
-#define beta_eq 0.5
+//#define beta_eq 0.5
 
 #define omega 2.0 * (PI) * (nu)
 #define kk ((omega) / (c_z))
@@ -295,6 +312,13 @@ void MultVectorConst(int n, T* v1, T alpha, T* v2)
 		v2[i] = v1[i] * alpha;
 }
 
+template<typename T>
+T* zero_out(long long int n, T* v)
+{
+#pragma omp parallel for simd schedule(static)
+	for (long long int i = 0; i < n; i++)
+		v[i] = 0.0;
+}
 
 
 

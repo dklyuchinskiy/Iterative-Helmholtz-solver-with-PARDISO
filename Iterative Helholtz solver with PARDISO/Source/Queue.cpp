@@ -8,6 +8,8 @@ Implementation of Queue by List.
 in PrintRanksInWidth function)
 *********************************/
 
+// DO NOT COMPILE IF THERE IS NO HSS
+
 void init(struct my_queue* &q)
 {
 	q = (struct my_queue*)malloc(sizeof(struct my_queue));

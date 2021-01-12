@@ -15,6 +15,7 @@ In addition, the computation of Size, MaxDepth
 and Ranks of the matrix tree is presented here.
 ********************************************************/
 
+// DO NOT COMPILE IF THERE IS NO HSS
 int TreeSize(mnode* root)
 {
 	int size = 0;

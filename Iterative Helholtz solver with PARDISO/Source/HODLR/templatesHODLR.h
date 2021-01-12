@@ -56,7 +56,6 @@ void print_vec(int size, int *vec1, double *vec2, char *name);
 void print_vec_complex(int size, dtype *p2, char *name);
 
 int compare_str(int n, char *s1, char *s2);
-int ind(int j, int n);
 
 map<vector<int>, double> dense_to_sparse(int m, int n, double *DD, int ldd, int *i_ind, int *j_ind, double *d);
 map<vector<int>, double> block3diag_to_CSR(int n1, int n2, int blocks, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, zcsr* Acsr);
@@ -82,6 +81,7 @@ void LowRankApproxStruct(int n2, int n1, dtype *A, int lda, cmnode* &Astr, doubl
 void SymRecCompressStruct(int n, dtype *A, const int lda, cmnode* &ACstr, const int smallsize, double eps, char *method);
 void DiagMultStruct(int n, cmnode* Astr, dtype *d, int small_size);
 void RecMultLStruct(int n, int m, cmnode* Astr, dtype *X, int ldx, dtype *Y, int ldy, int smallsize);
+void RecMultLStructWork(int n, int m, cmnode* Astr, dtype *X, int ldx, dtype *Y, int ldy, dtype *work1, int lwork1, dtype *work2, int lwork2, int smallsize);
 void AddStruct(int n, dtype alpha, cmnode* Astr, dtype beta, cmnode* Bstr, cmnode* &Cstr, int smallsize, double eps, char *method);
 void SymUpdate4Subroutine(int n2, int n1, dtype alpha, cmnode* Astr, const dtype *Y, int ldy, cmnode* &Bstr, int smallsize, double eps, char* method);
 void SymCompUpdate2Struct(int n, int k, cmnode* Astr, dtype alpha, dtype *Y, int ldy, dtype *V, int ldv, cmnode* &Bstr, int smallsize, double eps, char* method);
@@ -149,7 +149,7 @@ void SymUpdate5Subroutine(int n2, int n1, dtype alpha, cmnode* Astr, const dtype
 
 // Solver
 void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, dtype *f, zcsr* Dcsr, double thresh, int smallsize, int ItRef, char *bench,
-	cmnode** &Gstr, dtype *x_sol, int &success, double &RelRes, int &itcount);
+	cmnode** &Gstr, dtype *x_sol, int &success, double &RelRes, int &itcount, double beta_eq);
 void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, dtype beta2, dtype *work, int lwork, double thresh, int smallsize);
 void DirSolveFastDiagStruct(int n1, int n2, cmnode* *Gstr, dtype *B, const dtype *f, dtype *x, dtype *work, int lwork, double eps, int smallsize);
 
