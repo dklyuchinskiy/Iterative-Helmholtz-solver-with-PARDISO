@@ -602,7 +602,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			fprintf(output, "%d %e %e %lf\n", j, Res, RelRes, diff_sol);
 			//if (diff_sol < RES_EXIT) break;
 #endif
-		//	if (Res < RES_EXIT) break;
+		        if (RelRes < REL_RES_EXIT) break;
 
 			printf("--------------------------------------------------------------------------------\n");
 			time = omp_get_wtime() - time;

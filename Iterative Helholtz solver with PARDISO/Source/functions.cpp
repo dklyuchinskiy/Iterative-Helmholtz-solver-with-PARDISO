@@ -607,7 +607,7 @@ double check_norm_circle_3D_nopml(size_m xx, size_m yy, size_m zz, int start_x, 
 
 	norm = RelError(zlange, size, 1, x_sol_circ, x_orig_circ, size, thresh);
 
-	printf("Square NOPML: 0 < x < %lf, 0 < y < %lf, 0 < z < %lf.\n", LENGTH_X, LENGTH_Y, LENGTH_Z);
+	printf("Square NOPML: 0 < x < %lf, 0 < y < %lf, 0 < z < %lf\n", (double)LENGTH_X, (double)LENGTH_Y, (double)LENGTH_Z);
 	printf("Norm in circle: %lf < r < %lf: %lf\n", r0, r_max, norm);
 
 	free_arr(x_sol_circ);
@@ -864,7 +864,8 @@ dtype MakeSound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z,
 	return c_z;
 #else
 	//return c_z + c1 * x + c2 * y + c3 * z;
-	return xx.c1 * x + xx.c2 * y + xx.c3;
+	//return xx.c1 * x + xx.c2 * y + xx.c3;
+        return xx.c0 + xx.c1 * sin(xx.c2 * x) + xx.c3 * y;
 #endif
 }
 
@@ -1306,10 +1307,28 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 	int Nz = z.n;
 	printf("z.spg_pts = %d\n", z.spg_pts);
 
+#if 0
+        // ratio 3
 	double c3 = 600;
 	double c2 = (1500 - c3) / y.l;
 	double c1 = (1800 - c3 - c2 * y.l) / x.l;
-
+#else
+        // ratio 5
+	//double c3 = 600.0;
+	//double c2 = (1500.0 - c3) / LENGTH_Y;
+	//double c1 = (3000.0 - c3 - c2 * LENGTH_Y) / LENGTH_X;
+#endif
+       // c(x,y,z) = c0 + c1 * sin(c2 * x) + c3 * y
+        // c(0,0,0) = 600
+        // c(0,max) = 1500;
+        // c(max,0) = 2000;
+        // c(max,max) = 3000;
+        double c0 = 600.0;
+        double c1 = 1500.0;
+        double c3 = (1500.0 - c0) / LENGTH_Y;
+        double c2 = asin((3000.0 - c3 * LENGTH_Y - c0) / c1) / LENGTH_X;
+        printf("sin = %lf\n", 3000.0 - c3 * LENGTH_Y - c0);
+        x.c0 = c0;
 	x.c1 = c1;
 	x.c2 = c2;
 	x.c3 = c3;
@@ -1340,7 +1359,8 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 	double sound_min = sound3D[z.spg_pts * n + y.pml_pts * Nx + x.pml_pts].real();
 	double sound_max = sound3D[(Nz - z.spg_pts - 1) * n + (Ny - y.pml_pts - 1) * Nx + (Nx - x.pml_pts - 1)].real();
 
-	printf("Sound speed: %lf * x + %lf * y + %lf\n", x.c1, x.c2, x.c3);
+	//printf("Sound speed: %lf * x + %lf * y + %lf\n", x.c1, x.c2, x.c3);
+        printf("Sound speed: %lf + %lf * sin(%lf * x) + %lf * y\n", x.c0, x.c1, x.c2, x.c3);
 	printf("Sound speed: min = %lf, max = %lf\nRatio: %lf\n", sound_min, sound_max, sound_max / sound_min);
 	system("pause");
 #endif

@@ -60,7 +60,7 @@ struct size_m
 	double ta;
 	double tc;
 	double td;
-	double c1, c2, c3;
+	double c0, c1, c2, c3;
 };
 
 struct point 
@@ -160,18 +160,19 @@ enum class DIAG13
 #define PML
 #define GMRES_SIZE 128
 
-#define HODLR
+//#define HODLR
 #ifdef HODLR
 #define SYMMETRY
 #else
 #define PRINT
 #endif
 
-#define HOMO
+//#define HOMO
 //#define SAVE_MEM
 //#define CHECK_ACCURACY // 2D problems
 //#define PRINT_TEST
 #define RES_EXIT	1e-8
+#define REL_RES_EXIT    1e-4
 
 //#define ORDER4
 #define PML_PTS 0

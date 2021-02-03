@@ -42,7 +42,7 @@ int main()
 	int nthr = omp_get_max_threads();
 	printf("Max_threads: %d threads\n", nthr);
 	//omp_set_dynamic(0);
-	nthr = 1;
+	nthr = 20;
 	omp_set_num_threads(nthr);
 	mkl_set_num_threads(nthr);
 	printf("Run in parallel on %d threads\n", nthr);
@@ -65,7 +65,7 @@ int main()
 //	for (double beta_eq = 0.05; beta_eq <= 1.01; beta_eq += 0.05)
 	//	for (int spg_pts = 20; spg_pts <= 100; spg_pts += 20)
 		{
-			int spg_pts = 25;
+			int spg_pts = 50;
 			double beta_eq = 0.5;
 
 			printf("*********************************************\n");
@@ -129,9 +129,9 @@ int main()
 
 			x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-			int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
-			int n2 = 99 + 2 * y.pml_pts;
-			int n3 = 99 + 2 * z.spg_pts;
+			int n1 = 199 + 2 * x.pml_pts;		    // number of point across the directions
+			int n2 = 199 + 2 * y.pml_pts;
+			int n3 = 199 + 2 * z.spg_pts;
 			int n = n1 * n2;		// size of blocks
 			int NB = n3;			// number of blocks
 
@@ -218,7 +218,7 @@ int main()
 			//int niter = 8;// for freq = 4 but n = 50 and BCGStab
 							// FGMRES: freq = 4, n = 50, niter = 8
 
-			int niter = 20; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
+			int niter = 50; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
 
 #ifdef PRINT
 			printf("Frequency nu = %d\n", nu);
@@ -356,7 +356,7 @@ int main()
 				return 0;
 			}
 
-//#define MAKE_BETA_3D
+#define MAKE_BETA_3D
 
 #ifdef MAKE_BETA_3D
 			make_beta3D_count = true;
