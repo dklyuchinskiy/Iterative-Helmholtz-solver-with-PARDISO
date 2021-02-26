@@ -1308,27 +1308,27 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 	printf("z.spg_pts = %d\n", z.spg_pts);
 
 #if 0
-        // ratio 3
+	// ratio 3
 	double c3 = 600;
 	double c2 = (1500 - c3) / y.l;
 	double c1 = (1800 - c3 - c2 * y.l) / x.l;
 #else
-        // ratio 5
-	//double c3 = 600.0;
-	//double c2 = (1500.0 - c3) / LENGTH_Y;
-	//double c1 = (3000.0 - c3 - c2 * LENGTH_Y) / LENGTH_X;
+	// ratio 5
+    //double c3 = 600.0;
+    //double c2 = (1500.0 - c3) / LENGTH_Y;
+    //double c1 = (3000.0 - c3 - c2 * LENGTH_Y) / LENGTH_X;
 #endif
-       // c(x,y,z) = c0 + c1 * sin(c2 * x) + c3 * y
-        // c(0,0,0) = 600
-        // c(0,max) = 1500;
-        // c(max,0) = 2000;
-        // c(max,max) = 3000;
-        double c0 = 600.0;
-        double c1 = 1500.0;
-        double c3 = (1500.0 - c0) / LENGTH_Y;
-        double c2 = asin((3000.0 - c3 * LENGTH_Y - c0) / c1) / LENGTH_X;
-        printf("sin = %lf\n", 3000.0 - c3 * LENGTH_Y - c0);
-        x.c0 = c0;
+	   // c(x,y,z) = c0 + c1 * sin(c2 * x) + c3 * y
+		// c(0,0,0) = 600
+		// c(0,max) = 1500;
+		// c(max,0) = 2000;
+		// c(max,max) = 3000;
+	double c0 = 600.0;
+	double c1 = 1500.0;
+	double c3 = (1500.0 - c0) / LENGTH_Y;
+	double c2 = asin((3000.0 - c3 * LENGTH_Y - c0) / c1) / LENGTH_X;
+	printf("sin = %lf\n", 3000.0 - c3 * LENGTH_Y - c0);
+	x.c0 = c0;
 	x.c1 = c1;
 	x.c2 = c2;
 	x.c3 = c3;
@@ -1350,9 +1350,9 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 	}
 #else
 	for (int k = 0; k < Nz; k++)
-			for (int j = y.pml_pts; j < Ny - y.pml_pts; j++)
-				for (int i = x.pml_pts; i < Nx - x.pml_pts; i++)
-					sound3D[k * n + j * Nx + i] = MakeSound3D(x, y, z, (i + 1 - x.pml_pts) * x.h, (j + 1 - y.pml_pts) * y.h, (k + 1 - z.pml_pts) * z.h, source);
+		for (int j = y.pml_pts; j < Ny - y.pml_pts; j++)
+			for (int i = x.pml_pts; i < Nx - x.pml_pts; i++)
+				sound3D[k * n + j * Nx + i] = MakeSound3D(x, y, z, ((double)i + 1 - x.pml_pts) * x.h, ((double)j + 1 - y.pml_pts) * y.h, ((double)k + 1 - z.pml_pts) * z.h, source);
 #endif
 
 #ifndef HOMO
@@ -1360,7 +1360,7 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 	double sound_max = sound3D[(Nz - z.spg_pts - 1) * n + (Ny - y.pml_pts - 1) * Nx + (Nx - x.pml_pts - 1)].real();
 
 	//printf("Sound speed: %lf * x + %lf * y + %lf\n", x.c1, x.c2, x.c3);
-        printf("Sound speed: %lf + %lf * sin(%lf * x) + %lf * y\n", x.c0, x.c1, x.c2, x.c3);
+	printf("Sound speed: %lf + %lf * sin(%lf * x) + %lf * y\n", x.c0, x.c1, x.c2, x.c3);
 	printf("Sound speed: min = %lf, max = %lf\nRatio: %lf\n", sound_min, sound_max, sound_max / sound_min);
 	system("pause");
 #endif
@@ -5429,13 +5429,13 @@ void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dt
 	MKL_LONG status;
 	double norm = 0;
 	int lwork = size2D + x.n;
-	int levels = ceil(log2(ceil((double)x.n / smallsize))) + 1;
+	//int levels = ceil(log2(ceil((double)x.n / smallsize))) + 1;
 	int lwork1 = x.n * x.n / 2;
-	int lwork2 = 2 * x.n * 1 * levels;
+	//int lwork2 = 2 * x.n * 1 * levels;
 
 	dtype *x_sol_hss = alloc_arr2<dtype>(size);
 	dtype *f_FFT = alloc_arr2<dtype>(size);
-	dtype *work = alloc_arr2<dtype>(lwork + lwork1 + lwork2);
+	dtype *work = alloc_arr2<dtype>((size_t)lwork + lwork1);
 
 	// f(x,y,z) -> fy(x,z) 
 	DFTI_DESCRIPTOR_HANDLE my_desc_handle;

@@ -13,14 +13,18 @@ typedef std::complex<float> stype;
 #define MKL_Complex8 stype
 
 #if defined(_WIN32) || defined(WIN32)
-#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\mkl\include\mkl.h"
-#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\mkl\include\mkl_dfti.h"
-#include "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\mkl\include\mkl_rci.h"
+#include "mkl.h"
+#include "mkl_dfti.h"
+#include "mkl_rci.h"
 #else
 #include "mkl.h"
 #include "mkl_dfti.h"
 #include "mkl_rci.h"
 #endif
+
+//C:\Program Files(x86)\IntelSWTools\compilers_and_libraries\windows\mkl\lib\intel64\mkl_core.lib
+//C:\Program Files(x86)\IntelSWTools\compilers_and_libraries\windows\mkl\lib\intel64\mkl_intel_thread.lib
+//C:\Program Files(x86)\IntelSWTools\compilers_and_libraries\windows\mkl\lib\intel64\mkl_intel_lp64.lib
 
 //#define DEBUG
 #define min(a, b) ((a) < (b)) ? (a) : (b)

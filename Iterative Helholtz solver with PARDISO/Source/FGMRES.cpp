@@ -93,23 +93,23 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	//	output(str2, false, x, y, z, sound3D, deltaL)
 
 	printf("-----Step 1. Memory allocation for 2D problems\n");
-	printf("size3D = %d\n", size);
-	if (size > 2147483647) printf("!!! OVERFLOW !!!\n");
+	//printf("size3D = %d\n", size);
+	//if (size > 2147483647) printf("!!! OVERFLOW !!!\n");
 	//system("pause");
 	zcsr *D2csr_zero;
-	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
-	int non_zeros_in_2Dblock9diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n) + 4 * (x.n - 1) * (y.n - 1);
-	int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
+	size_t non_zeros_in_2Dblock3diag = ((size_t)x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
+	size_t non_zeros_in_2Dblock9diag = ((size_t)x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n) + 4 * (x.n - 1) * (y.n - 1);
+	size_t non_zeros_in_2Dblock13diag = ((size_t)x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
 
 
-	int non_zeros;
+	size_t non_zeros = 0;
 
 #if 1
 	non_zeros = non_zeros_in_2Dblock9diag;
-
+	
 	D2csr_zero = (zcsr*)malloc(sizeof(zcsr));
 	D2csr_zero->values = alloc_arr<dtype>(non_zeros);
-	D2csr_zero->ia = alloc_arr<int>(size2D + 1);
+	D2csr_zero->ia = alloc_arr<int>((size_t)size2D + 1);
 	D2csr_zero->ja = alloc_arr<int>(non_zeros);
 	D2csr_zero->ia[size2D] = non_zeros + 1;
 	D2csr_zero->non_zeros = non_zeros;
@@ -253,8 +253,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	}
 #else
 	//int smallsize = x.n / 2 - 10;
-	int smallsize = 40;
-	dtype *B = alloc_arr<dtype>((size2D - x.n) * z.n); // for right diagonal
+	int smallsize = 160;
+	dtype *B = alloc_arr<dtype>(((size_t)size2D - x.n) * z.n); // for right diagonal
 	bool *solves = alloc_arr<bool>(z.n);
 	int lwork_HODLR = x.n * x.n;
 	dtype *work_HODLR = alloc_arr2<dtype>(lwork_HODLR);
@@ -308,17 +308,17 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	system("pause");
 #endif
 
-	double mem = 2.0 * non_zeros_in_2Dblock9diag / (1024 * 1024 * 1024);
-	mem += double(size2D + 1) / (1024 * 1024 * 1024);
+	double mem = 2.0 * non_zeros_in_2Dblock9diag / ((size_t)1024 * 1024 * 1024);
+	mem += ((double)size2D + 1) / ((size_t)1024 * 1024 * 1024);
 	mem *= count;
-	mem += double(z.n * size2D) / (1024 * 1024 * 1024);
+	mem += ((double)z.n * size2D) / ((size_t)1024 * 1024 * 1024);
 
 	mem *= 8; // bytes
 	mem *= 2;
 
 	printf("Memory for %d 2D matrices: %lf Gb\n", count, mem);
 
-	mem_pard /= (1024 * 1024);
+	mem_pard /= ((size_t)1024 * 1024);
 	mem_pard *= count;
 	printf("Memory for %d PARDISO factor + analysis 2D matrices: %lf Gb\n", count, mem_pard);
 
@@ -326,7 +326,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	system("pause");
 #endif
 
-	printf("-----Step 1. Memory allocation-----\n");
+	printf("-----Step 2. Memory allocation for FGMRES-----\n");
 	// init cond
 	dtype *x0 = alloc_arr<dtype>(size);
 	dtype *x_init = alloc_arr<dtype>(size);
@@ -430,7 +430,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		TestNormalizedVector(size, &V[0], thresh);
 
 		// 2. The main iterations of algorithm
-		printf("-----Step 2. Iterations-----\n");
+		printf("-----Step 3. Iterations-----\n");
 		for (size_t j = 0; j < (size_t)m; j++)
 		{
 			printf("---------------------\nIteration = %d\n---------------------\n", j);

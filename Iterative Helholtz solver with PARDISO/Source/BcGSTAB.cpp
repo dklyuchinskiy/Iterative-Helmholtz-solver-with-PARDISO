@@ -20,17 +20,12 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 	double norm = 0;
 	double norm_f = 0;
 	double norm_r0 = 0;
-	double beta = 0;
 	double Res;
 	double RelRes;
 	int i1, j1, k1;
 
 	int nrhs = 1;
 	int info = 0;
-	int col_min;
-	int row_min;
-	dtype work_size;
-	dtype done = { 1.0, 0.0 };
 	dtype mone = { -1.0, 0.0 };
 
 	int* freqs = alloc_arr<int>(size);
@@ -394,8 +389,6 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 	// vars
 	dtype calpha;
 	double dalpha;
-	double norm_re;
-	double norm_im;
 
 #pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < size; i++)
@@ -554,8 +547,8 @@ void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype *x_s
 
 			check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, j, 0, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
 
-			norm_re = RelError(dlange, size_nopml, 1, x_sol_re, x_orig_re, size_nopml, thresh);
-			norm_im = RelError(dlange, size_nopml, 1, x_sol_im, x_orig_im, size_nopml, thresh);
+			double norm_re = RelError(dlange, size_nopml, 1, x_sol_re, x_orig_re, size_nopml, thresh);
+			double norm_im = RelError(dlange, size_nopml, 1, x_sol_im, x_orig_im, size_nopml, thresh);
 			norm = RelError(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
 #ifdef PRINT
 			printf("norm_re = %lf\n", norm_re);

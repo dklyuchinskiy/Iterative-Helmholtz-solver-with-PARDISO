@@ -1040,8 +1040,6 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y, size_m x_lg, size_m y_
 	int non_zeros_in_2Dblock3diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
 	int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
 	//int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
-	int ione = 1;
-	int zero = 0;
 	int itwo = 2;
 
 	dtype *x_sol = alloc_arr<dtype>(size2D);
@@ -1081,7 +1079,6 @@ double Test2DLaplaceLevander4thKernel(size_m x, size_m y, size_m x_lg, size_m y_
 	int msglvl = 0;
 	int error = 0;
 	int phase; // analisys + factorization + solution
-	int info;
 
 	point src = { x.l / 2, y.l / 2 };
 	double k = 0.02;
@@ -1287,7 +1284,6 @@ double Test2DLaplaceLevander4thKernelGenNumSolutionLowGrid(size_m x, size_m y, d
 	//int non_zeros_in_2Dblock13diag = (x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
 	int ione = 1;
 	int zero = 0;
-	int itwo = 2;
 
 	dtype *f = alloc_arr<dtype>(size2D);
 	dtype *g = alloc_arr<dtype>(size2D);
