@@ -2608,6 +2608,7 @@ void TestRowInterchange(int n, int m, double eps)
 	print(n, m, A, lda, "AbackReverse");
 }
 
+#if 0
 void Test_DirFactFastDiagStructOnlineHODLR(size_m x, size_m y, cmnode** Gstr, dtype *B, dtype kwave2, double eps, int smallsize)
 {
 	printf("Testing factorization...\n");
@@ -2696,6 +2697,7 @@ void Test_DirFactFastDiagStructOnlineHODLR(size_m x, size_m y, cmnode** Gstr, dt
 	printf("Time: %lf\n", timer);
 
 }
+#endif
 
 void Test_DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** Gstr, dtype *B, double eps, int smallsize)
 {

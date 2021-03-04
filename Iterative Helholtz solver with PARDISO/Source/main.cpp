@@ -129,9 +129,9 @@ int main()
 
 			x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-			int n1 = 49 + 2 * x.pml_pts;		    // number of point across the directions
-			int n2 = 49 + 2 * y.pml_pts;
-			int n3 = 49 + 2 * z.spg_pts;
+			int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
+			int n2 = 99 + 2 * y.pml_pts;
+			int n3 = 99 + 2 * z.spg_pts;
 			int n = n1 * n2;		// size of blocks
 			int NB = n3;			// number of blocks
 

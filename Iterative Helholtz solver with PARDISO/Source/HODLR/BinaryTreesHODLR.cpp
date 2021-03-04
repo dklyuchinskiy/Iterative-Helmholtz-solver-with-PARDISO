@@ -2592,7 +2592,7 @@ void LowRankToUnsymmHSS(int n, int r, dtype *U, int ldu, dtype *VT, int ldvt, cu
 
 
 // Solver
-
+#if 1
 void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, dtype *f, zcsr* Dcsr, double thresh, int smallsize, int ItRef, char *bench,
 	/* output */ 	cmnode** &Gstr, dtype *x_sol, int &success, double &RelRes, int &itcount, double beta_eq)
 {
@@ -2619,6 +2619,8 @@ void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, 
 	int lwork2 = n * n / 2;
 	int lwork3 = 2 * n * 1 * levels;
 	dtype *work = alloc_arr<dtype>(lwork + lwork2 + lwork3);
+	dtype *sound2D;
+	double kww = 0;
 
 	printf("Factorization of matrix...\n");
 	tt = omp_get_wtime();
@@ -2626,7 +2628,7 @@ void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, 
 #ifndef ONLINE
 	DirFactFastDiagStruct(x.n, y.n, z.n, D, ldd, B, Gstr, thresh, smallsize, bench);
 #else
-	DirFactFastDiagStructOnline(x, y, Gstr, B, kwave_beta2, work, lwork, thresh, smallsize);
+	DirFactFastDiagStructOnline(x, y, Gstr, B, sound2D, kww, beta_eq, work, lwork, thresh, smallsize);
 #endif
 	tt = omp_get_wtime() - tt;
 	if (compare_str(7, bench, "print_time"))
@@ -2693,10 +2695,11 @@ void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, 
 	free_arr(x1);
 	free_arr(work);
 }
+#endif
 
 /* Функция вычисления разложения симметричной блочно-диагональной матрицы с использование сжатого формата.
 Внедиагональные блоки предполагаются диагональными матрицами */
-void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, dtype kwave_beta2, dtype *work, int lwork,
+void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, dtype *sound2D, double kww, double beta_eq, dtype *work, int lwork,
 	double eps, int smallsize)
 {
 	int n = x.n;
@@ -2718,7 +2721,7 @@ void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, d
 
 	Clear(n, n, DD, lddd);
 	tt = omp_get_wtime();
-	GenerateDiagonal1DBlockHODLR(0, x, y, DD, lddd, kwave_beta2);
+	GenerateDiagonal1DBlockHODLR(0, x, y, DD, lddd, sound2D, kww, beta_eq);
 	SymRecCompressStruct(n, DD, lddd, DCstr, smallsize, eps, "SVD");
 	tt = omp_get_wtime() - tt;
 #ifdef DISPLAY
@@ -2744,7 +2747,7 @@ void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, d
 		Clear(n, n, DD, lddd);
 
 		tt = omp_get_wtime();
-		GenerateDiagonal1DBlockHODLR(k, x, y, DD, lddd, kwave_beta2);
+		GenerateDiagonal1DBlockHODLR(k, x, y, DD, lddd, sound2D, kww, beta_eq);
 		SymRecCompressStruct(n, DD, lddd, DCstr, smallsize, eps, "SVD");
 		tt = omp_get_wtime() - tt;
 #ifdef DISPLAY

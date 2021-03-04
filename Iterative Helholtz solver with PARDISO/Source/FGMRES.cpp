@@ -93,20 +93,21 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	//	output(str2, false, x, y, z, sound3D, deltaL)
 
 	printf("-----Step 1. Memory allocation for 2D problems\n");
-	//printf("size3D = %d\n", size);
-	//if (size > 2147483647) printf("!!! OVERFLOW !!!\n");
-	//system("pause");
+
 	zcsr *D2csr_zero;
-	size_t non_zeros_in_2Dblock3diag = ((size_t)x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
-	size_t non_zeros_in_2Dblock9diag = ((size_t)x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n) + 4 * (x.n - 1) * (y.n - 1);
-	size_t non_zeros_in_2Dblock13diag = ((size_t)x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
-
-
 	size_t non_zeros = 0;
+#if DIAG_PATTERN == 3
+	size_t non_zeros_in_2Dblock3diag = ((size_t)x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n);
+	non_zeros = non_zeros_in_2Dblock3diag;
+#elif DIAG_PATTERN == 9
+	size_t non_zeros_in_2Dblock9diag = ((size_t)x.n + (x.n - 1) * 2) * y.n + 2 * (size2D - x.n) + 4 * (x.n - 1) * (y.n - 1);
+	non_zeros = non_zeros_in_2Dblock9diag;
+#else
+	size_t non_zeros_in_2Dblock13diag = ((size_t)x.n + (x.n - 1) * 2 + (x.n - 2) * 2 + (x.n - 3) * 2) * y.n + 2 * (size2D - x.n) + 2 * (size2D - 2 * x.n) + 2 * (size2D - 3 * x.n);
+	non_zeros = non_zeros_in_2Dblock13diag;
+#endif
 
 #if 1
-	non_zeros = non_zeros_in_2Dblock9diag;
-	
 	D2csr_zero = (zcsr*)malloc(sizeof(zcsr));
 	D2csr_zero->values = alloc_arr<dtype>(non_zeros);
 	D2csr_zero->ia = alloc_arr<int>((size_t)size2D + 1);
@@ -132,29 +133,29 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	double sigma = 0.25;
 	double mem_pard = 0;
 
-#ifndef HODLR
-	time = omp_get_wtime();
+	//rubish
 	//GenSparseMatrixOnline2DwithPMLand9Points(-1, x, y, z, D2csr_zero, 0, freqs, sigma);
-	//GenSparseMatrixOnline2DwithPML(-1, x, y, D2csr_zero, 0, freqs);
-	GenSparseMatrixOnline2DwithPMLand9Pts(-1, x, y, D2csr_zero, 0, freqs);
-	//GenSparseMatrixOnline2DwithPMLFast(-1, x, y, D2csr_zero, 0, freqs);
-	//GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, D2csr_zero, 0, freqs);  // does not work now
-	time = omp_get_wtime() - time;
-	printf("time for constructing = %lf sec\n", time);
+    //GenSparseMatrixOnline2DwithPMLFast(-1, x, y, D2csr_zero, 0, freqs);
 
-	time = omp_get_wtime();
-	//TestSymmSparseMatrixOnline2DwithPML(x, y, z, D2csr_zero);
-#if 0
-	TestSymmSparseMatrixOnline2DwithPML9Pts(x, y, z, D2csr_zero);
-#endif
-	time = omp_get_wtime() - time;
-#endif
-
-	// Memory for 2D CSR matrix
 #ifndef HODLR
+	time = omp_get_wtime();
+#if DIAG_PATTERN == 3
+	GenSparseMatrixOnline2DwithPML(-1, x, y, D2csr_zero, 0, freqs);
+	TestSymmSparseMatrixOnline2DwithPML(x, y, z, D2csr_zero);
+#elif DIAG_PATTERN == 9
+	GenSparseMatrixOnline2DwithPMLand9Pts(-1, x, y, D2csr_zero, 0, freqs);
+	TestSymmSparseMatrixOnline2DwithPML9Pts(x, y, z, D2csr_zero);
+#else
+	GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, D2csr_zero, 0, freqs);  // does not work now
+#endif
+	time = omp_get_wtime() - time;
+	printf("time for constructing and test = %lf sec\n", time);
+	system("pause");
+
 	zcsr **D2csr;
 	D2csr = (zcsr**)malloc(z.n * sizeof(zcsr*));
 #else
+	//try to make unsymmetric solver cumnode
 	cmnode* **Gstr;
 	Gstr = (cmnode***)malloc(z.n * sizeof(cmnode**));
 #endif
@@ -253,11 +254,11 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	}
 #else
 	//int smallsize = x.n / 2 - 10;
-	int smallsize = 160;
+	int smallsize = 40;
 	dtype *B = alloc_arr<dtype>(((size_t)size2D - x.n) * z.n); // for right diagonal
 	bool *solves = alloc_arr<bool>(z.n);
 	int lwork_HODLR = x.n * x.n;
-	dtype *work_HODLR = alloc_arr2<dtype>(lwork_HODLR);
+	dtype *work_HODLR = alloc_arr<dtype>(lwork_HODLR);
 
 	printf("Size of 1D block: %d x %d\nSmallsize = %d\n", x.n, x.n, smallsize);
 	system("pause");
@@ -286,11 +287,17 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		if (1)
 		//if (kww < ratio * k2)
 		{
+			// only for homogeneous domain
+#ifdef HOMO
 			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } -kww;
 			printf("Solved k = %d beta2 = (%lf, %lf)\n", k, kwave_beta2.real(), kwave_beta2.imag());
+#else
+			dtype kwave_beta2 = 0;
+			printf("Solved k = %d\n", k);
+#endif
 
 			// Factorization of matrices
-			DirFactFastDiagStructOnline(x, y, Gstr[k], &B[k * (size2D - x.n)], kwave_beta2, work_HODLR, lwork_HODLR, thresh, smallsize);
+			DirFactFastDiagStructOnline(x, y, Gstr[k], &B[k * (size2D - x.n)], sound2D, kww, beta_eq, work_HODLR, lwork_HODLR, thresh, smallsize);
 			solves[k] = true;
 			count++;
 
@@ -308,7 +315,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	system("pause");
 #endif
 
-	double mem = 2.0 * non_zeros_in_2Dblock9diag / ((size_t)1024 * 1024 * 1024);
+	double mem = 2.0 * non_zeros / ((size_t)1024 * 1024 * 1024);
 	mem += ((double)size2D + 1) / ((size_t)1024 * 1024 * 1024);
 	mem *= count;
 	mem += ((double)z.n * size2D) / ((size_t)1024 * 1024 * 1024);

@@ -171,6 +171,12 @@ enum class DIAG13
 #define PRINT
 #endif
 
+
+// for PARDISO settings
+//#define SYMMETRY
+//#define DIAG_PATTERN 3
+#define DIAG_PATTERN 9
+
 //#define HOMO
 //#define SAVE_MEM
 //#define CHECK_ACCURACY // 2D problems

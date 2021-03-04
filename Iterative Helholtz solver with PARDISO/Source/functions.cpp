@@ -864,8 +864,8 @@ dtype MakeSound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z,
 	return c_z;
 #else
 	//return c_z + c1 * x + c2 * y + c3 * z;
-	//return xx.c1 * x + xx.c2 * y + xx.c3;
-        return xx.c0 + xx.c1 * sin(xx.c2 * x) + xx.c3 * y;
+	return xx.c1 * x + xx.c2 * y + xx.c3;
+    //    return xx.c0 + xx.c1 * sin(xx.c2 * x) + xx.c3 * y;
 #endif
 }
 
@@ -1312,17 +1312,25 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 	double c3 = 600;
 	double c2 = (1500 - c3) / y.l;
 	double c1 = (1800 - c3 - c2 * y.l) / x.l;
+	x.c1 = c1;
+	x.c2 = c2;
+	x.c3 = c3;
 #else
 	// ratio 5
-    //double c3 = 600.0;
-    //double c2 = (1500.0 - c3) / LENGTH_Y;
-    //double c1 = (3000.0 - c3 - c2 * LENGTH_Y) / LENGTH_X;
+    double c3 = 600.0;
+    double c2 = (1500.0 - c3) / LENGTH_Y;
+    double c1 = (3000.0 - c3 - c2 * LENGTH_Y) / LENGTH_X;
+	x.c1 = c1;
+	x.c2 = c2;
+	x.c3 = c3;
 #endif
 	   // c(x,y,z) = c0 + c1 * sin(c2 * x) + c3 * y
 		// c(0,0,0) = 600
 		// c(0,max) = 1500;
 		// c(max,0) = 2000;
 		// c(max,max) = 3000;
+
+#if 0
 	double c0 = 600.0;
 	double c1 = 1500.0;
 	double c3 = (1500.0 - c0) / LENGTH_Y;
@@ -1332,6 +1340,8 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 	x.c1 = c1;
 	x.c2 = c2;
 	x.c3 = c3;
+#endif
+
 #if 0
 	for (int k = 0; k < Nz; k++)
 	{
@@ -2852,7 +2862,6 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, zcsr* Acsr, dtype
 				{
 					Acsr->ja[count] = l2 + 1;
 					Acsr->values[count++] = beta2D_pml(x, y, static_cast<int>(diag), kwave_beta2, j1, k1) / alp;
-
 				}
 
 			}
@@ -2881,7 +2890,7 @@ void GenSparseMatrixOnline2DwithPML(int w, size_m x, size_m y, zcsr* Acsr, dtype
 		//printf("SUCCESSED 2D generation for frequency %d!\n", w);
 	}
 
-	//print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat.dat");
+	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat_hetero.dat");
 }
 
 void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, dtype kwave_beta2, int* freqs)
@@ -3156,9 +3165,13 @@ void GenSparseMatrixOnline2DwithPMLand9Pts(int w, size_m x, size_m y, zcsr* Acsr
 	//double c = 0.85;
 	//double d = 0.0;
 
+//	double a = 1.0;
+ //   double c = 0.85;
+ //   double d = 0.0;   // 0.1597, 0.038, 0.011
+
 	double a = 1.0;
-    double c = 0.85;
-    double d = 0.0;   // 0.1597, 0.038, 0.011
+	double c = 1.0;
+	double d = 0.0;   // 0.1597, 0.038, 0.011
 
 	//double a = 0.5461;
 	//double c = 0.6248;
@@ -3233,7 +3246,11 @@ void GenSparseMatrixOnline2DwithPMLand9Pts(int w, size_m x, size_m y, zcsr* Acsr
 			{
 				take_coord2D(x.n, y.n, l1, j1, k1);
 				take_coord2D(x.n, y.n, l2, j2, k2);
-
+#ifdef SYMMETRY
+				dtype alp = alpha(x, j1) * alpha(y, k1);
+#else
+				dtype alp = 1;
+#endif
 				DIAG9 diag = CheckDiag9Pts(x, y, l1, l2);
 
 				if (diag == DIAG9::zero) freqs[count2++] = count;
@@ -3241,7 +3258,7 @@ void GenSparseMatrixOnline2DwithPMLand9Pts(int w, size_m x, size_m y, zcsr* Acsr
 				if (diag != DIAG9::not_a_diag)
 				{
 					Acsr->ja[count] = l2 + 1;
-					Acsr->values[count++] = beta2D_pml_9pts_opt(x, y, static_cast<int>(diag), kwave_beta2, j1, k1, a, c, d);
+					Acsr->values[count++] = beta2D_pml_9pts_opt(x, y, static_cast<int>(diag), kwave_beta2, j1, k1, a, c, d) / alp;
 				}
 			}
 
@@ -3262,10 +3279,16 @@ void GenSparseMatrixOnline2DwithPMLand9Pts(int w, size_m x, size_m y, zcsr* Acsr
 	}
 	else
 	{
-#pragma omp parallel for simd schedule(static)
-		for (int i = 0; i < size; i++)
-			Acsr->values[freqs[i]] += kwave_beta2;
-
+		for (int l = 0; l < size; l++)
+		{
+#ifdef SYMMETRY
+			take_coord2D(x.n, y.n, l, j1, k1);
+			dtype alp = alpha(x, j1) * alpha(y, k1);
+#else
+			dtype alp = 1;
+#endif
+			Acsr->values[freqs[l]] += kwave_beta2 / alp;
+		}
 		//printf("SUCCESSED 2D generation for frequency %d!\n", w);
 	}
 

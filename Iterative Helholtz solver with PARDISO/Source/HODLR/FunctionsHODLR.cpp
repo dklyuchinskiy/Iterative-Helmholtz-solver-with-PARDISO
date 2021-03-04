@@ -327,7 +327,7 @@ void GenerateDiagonal1DBlock(int part_of_field, size_m x, size_m y, dtype *DD, i
 
 }
 
-void GenerateDiagonal1DBlockHODLR(int j, size_m x, size_m y, dtype *DD, int lddd, dtype kwave_beta2)
+void GenerateDiagonal1DBlockHODLR(int j, size_m x, size_m y, dtype *DD, int lddd, dtype *sound2D, double kww, double beta_eq)
 {
 	int n = x.n;
 
@@ -340,11 +340,18 @@ void GenerateDiagonal1DBlockHODLR(int j, size_m x, size_m y, dtype *DD, int lddd
 #else
 		dtype alp = 1;
 #endif
+
+#ifdef HOMO
+		double k2 = double(kk) * double(kk);
+		dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } - kww;
+#else
+		dtype kxyz = (double)omega / sound2D[i + j * x.n];
+		dtype kwave_beta2 = kxyz * kxyz * dtype{ 1, beta_eq } - kww;
+#endif
 		DD[i + lddd * i] = beta2D_pml(x, y, 0, kwave_beta2, i, j) / alp;
 		if (i > 0) DD[i + lddd * (i - 1)] = beta2D_pml(x, y, -1, kwave_beta2, i, j) / alp; // forward
 		if (i < n - 1) DD[i + lddd * (i + 1)] = beta2D_pml(x, y, 1, kwave_beta2, i, j) / alp; // backward
 	}
-
 }
 
 void GenerateSubdiagonalB(size_m x, size_m y, dtype *B)
