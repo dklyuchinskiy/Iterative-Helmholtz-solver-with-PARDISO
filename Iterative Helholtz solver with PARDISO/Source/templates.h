@@ -80,6 +80,8 @@ DIAG9 CheckDiag9Pts(size_m x, size_m y, int l1, int l2);
 void nullifyPML3D(size_m x, size_m y, size_m z, int size1, dtype* vect);
 void HeteroSoundSpeed3DExtensionToPML(size_m x, size_m y, size_m z, dtype *sound3D);
 void RecMultLStructWork2(int n, int m, cmnode* Astr, dtype* X, int ldx, dtype beta, dtype* Y, int ldy, dtype* work1, int lwork1, int smallsize);
+float* ReadData();
+void SetSoundSpeed3DFromFile(size_m x, size_m y, size_m z, dtype* sound3D, point source);
 
 void ModifyNumericalSolution(int size_nopml, dtype *x_sol_nopml, dtype* x_orig_nopml);
 void ReadSolution(int size, dtype *x_sol, char *);
@@ -138,7 +140,7 @@ void SolvePardiso3D(size_m x, size_m y, size_m z, zcsr* Dcsr, dtype* x_pard, dty
 dtype my_exp(double val);
 dtype EulerExp(dtype val);
 dtype u_ex_complex(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
-dtype F3D_ex_complex(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source, int& l);
+dtype F3D_ex_complex(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source, int &l, int &key);
 dtype F2D_ex_complex(size_m xx, size_m yy, double x, double y, point source, int& l);
 dtype F1D_ex_complex(size_m xx, double x, point source, int& l);
 void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_orig, dtype* x_pard, double diff_sol);

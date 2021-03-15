@@ -42,6 +42,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	int count = 0;
 	int ratio = 0;
 
+	//float *sound3D_OT = ReadData();
+
 	FILE *output;
 	char str0[255];
 	sprintf(str0, "convergence_N%d_PML%d_Lx%d_FREQ%d_SPG%6.lf_BETA%5.3lf_FGMRES.dat", x.n_nopml, x.pml_pts, (int)LENGTH_X, (int)nu, z.h * 2 * z.spg_pts, beta_eq);
@@ -71,7 +73,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	//	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
 #if 1
 	// Gen velocity of sound in 3D domain
-	SetSoundSpeed3D(x, y, z, sound3D, source);
+	//SetSoundSpeed3D(x, y, z, sound3D, source);
+	SetSoundSpeed3DFromFile(x, y, z, sound3D, source);
 
 	// Extension of 3D sound speed to PML zone
 	HeteroSoundSpeed3DExtensionToPML(x, y, z, sound3D);
@@ -144,7 +147,9 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	TestSymmSparseMatrixOnline2DwithPML(x, y, z, D2csr_zero);
 #elif DIAG_PATTERN == 9
 	GenSparseMatrixOnline2DwithPMLand9Pts(-1, x, y, D2csr_zero, 0, freqs);
-	TestSymmSparseMatrixOnline2DwithPML9Pts(x, y, z, D2csr_zero);
+	
+	if (x.n_nopml <= 100)
+		TestSymmSparseMatrixOnline2DwithPML9Pts(x, y, z, D2csr_zero);
 #else
 	GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, D2csr_zero, 0, freqs);  // does not work now
 #endif
@@ -417,17 +422,17 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 #endif
 
 		norm = dznrm2(&size, w, &ione);
-		printf("norm ||Ax0|| = %lf\n", norm);
+		printf("norm ||Ax0|| = %e\n", norm);
 
 		norm_f = dznrm2(&size, f, &ione);
-		printf("norm ||f|| = %lf\n", norm_f);
+		printf("norm ||f|| = %e\n", norm_f);
 
 		//Add_dense(size, ione, 1.0, f, size, -1.0, w, size, r0, size);
 		zcopy(&size, f, &ione, r0, &ione);
 		zaxpy(&size, &mone, w, &ione, r0, &ione); // r0: = f - Ax0
 
 		norm = dznrm2(&size, r0, &ione);
-		printf("norm ||r0|| = %lf\n", norm);
+		printf("norm ||r0|| = %e\n", norm);
 
 		//norm = RelError(zlange, size, 1, r0, f, size, thresh);
 		//printf("r0 = f - Ax0, norm ||r0 - f|| = %lf\n", norm);

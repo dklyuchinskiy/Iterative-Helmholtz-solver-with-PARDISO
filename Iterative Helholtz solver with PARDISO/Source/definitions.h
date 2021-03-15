@@ -205,12 +205,19 @@ enum class DIAG13
 
 //#define C3 0.7
 
-#if 0
+#if 1
 
+#if 0
 // grid 80, 160, 320
 #define LENGTH_X 5120
 #define LENGTH_Y 5120
 #define LENGTH_Z 2560
+#else
+// grid 110, 160, 320
+#define LENGTH_X 9900
+#define LENGTH_Y 9900
+#define LENGTH_Z 4680
+#endif
 #else
 // grid 50, 100, 200
 #define LENGTH_X LENGTH

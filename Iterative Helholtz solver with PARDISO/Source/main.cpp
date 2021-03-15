@@ -129,11 +129,19 @@ int main()
 
 			x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
-			int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
-			int n2 = 99 + 2 * y.pml_pts;
-			int n3 = 99 + 2 * z.spg_pts;
+			// OT 110, 110, 52  - 90m
+			// OT 165, 165, 78  - 60m
+			// OT 330, 330, 156 - 30m
+
+			int n1 = 330 + 2 * x.pml_pts;		    // number of point across the directions
+			int n2 = 330 + 2 * y.pml_pts;
+			int n3 = 156 + 2 * z.spg_pts;
 			int n = n1 * n2;		// size of blocks
 			int NB = n3;			// number of blocks
+
+
+			// FGMRES or BcGSTAB number of iterations/niter
+			int niter = 50;
 
 			x.n = n1;
 			y.n = n2;
@@ -172,6 +180,7 @@ int main()
 			x_nopml.n_nopml = y_nopml.n_nopml = x_nopml.n;
 			z_nopml.n_nopml = z_nopml.n;
 
+#if 0
 			x.l = LENGTH_X + (double)(2 * x.pml_pts * LENGTH_X) / (x.n_nopml + 1);
 			y.l = LENGTH_Y + (double)(2 * y.pml_pts * LENGTH_Y) / (y.n_nopml + 1);
 			z.l = LENGTH_Z + (double)(2 * z.spg_pts * LENGTH_Z) / (z.n_nopml + 1);
@@ -179,8 +188,22 @@ int main()
 			x.h = x.l / (x.n + 1);  // x.n + 1 grid points of the whole domain
 			y.h = y.l / (y.n + 1);  // x.n - 1 - inner points
 			z.h = z.l / (z.n + 1);  // 2 points - for the boundaries
+#else
+			x.l = LENGTH_X + (double)(2 * x.pml_pts * LENGTH_X) / (x.n_nopml);
+			y.l = LENGTH_Y + (double)(2 * y.pml_pts * LENGTH_Y) / (y.n_nopml);
+			z.l = LENGTH_Z + (double)(2 * z.spg_pts * LENGTH_Z) / (z.n_nopml);
 
-			point source = { x.l / 2.0, y.l / 2.0, z.l / 2.0 };
+			x.h = x.l / (x.n);  // x.n grid points of the whole domain
+			y.h = y.l / (y.n);  // x.n - 2 - inner points
+			z.h = z.l / (z.n);  // 2 points - for the boundaries
+#endif
+			double xc = x.l;
+			double yc = y.l;
+			double zc = z.l;
+			if (n1 % 2 != 0) xc += x.h;
+			if (n2 % 2 != 0) yc += y.h;
+			if (n3 % 2 != 0) zc += z.h;
+			point source = { xc / 2.0, yc / 2.0, zc / 2.0 };
 
 #define PRINT_INIT
 
@@ -195,6 +218,7 @@ int main()
 			printf("Size of SPONGE domain: Lz = %lf\n", 2 * z.spg_pts * z.h);
 			printf("with points: Nz = %d\n", 2 * z.spg_pts);
 			printf("Steps for physical domain: hx = %lf, hy = %lf, hz = %lf\n", x.h, y.h, z.h);
+			printf("Source should be x = %lf, y = %lf, z = %lf\n", source.x, source.y, source.z);
 
 			printf("Size of system Au = f : %d x %d \n", size, size);
 #endif
@@ -218,7 +242,7 @@ int main()
 			//int niter = 8;// for freq = 4 but n = 50 and BCGStab
 							// FGMRES: freq = 4, n = 50, niter = 8
 
-			int niter = 30; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
+			//int niter = 100; // FGMRES 12 (100) 10 (50), BCGSTAB 5 (100), 4 (50)
 
 #ifdef PRINT
 			printf("Frequency nu = %d\n", nu);
@@ -720,15 +744,15 @@ int main()
 			//return 0;
 #endif
 
-//#define OUTPUT
-//#define GNUPLOT
+#define OUTPUT
+#define GNUPLOT
 
 #ifdef OUTPUT
 			printf("Output results to file...\n");
 
-			char file1[255]; sprintf(file1, "Charts3DHetero/%d/model_ft", x.n_nopml + 1);
-			char file2[255]; sprintf(file2, "Charts3DHetero/%d/real/helm_ft", x.n_nopml + 1);
-			char file3[255]; sprintf(file3, "Charts3DHetero/%d/imag/helm_ft", x.n_nopml + 1);
+			char file1[255]; sprintf(file1, "Charts3DHeteroOT/%d/model_ft", x.n_nopml + 1);
+			char file2[255]; sprintf(file2, "Charts3DHeteroOT/%d/real/helm_ft", x.n_nopml + 1);
+			char file3[255]; sprintf(file3, "Charts3DHeteroOT/%d/imag/helm_ft", x.n_nopml + 1);
 			output(file1, pml_flag, x, y, z, x_orig_nopml, x_sol_nopml, diff_sol);
 #endif
 
