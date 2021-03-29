@@ -492,8 +492,8 @@ void PrintProjection1D(size_m x, size_m y, dtype *x_ex, dtype *x_prd, int freq)
 	{
 		if (j == y.n / 2)
 		{
-			sprintf(str1, "Charts3D/%d/projX/model_pml1Dx_freq%d_sec%d_h%d", x.n_nopml + 1, freq, j, (int)x.h);
-			sprintf(str2, "Charts3D/%d/projX/model_pml1Dx_diff_freq%d_sec%d_h%d", x.n_nopml + 1, freq, j, (int)x.h);
+			sprintf(str1, "Charts3DHeteroOT/%d/projX/model_pml1Dx_freq%d_sec%d_h%d", x.n_nopml, freq, j, (int)x.h);
+			sprintf(str2, "Charts3DHeteroOT/%d/projX/model_pml1Dx_diff_freq%d_sec%d_h%d", x.n_nopml, freq, j, (int)x.h);
 
 			output1D(str1, pml_flag, x, &x_ex[x.n * j], &x_prd[x.n * j]);
 			gnuplot1D(str1, str2, pml_flag, 0, x);
@@ -501,8 +501,8 @@ void PrintProjection1D(size_m x, size_m y, dtype *x_ex, dtype *x_prd, int freq)
 	}
 
 	// output 1D - Y direction
-	sprintf(str1, "Charts3D/%d/projY/model_pml1Dy_freq%d_sec%d_h%d", y.n_nopml + 1, freq, x.n / 2, (int)x.h);
-	sprintf(str2, "Charts3D/%d/projY/model_pml1Dy_diff_freq%d_sec%d_h%d", y.n_nopml + 1, freq, x.n / 2, (int)x.h);
+	sprintf(str1, "Charts3DHeteroOT/%d/projY/model_pml1Dy_freq%d_sec%d_h%d", y.n_nopml, freq, x.n / 2, (int)x.h);
+	sprintf(str2, "Charts3DHeteroOT/%d/projY/model_pml1Dy_diff_freq%d_sec%d_h%d", y.n_nopml, freq, x.n / 2, (int)x.h);
 
 	for (int j = 0; j < y.n; j++)
 	{
@@ -1395,8 +1395,13 @@ void SetSoundSpeed3DFromFile(size_m x, size_m y, size_m z, dtype* sound3D, point
 	int n3 = z.n_nopml;  // z
 	size_t size = n1 * n2 * n3;
 	//char fname_bin[255] = "OT_small_at_90m.bin";
-	char fname_bin[255] = "OT_small_at_60m.bin";
+	//char fname_bin[255] = "OT_small_at_60m.bin";
 	//char fname_bin[255] = "OT_small_at_30m.bin";
+	//char fname_bin[255] = "OT_small_at_15m.bin";
+
+	char fname_bin[255];
+	sprintf(fname_bin, "OT_small_at_%dm.bin", (int)x.h);
+
 	FILE *fp;
 	fp = fopen(fname_bin, "rb");
 	if (fp == NULL) printf("!!!FILE IS NOT OPEN!!!\n");
@@ -1454,8 +1459,161 @@ void SetSoundSpeed3DFromFile(size_m x, size_m y, size_m z, dtype* sound3D, point
 	system("pause");
 }
 
+void ExtraData(size_m x, size_m y, size_m z)
+{
+	int n1 = x.n_nopml; // x
+	int n2 = y.n_nopml; // y
+	int n3 = z.n_nopml;  // z
+	size_t size = n1 * n2 * n3;
+	//char fname_bin[255] = "OT_small_at_90m.bin";
+	//char fname_bin[255] = "OT_small_at_60m.bin";
+	//char fname_bin[255] = "OT_small_at_30m.bin";
+
+#if 0
+	char fname_in[255] = "OT_small_at_90m.bin";
+	char fname_out[255] = "OT_small_at_45m.bin";
+#else
+	char fname_in[255] = "OT_small_at_30m.bin";
+	char fname_out[255] = "OT_small_at_15m.bin";
+#endif
+
+	FILE *fp = fopen(fname_in, "rb");
+	if (fp == NULL) printf("!!!FILE IS NOT OPEN!!!\n");
+	float *data_ss = (float*)malloc(size * sizeof(float));
+
+	printf("DATA OT IS READY TO READ!\n");
+	printf("Size of file should be: %ld Kbytes!\n", size * sizeof(float) / 1024);
+	system("pause");
+	fread(data_ss, sizeof(float), size, fp);
+	fclose(fp);
+	printf("DATA OT IS READ!\n");
+
+	char str1[255]; sprintf(str1, "SoundSpeed3D_OT_ReadedFromFile_N%d_%d_%d.dat", n1, n2, n3);
+	FILE *file = fopen(str1, "w");
+
+	for (int j = 0; j < n2; j++)
+		for (int i = 0; i < n1; i++)
+			for (int k = 0; k < n3; k++)
+				fprintf(file, "%lf %lf %lf %f\n", j * y.h, i * x.h, k * z.h, data_ss[j * n3 * n2 + i * n3 + k]);
+
+	fclose(file);
+
+	int n1_new = 2 * n1;
+	int n2_new = 2 * n2;
+	int n3_new = 2 * n3 - 1;
+	int size_new = n1_new * n2_new * n3_new;
+
+	float *data_new = alloc_arr<float>(size_new);
+
+#if 0
+	for (int j = 0; j < n2; j++)
+		for (int i = 0; i < n1; i++)
+			for (int k = 0; k < n3; k++)
+				if (k % 2 == 0)
+				{
+					data_new[2 * j * n3_new * n2_new + 2 * i * n3_new + 2 * k] = data_ss[j * n3 * n2 + i * n3 + k];
+				}
+				else
+				{
+					data_new[2 * j * n3_new * n2_new + 2 * i * n3_new + 2 * k + 1] = (data_ss[j * n3 * n2 + i * n3 + k] + data_ss[j * n3 * n2 + i * n3 + k + 1]) / 2.0;
+				}
+
+	for (int j = 0; j < n2; j++)
+		for (int i = 0; i < n1; i++)
+			for (int k = 0; k < 2 * n3 - 1; k++)
+				if (i % 2 == 0)
+				{
+					data_new[2 * j * n3_new * n2_new + 2 * i * n3_new + k] = data_ss[j * n3 * n2 + i * n3 + k];
+				}
+				else
+				{
+					data_new[2 * j * n3_new * n2_new + (2 * i + 1) * n3_new + k] = (data_ss[j * n3 * n2 + i * n3 + k] + data_ss[j * n3 * n2 + (i + 1) * n3 + k]) / 2.0;
+				}
+
+	for (int j = 0; j < n2; j++)
+		for (int i = 0; i < 2 * n1 - 1; i++)
+			for (int k = 0; k < 2 * n3 - 1; k++)
+				if (j % 2 == 0)
+				{
+					data_new[2 * j * n3_new * n2_new + i * n3_new + k] = data_ss[j * n3 * n2 + i * n3 + k];
+				}
+				else
+				{
+					data_new[(2 * j + 1) * n3_new * n2_new + i * n3_new + k] = (data_ss[j * n3 * n2 + i * n3 + k] + data_ss[(j + 1) * n3 * n2 + i * n3 + k]) / 2.0;
+				}
+#else
+	for (int j = 0; j < n2; j++)
+		for (int i = 0; i < n1; i++)
+			for (int k = 0; k < n3; k++)
+			{
+				data_new[2 * j * n3_new * n1_new + 2 * i * n3_new + 2 * k] = data_ss[j * n3 * n1 + i * n3 + k];
+				if (k < n3 - 1) 
+					data_new[2 * j * n3_new * n1_new + 2 * i * n3_new + 2 * k + 1] = (data_ss[j * n3 * n1 + i * n3 + k] + data_ss[j * n3 * n1 + i * n3 + k + 1]) / 2.0;
+			}
+
+	for (int j = 0; j < n2; j++)
+		for (int i = 0; i < n1 - 1; i++)
+			for (int k = 0; k < 2 * n3 - 1; k++)
+					data_new[2 * j * n3_new * n1_new + (2 * i + 1) * n3_new + k] = (data_new[2 * j * n3_new * n1_new + 2 * i * n3_new + k] + data_new[2 * j * n3_new * n1_new + (2 * i + 2) * n3_new + k]) / 2.0;
+
+	for (int j = 0; j < n2 - 1; j++)
+		for (int i = 0; i < 2 * n1 - 1; i++)
+			for (int k = 0; k < 2 * n3 - 1; k++)
+					data_new[(2 * j + 1) * n3_new * n1_new + i * n3_new + k] = (data_new[2 * j * n3_new * n1_new + i * n3_new + k] + data_new[(2 * j + 2) * n3_new * n1_new + i * n3_new + k]) / 2.0;
+#endif
+
+	for (int i = 0; i < 2 * n1; i++)
+		for (int k = 0; k < 2 * n3 - 1; k++)
+			data_new[(2 * n2 - 1) * n3_new * n1_new + i * n3_new + k] = data_new[(2 * n2 - 2) * n3_new * n1_new + i * n3_new + k];
+
+	for (int j = 0; j < 2 * n2; j++)
+		for (int k = 0; k < 2 * n3 - 1; k++)
+			data_new[j * n3_new * n1_new + (2 * n1 - 1) * n3_new + k] = data_new[j * n3_new * n1_new + (2 * n1 - 2) * n3_new + k];
+
+	fp = fopen(fname_out, "wb");
+	fwrite(data_new, sizeof(float), size_new, fp);
+	fclose(fp);
+
+#if 0
+	printf("DATA OT IS PRINTED!\n");
+	system("pause");
+
+	int Nz = z.n;
+	int Ny = y.n;
+	int Nx = x.n;
+
+	for (int j = y.pml_pts; j < Ny - y.pml_pts; j++)
+		for (int i = x.pml_pts; i < Nx - x.pml_pts; i++)
+			for (int k = z.spg_pts; k < Nz - z.spg_pts; k++)
+				sound3D[k * Nx * Ny + j * Nx + i] = data_ss[(j - y.pml_pts) * n3 * n1 + (i - x.pml_pts) * n3 + (k - z.spg_pts)];
+	//sound3D[j * Nz * Nx + i * Nz + k] = data_ss[(j - y.pml_pts) * n3 * n2 + (i - x.pml_pts) * n3 + (k - z.spg_pts)];
+
+#ifndef HOMO
+	double sound_min = sound3D[z.spg_pts * Nx  * Ny + y.pml_pts * Nx + x.pml_pts].real();
+	double sound_max = sound3D[(Nz - z.spg_pts - 1) * Nx  * Ny + (Ny - y.pml_pts - 1) * Nx + (Nx - x.pml_pts - 1)].real();
+
+	//printf("Sound speed: %lf * x + %lf * y + %lf\n", x.c1, x.c2, x.c3);
+	//printf("Sound speed OverTrust: min = %lf, max = %lf\nRatio: %lf\n", sound_min, sound_max, sound_max / sound_min);
+#endif
+
+#if 0
+	char str[255]; sprintf(str, "SoundSpeed3D_N%d.dat", x.n);
+	FILE* file = fopen(str, "w");
+
+	for (int k = z.spg_pts; k < Nz - z.spg_pts; k++)
+		for (int j = y.pml_pts; j < Ny - y.pml_pts; j++)
+			for (int i = x.pml_pts; i < Nx - x.pml_pts; i++)
+				fprintf(file, "sound[%d][%d][%d] = %lf\n", i, j, k, sound3D[k * n + j * Nx + i].real());
+
+	fclose(file);
+#endif
+#endif
+	system("pause");
+}
+
 void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D, point source)
 {
+	printf("Set sound speed 2D...\n");
 	int n = x.n * y.n;
 	int Nx = x.n;
 	int Ny = y.n;
@@ -1509,6 +1667,7 @@ void SetSoundSpeed2D(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2
 
 void GenerateDeltaL(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D, dtype* deltaL, double beta_eq)
 {
+	printf("GenerateDeltaL...\n");
 	int size2D = x.n * y.n;
 	int nx = x.n;
 	int ny = y.n;
@@ -2389,6 +2548,7 @@ void Copy2DCSRMatrix(int size2D, int nonzeros, zcsr* &A, zcsr* &B)
 
 void HeteroSoundSpeed2DExtensionToPML(size_m x, size_m y, dtype *sound2D)
 {
+	printf("HeteroSoundSpeed2DExtensionToPML...\n");
 	int ii = 0, jj = 0;
 
 	// left x PML
@@ -2466,6 +2626,56 @@ void HeteroSoundSpeed3DExtensionToPML(size_m x, size_m y, size_m z, dtype *sound
 		for (int j = y.n - y.pml_pts; j < y.n; j++)
 			sound3D[i + x.n * j + k * size2D] = sound3D[ii + x.n * jj + k * size2D];
 	}
+#endif
+
+
+//#define PRINT_SS
+#ifdef PRINT_SS
+	for (int j = 0; j < y.n; j++)
+	{
+		char str[255];
+		sprintf(str, "SoundSpeedData/SoundSpeedProjX_%d.dat", j);
+		FILE *out = fopen(str, "w");
+		for (int k = z.spg_pts; k < z.n - z.spg_pts; k++)
+			for (int i = 0; i < x.n; i++)
+				fprintf(out, "%lf %lf %lf\n", k * z.h, i * x.h, sound3D[k * x.n * y.n + j * x.n + i].real());
+	}
+
+	for (int i = 0; i < x.n; i++)
+	{
+		char str[255];
+		sprintf(str, "SoundSpeedData/SoundSpeedProjY_%d.dat", i);
+		FILE *out = fopen(str, "w");
+		for (int k = z.spg_pts; k < z.n - z.spg_pts; k++)
+			for (int j = 0; j < y.n; j++)
+				fprintf(out, "%lf %lf %lf\n", k * z.h, j * x.h, sound3D[k * x.n * y.n + j * x.n + i].real());
+	}
+
+	FILE *file1 = fopen("PrintSS.plt", "w");
+	//fprintf(file1, "set term png font \"Times-Roman, 16\"\n");
+	fprintf(file1, "set term png\n");
+	fprintf(file1, "set size ratio 0.5\n");
+	fprintf(file1, "set xrange[0:%d]\nset yrange[%d:%d]\n", (int)x.l, (int)(z.spg_pts * z.h), (int)((z.n - z.spg_pts) * z.h));
+	fprintf(file1, "set pm3d\n");
+	fprintf(file1, "set palette\n");
+
+	for (int j = 0; j < y.n; j++)
+	{
+		char str[255];
+		sprintf(str, "SoundSpeedData/SoundSpeedProjX_%d.dat", j);
+		fprintf(file1, "set output 'SoundSpeedData/SoundSpeedProjX_%4.2lf.png'\n", (j + 1) * y.h);
+		fprintf(file1, "plot '%s' u 2:1:3 w linespoints pt 7 palette pointsize 1 notitle\n\n", str);
+	}
+
+	for (int i = 0; i < x.n; i++)
+	{
+		char str[255];
+		sprintf(str, "SoundSpeedData/SoundSpeedProjY_%d.dat", i);
+		fprintf(file1, "set output 'SoundSpeedData/SoundSpeedProjY_%4.2lf.png'\n", (i + 1) * x.h);
+		fprintf(file1, "plot '%s' u 2:1:3 w linespoints pt 7 palette pointsize 1 notitle\n\n", str);
+	}
+	fclose(file1);
+	system("PrintSS.plt");
 #endif
 
 #if 1
@@ -4964,6 +5174,12 @@ void gnuplot(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m y
 		//printf("k = %d\nleft: %d  %lf \nright: %d %lf \n\n", k, 0 + 0 * x.n, x_orig[0 + 0 * Nx + k * Ny * Nx].real(), (Nx - 1 + (Ny - 1) * Nx) / 2, x_orig[(Nx - 1 + (Ny - 1) * Nx) / 2 + k * Ny * Nx].real());
 		fprintf(file1, "set output '%s_z_%4.2lf.png'\n", sout, (k + 1) * z.h);
 		fprintf(file1, "splot '%s_%02d.dat' u 2:1:%d w linespoints pt 7 palette pointsize 1 notitle\n\n", splot, k + 1, col);
+	}
+	
+	for (int k = 0; k < Nz; k++)
+	{
+		fprintf(file1, "set output 'Proj%s_z_%4.2lf.png'\n", sout, (k + 1) * z.h);
+		fprintf(file1, "plot '%s_%02d.dat' u 2:1:%d w linespoints pt 7 palette pointsize 1 notitle\n\n", splot, k + 1, col);
 	}
 
 	fprintf(file1, "exit\n");

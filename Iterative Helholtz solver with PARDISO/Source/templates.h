@@ -28,7 +28,7 @@ void GenMatrixandRHSandSolution2(size_m x, size_m y, size_m z, double *D, int ld
 
 
 // Support
-
+void ExtraData(size_m x, size_m y, size_m z);
 dtype ratio_dot(int size, dtype alpha, dtype beta, dtype *s1, dtype *s2, dtype *s3);
 double random(double min, double max);
 double F_ex(size_m xx, size_m yy, size_m zz, double x, double y, double z);

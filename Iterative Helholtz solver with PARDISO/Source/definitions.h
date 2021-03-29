@@ -216,7 +216,9 @@ enum class DIAG13
 // grid 110, 160, 320
 #define LENGTH_X 9900
 #define LENGTH_Y 9900
-#define LENGTH_Z 4680
+//#define LENGTH_Z 4680
+//#define LENGTH_Z 4650
+#define LENGTH_Z 4635
 #endif
 #else
 // grid 50, 100, 200

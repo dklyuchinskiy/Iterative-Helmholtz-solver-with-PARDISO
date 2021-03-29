@@ -42,7 +42,7 @@ int main()
 	int nthr = omp_get_max_threads();
 	printf("Max_threads: %d threads\n", nthr);
 	//omp_set_dynamic(0);
-	nthr = 6;
+	nthr = 12;
 	omp_set_num_threads(nthr);
 	mkl_set_num_threads(nthr);
 	printf("Run in parallel on %d threads\n", nthr);
@@ -131,17 +131,20 @@ int main()
 
 			// OT 110, 110, 52  - 90m
 			// OT 165, 165, 78  - 60m
-			// OT 330, 330, 156 - 30m
+			// OT 220, 220, 103 - 45m
+			// OT 330, 330, 155 - 30m
+			// OT 660, 660, 309 - 15m
 
-			int n1 = 330 + 2 * x.pml_pts;		    // number of point across the directions
-			int n2 = 330 + 2 * y.pml_pts;
-			int n3 = 156 + 2 * z.spg_pts;
+			int n1 = 660 + 2 * x.pml_pts;		    // number of point across the directions
+			int n2 = 660 + 2 * y.pml_pts;
+			int n3 = 309 + 2 * z.spg_pts;
+
 			int n = n1 * n2;		// size of blocks
 			int NB = n3;			// number of blocks
 
 
 			// FGMRES or BcGSTAB number of iterations/niter
-			int niter = 50;
+			int niter = 60;
 
 			x.n = n1;
 			y.n = n2;
@@ -260,7 +263,11 @@ int main()
 
 			printf("Number of iterations: %d\n", niter + 1);
 
-
+#if 0
+			printf("Extra data...\n");
+			ExtraData(x, y, z);
+			printf("Extra data DONE\n");
+#endif
 			system("pause");
 			int n_nopml = x.n_nopml * y.n_nopml;
 			int size_nopml = n_nopml * z.n_nopml;
@@ -474,6 +481,41 @@ int main()
 #ifdef PRINT
 			printf("Time: %lf\n", all_time);
 			printf("size = %d size_no_pml = %d\n", size, size_nopml);
+#endif
+
+#if 0
+			// for printing with gnuplot (1D projections in sponge direction)
+			dtype* z_sol1D_ex = alloc_arr<dtype>(z.n);
+			dtype* z_sol1D_prd = alloc_arr<dtype>(z.n);
+
+			// output 1D - Z direction
+			//char str1[255], str2[255];
+			printf("Prepare 1D projections...\n");
+			pml_flag = 0;
+
+			for (int j = 0; j < y.n; j++)
+			{
+				if (j == y.n / 2 || j == y.n / 4 || j == y.n * 3 / 4)
+				{
+					sprintf(str1, "Charts3DHeteroOT/%d/projZ/model_pml1Dz_sec%d_h%d", x.n_nopml, j, (int)x.h);
+					sprintf(str2, "Charts3DHeteroOT/%d/projZ/model_pml1Dz_diff_sec%d_h%d", x.n_nopml, j, (int)x.h);
+
+					for (int k = 0; k < z.n; k++)
+					{
+						z_sol1D_ex[k] = x_orig[j + x.n * j + size2D * k];
+						z_sol1D_prd[k] = x_sol[j + x.n * j + size2D * k];
+					}
+
+					output1D(str1, pml_flag, z, z_sol1D_ex, z_sol1D_prd);
+					gnuplot1D(str1, str2, pml_flag, 0, z);
+				}
+			}
+
+			printf("Print 1D projections...\n");
+			for (int k = 0; k < z.n; k++)
+			{
+				PrintProjection1D(x, y, &x_orig[k * size2D], &x_sol[k * size2D], k);
+			}
 #endif
 
 			// 4.89e-11 - за 25 итераций
@@ -733,7 +775,7 @@ int main()
 			printf("norm x_sol = %lf\n", RelRes);
 
 			char str[255];
-			sprintf(str, "sol3D_N%d.dat", x.n_nopml + 1);
+			sprintf(str, "sol3D_N%d.dat", x.n_nopml);
 			FILE *file = fopen(str, "w");
 
 			for (int i = 0; i < size_nopml; i++)
@@ -750,9 +792,9 @@ int main()
 #ifdef OUTPUT
 			printf("Output results to file...\n");
 
-			char file1[255]; sprintf(file1, "Charts3DHeteroOT/%d/model_ft", x.n_nopml + 1);
-			char file2[255]; sprintf(file2, "Charts3DHeteroOT/%d/real/helm_ft", x.n_nopml + 1);
-			char file3[255]; sprintf(file3, "Charts3DHeteroOT/%d/imag/helm_ft", x.n_nopml + 1);
+			char file1[255]; sprintf(file1, "Charts3DHeteroOT/%d/model_ft", x.n_nopml);
+			char file2[255]; sprintf(file2, "Charts3DHeteroOT/%d/real/helm_ft", x.n_nopml);
+			char file3[255]; sprintf(file3, "Charts3DHeteroOT/%d/imag/helm_ft", x.n_nopml);
 			output(file1, pml_flag, x, y, z, x_orig_nopml, x_sol_nopml, diff_sol);
 #endif
 
