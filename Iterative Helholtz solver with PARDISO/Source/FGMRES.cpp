@@ -2,7 +2,7 @@
 #include "TemplatesForMatrixConstruction.h"
 #include "TestSuite.h"
 
-void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double &diff_sol, double beta_eq)
+void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double &diff_sol, double beta_eq)
 {
 	printf("-------------FGMRES-----------\n");
 
@@ -138,17 +138,18 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 
 	//rubish
 	//GenSparseMatrixOnline2DwithPMLand9Points(-1, x, y, z, D2csr_zero, 0, freqs, sigma);
-    //GenSparseMatrixOnline2DwithPMLFast(-1, x, y, D2csr_zero, 0, freqs);
-
+   
+	printf("Generating sparse matrix...\n");
 #ifndef HODLR
 	time = omp_get_wtime();
 #if DIAG_PATTERN == 3
-	GenSparseMatrixOnline2DwithPML(-1, x, y, D2csr_zero, 0, freqs);
-	TestSymmSparseMatrixOnline2DwithPML(x, y, z, D2csr_zero);
+	//GenSparseMatrixOnline2DwithPML(-1, x, y, D2csr_zero, 0, freqs);
+	GenSparseMatrixOnline2DwithPMLFast(-1, x, y, D2csr_zero, 0, freqs);
+	if (x.n_nopml <= 150)
+		TestSymmSparseMatrixOnline2DwithPML(x, y, z, D2csr_zero);
 #elif DIAG_PATTERN == 9
 	GenSparseMatrixOnline2DwithPMLand9Pts(-1, x, y, D2csr_zero, 0, freqs);
-	
-	if (x.n_nopml <= 100)
+	if (x.n_nopml <= 150)
 		TestSymmSparseMatrixOnline2DwithPML9Pts(x, y, z, D2csr_zero);
 #else
 	GenSparseMatrixOnline2DwithPMLand13Pts(-1, x, y, D2csr_zero, 0, freqs);  // does not work now
@@ -198,7 +199,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		{
 			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } -kww;
 #ifdef PRINT
-			printf("Solved k = %d beta2 = (%lf, %lf)\n", k, kwave_beta2.real(), kwave_beta2.imag());
+			printf("Solved k = %d beta2 = (%lf, %lf). ", k, kwave_beta2.real(), kwave_beta2.imag());
 #endif
 			D2csr[k]->values = alloc_arr<dtype>(non_zeros);
 			D2csr[k]->ia = alloc_arr<int>(size2D + 1);
@@ -231,7 +232,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 #endif
 #endif
 
-
 #if 1
 			// Factorization of matrices
 
@@ -239,7 +239,9 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &zdum, &zdum, &error);
 			if (error != 0) printf("!!! ANALYSIS ERROR: %d !!!\n", error);
 
-			mem_pard = max(iparm[14], iparm[15] + iparm[16]);
+			double mem_cur = max(iparm[14], iparm[15] + iparm[16]);
+			mem_pard += mem_cur;
+			printf("Mem = %lf Gb. Full_memory = %lf Gb\n", mem_cur / ((size_t)1024 * 1024), mem_pard / ((size_t)1024 * 1024));
 
 			phase = 22;
 			pardiso(&pt[k * 64], &maxfct, &mnum, &mtype, &phase, &size2D, D2csr[k]->values, D2csr[k]->ia, D2csr[k]->ja, &perm[k * size2D], &rhs, &iparm[k * 64], &msglvl, &zdum, &zdum, &error);
@@ -249,6 +251,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			count++;
 			continue;
 
+			system("pause");
 			// источник в каждой задаче в середине 
 			//GenSparseMatrixOnline2D("FT", i, x, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
 		}
@@ -331,7 +334,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	printf("Memory for %d 2D matrices: %lf Gb\n", count, mem);
 
 	mem_pard /= ((size_t)1024 * 1024);
-	mem_pard *= count;
 	printf("Memory for %d PARDISO factor + analysis 2D matrices: %lf Gb\n", count, mem_pard);
 
 #ifndef PERF
@@ -367,10 +369,11 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 #endif
 
 	dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
-	dtype *x_orig_nopml = alloc_arr<dtype>(size_nopml);
 
 #ifndef HOMO
 	dtype *x_sol_prev_nopml = alloc_arr<dtype>(size_nopml);
+#else
+	dtype *x_orig_nopml = alloc_arr<dtype>(size_nopml);
 #endif
 
 //#define TEST_L0
@@ -382,11 +385,13 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	dtype *f_sol_nopml = alloc_arr<dtype>(size_nopml);
 #endif
 
+#ifdef HOMO
 	// test2
 	double *x_orig_re = alloc_arr<double>(size_nopml);
 	double *x_sol_re = alloc_arr<double>(size_nopml);
 	double *x_orig_im = alloc_arr<double>(size_nopml);
 	double *x_sol_im = alloc_arr<double>(size_nopml);
+#endif
 
 	// vars
 	dtype calpha;
@@ -407,7 +412,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	for (int i = 0; i < size; i++)
 		x_init[i] = 0;
 
-	for (int restart = 0; restart < 1; restart++)
+	for (int restart = 0; restart < rest; restart++)
 	{
 		printf("------RESTART = %d------\n", restart);
 		// 1. First step. Compute r_0 and its norm
@@ -427,15 +432,11 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		norm_f = dznrm2(&size, f, &ione);
 		printf("norm ||f|| = %e\n", norm_f);
 
-		//Add_dense(size, ione, 1.0, f, size, -1.0, w, size, r0, size);
 		zcopy(&size, f, &ione, r0, &ione);
 		zaxpy(&size, &mone, w, &ione, r0, &ione); // r0: = f - Ax0
 
 		norm = dznrm2(&size, r0, &ione);
 		printf("norm ||r0|| = %e\n", norm);
-
-		//norm = RelError(zlange, size, 1, r0, f, size, thresh);
-		//printf("r0 = f - Ax0, norm ||r0 - f|| = %lf\n", norm);
 
 		NormalizeVector(size, r0, &V[ldv * 0], beta); // v + size * j = &v[ldv * j]
 
@@ -445,7 +446,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 		printf("-----Step 3. Iterations-----\n");
 		for (size_t j = 0; j < (size_t)m; j++)
 		{
-			printf("---------------------\nIteration = %d\n---------------------\n", j);
+			printf("---------------------\nIteration = %d\n---------------------\n", restart * m + j);
 			time = omp_get_wtime();
 			// Compute w[j] := A * v[j]
 #ifndef HODLR
@@ -461,16 +462,13 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 				//H[i + ldh * j] = zdot(size, w, &V[ldv * i]);
 
 				//w[j] = w[j] - H[i][j]*v[i]
-				//AddDenseVectorsComplex(size, 1.0, w, -H[i + ldh * j], &V[ldv * i], w);
 				calpha = -H[i + ldh * j];
 				zaxpy(&size, &calpha, &V[ldv * i], &ione, w, &ione);
 			}
 
 			H[j + 1 + ldh * j] = dznrm2(&size, w, &ione);
-			//			printf("norm H[%d][%d] = %lf %lf\n", j, j, H[j + ldh * j].real(), H[j + ldh * j].imag());
-			//			printf("norm H[%d][%d] = %lf %lf\n", j + 1, j, H[j + 1 + ldh * j].real(), H[j + 1 + ldh * j].imag());
 
-						// Check the convergence to the exact solution
+			// Check the convergence to the exact solution
 			if (abs(H[j + 1 + ldh * j]) < thresh)
 			{
 				iterCount = j + 1;
@@ -479,7 +477,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			}
 
 			// If not, construct the new vector of basis
-			//MultVectorConst(size, w, 1.0 / H[j + 1 + ldh * j], &V[ldv * (j + 1)]);
 			zcopy(&size, w, &ione, &V[ldv * (j + 1)], &ione);
 			dalpha = 1.0 / H[j + 1 + ldh * j].real();
 			zdscal(&size, &dalpha, &V[ldv * (j + 1)], &ione);
@@ -512,20 +509,11 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 				Hgels[i] = H[i];
 
 			// Query
-			//int lwork = -1;
 			row_min = j + 2;
 			col_min = j + 1;
 
-			//	row_min = m + 1;
-			//	col_min = m;
-
-			//zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, &work_size, &lwork, &info);
-
-			//lwork = (int)work_size.real();
-			//dtype *work = alloc_arr<dtype>(lwork);
 			// Run
 			zgels("no", &row_min, &col_min, &nrhs, Hgels, &ldh, eBeta, &ldb, work, &lwork, &info);
-			//free_arr(work);
 
 			RelRes = dznrm2(&col_min, eBeta, &ione);
 			printf("norm y_k[%d] = %e\n", j, RelRes);
@@ -589,9 +577,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 #endif
 
 			reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
-			reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
-
 #ifdef HOMO
+			reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
 			norm = RelError(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
 			printf("Residual in 3D phys domain |x_sol - x_orig| / |x_orig| = %lf\n", norm);
 			printf("-----------\n");
@@ -611,10 +598,10 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 			diff_sol = RelError(zlange, size_nopml, 1, x_sol_nopml, x_sol_prev_nopml, size_nopml, thresh);
 			MultVectorConst<dtype>(size_nopml, x_sol_nopml, 1.0, x_sol_prev_nopml);
 			printf("norm |u_k+1 - u_k|= %e\n", diff_sol);
-			fprintf(output, "%d %e %e %lf\n", j, Res, RelRes, diff_sol);
+			fprintf(output, "%d %e %e %lf\n", restart * m + j, Res, RelRes, diff_sol);
 			//if (diff_sol < RES_EXIT) break;
 #endif
-		        if (RelRes < REL_RES_EXIT) break;
+		    if (RelRes < REL_RES_EXIT) break;
 
 			printf("--------------------------------------------------------------------------------\n");
 			time = omp_get_wtime() - time;
@@ -682,8 +669,11 @@ void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_so
 	free_arr(x0);
 	free_arr(x_init);
 	free_arr(Ax0_nopml);
+#ifdef HOMO
+	free_arr(x_orig_nopml);
 	free_arr(x_orig_re);
 	free_arr(x_orig_im);
 	free_arr(x_sol_re);
 	free_arr(x_sol_im);
+#endif
 }

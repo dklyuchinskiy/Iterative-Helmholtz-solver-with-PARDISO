@@ -754,12 +754,14 @@ void GenRHSandSolutionViaSound3D(size_m x, size_m y, size_m z, /* output */ dtyp
 #ifndef TEST_HELM_1D
 	SetRHS3D(x, y, z, f, source, l);
 
+#ifdef HOMO
 	// approximation of inner points values
 #pragma omp parallel for schedule(dynamic)
 	for (int k = 0; k < z.n; k++)
 		for (int j = 0; j < y.n; j++)
 			for (int i = 0; i < x.n; i++)
 				u[k * size2D + j * x.n + i] = u_ex_complex_sound3D(x, y, z, (i + 1) * x.h, (j + 1) * y.h, (k + 1) * z.h, source);
+#endif
 #else
 	SetRHS3DForTest(x, y, z, f, source, l);
 
@@ -773,6 +775,7 @@ void GenRHSandSolutionViaSound3D(size_m x, size_m y, size_m z, /* output */ dtyp
 			u[w + k * size2D] = u_ex1D[k];
 		}
 #endif
+
 
 
 	printf("RHS and solution are constructed\n");
@@ -3079,7 +3082,7 @@ DIAG5 CheckDiag5Pts(size_m x, size_m y, int l1, int l2)
 	{
 		return DIAG5::zero;
 	}
-	else if (l1 == l2 - 1 && (l1 + 1) % x.n != 0)
+	else if (l1 == l2 - 1 && l2 % x.n != 0)
 	{
 		return DIAG5::one;
 	}
@@ -3186,6 +3189,7 @@ void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, d
 	int size2 = size - y.n;
 	int size3 = size - y.n;
 	int non_zeros_in_2Dblock3diag = size + size2 * 2 + size3 * 2;
+
 	double RelRes = 0;
 	int j1, k1;
 	int j2, k2;
@@ -3211,9 +3215,9 @@ void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, d
 		for (int l1 = 0; l1 < size; l1++)
 		{
 			Acsr->ia[l1] = count + 1;
+			take_coord2D(x.n, y.n, l1, j1, k1);
 
-			l2 = l1 - x.n;
-			take_coord2D(x.n, y.n, l2, j1, k1);
+			l2 = l1 - x.n;	
 			if (l2 >= 0)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3221,7 +3225,6 @@ void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, d
 			}
 
 			l2 = l1 - 1;
-			take_coord2D(x.n, y.n, l2, j1, k1);
 			if (l2 >= 0 && l1 % x.n != 0)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3229,7 +3232,6 @@ void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, d
 			}
 
 			l2 = l1;
-			take_coord2D(x.n, y.n, l2, j1, k1);
 			if (1)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3238,7 +3240,6 @@ void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, d
 			}
 
 			l2 = l1 + 1;
-			take_coord2D(x.n, y.n, l2, j1, k1);
 			if (l2 < size && l2 % x.n != 0)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3247,7 +3248,6 @@ void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, d
 
 
 			l2 = l1 + x.n;
-			take_coord2D(x.n, y.n, l2, j1, k1);
 			if (l2 < size)
 			{
 				Acsr->ja[count] = l2 + 1;
@@ -3271,7 +3271,7 @@ void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, d
 		//printf("SUCCESSED 2D generation for frequency %d!\n", w);
 	}
 
-	//print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat.dat");
+	print_2Dcsr_mat_to_file(x, y, Acsr, "2Dmat_hetero_fast.dat");
 }
 
 
@@ -4816,6 +4816,45 @@ double random(double min, double max)
 	return (double)(rand()) / RAND_MAX * (max - min) + min;
 }
 
+void output_hetero(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_pard, double diff_sol)
+{
+	char name[255], name2[255];
+	int Nx, Ny, Nz;
+
+	if (pml_flag == true)
+	{
+		Nx = x.n - 2 * x.pml_pts;
+		Ny = y.n - 2 * y.pml_pts;
+		Nz = z.n - 2 * z.spg_pts;
+	}
+	else
+	{
+		Nx = x.n;
+		Ny = y.n;
+		Nz = z.n;
+	}
+
+	double rel_real, rel_imag;
+
+	for (int k = 0; k < Nz; k++)
+	{
+		sprintf(name, "%s_%02d.dat", str, k + 1);
+		FILE *file = fopen(name, "w");
+		for (int j = 0; j < Ny; j++)
+			for (int i = 0; i < Nx; i++)
+			{
+
+				//				if (fabs(rel_real) > 2)
+				{
+					fprintf(file, "%lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf %12.10lf\n", i * x.h, j * y.h, k * z.h,
+						-1.0, -1.0,
+						x_pard[i + j * Nx + k * Nx * Ny].real(), x_pard[i + j * Nx + k * Nx * Ny].imag(),
+						-1.0, -1.0);
+				}
+			}
+		fclose(file);
+	}
+}
 
 void output(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_orig, dtype* x_pard, double diff_sol)
 {

@@ -129,22 +129,24 @@ int main()
 
 			x_nopml.pml_pts = y_nopml.pml_pts = z_nopml.pml_pts = 0;
 
+			// OT 55,  55,  26  - 180m
 			// OT 110, 110, 52  - 90m
 			// OT 165, 165, 78  - 60m
 			// OT 220, 220, 103 - 45m
 			// OT 330, 330, 155 - 30m
 			// OT 660, 660, 309 - 15m
 
-			int n1 = 660 + 2 * x.pml_pts;		    // number of point across the directions
-			int n2 = 660 + 2 * y.pml_pts;
-			int n3 = 309 + 2 * z.spg_pts;
+			int n1 = 220 + 2 * x.pml_pts;		    // number of point across the directions
+			int n2 = 220 + 2 * y.pml_pts;
+			int n3 = 103 + 2 * z.spg_pts;
 
 			int n = n1 * n2;		// size of blocks
 			int NB = n3;			// number of blocks
 
 
 			// FGMRES or BcGSTAB number of iterations/niter
-			int niter = 60;
+			int niter = 10;
+			int restart = 10;
 
 			x.n = n1;
 			y.n = n2;
@@ -273,33 +275,6 @@ int main()
 			int size_nopml = n_nopml * z.n_nopml;
 			int size2D_nopml = n_nopml;
 
-			//printf("Size no PML: %d\n", size_nopml);
-
-#ifdef PRINT
-			printf("-----Memory required:-----\n");
-#endif
-			double total = 0;
-			total = double(size) / ((size_t)1024 * 1024 * 1024);
-			total *= 4 + 2; // 2 for 2D problems - FFT + PARDISO
-			total += double(size2D) / ((size_t)1024 * 1024 * 1024);
-			total += double(4 * size_nopml) / ((size_t)1024 * 1024 * 1024);
-			total *= 8;
-			total *= 2;
-
-#ifdef PRINT
-			printf("Initial = %lf GB\n", total);
-#endif
-
-			total = double(size) / ((size_t)1024 * 1024 * 1024);
-			total *= (niter + 1) + 4;
-			total += double(6 * size_nopml) / ((size_t)1024 * 1024 * 1024);
-			total *= 8;
-			total *= 2;
-
-#ifdef PRINT
-			printf("FGMRES = %lf GB\n", total);
-#endif
-
 //#define TEST1D
 
 #ifdef TEST1D
@@ -317,15 +292,45 @@ int main()
 #endif
 			system("pause");
 			// Solution and right hand side
+#ifdef HOMO
 			dtype *x_orig = alloc_arr<dtype>(size);
-			dtype *x_sol = alloc_arr<dtype>(size);
-			dtype *f = alloc_arr<dtype>(size);
-			dtype *g = alloc_arr<dtype>(size);
-
 			dtype *x_orig_nopml = alloc_arr<dtype>(size_nopml);
+#else
+			dtype *x_orig = NULL;
+			dtype *x_orig_nopml = NULL;
+#endif
+
+			dtype *x_sol = alloc_arr<dtype>(size);	
 			dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
+
+			dtype *f = alloc_arr<dtype>(size);
 			dtype *f_nopml = alloc_arr<dtype>(size_nopml);
-			dtype *g_nopml = alloc_arr<dtype>(size_nopml);
+
+#ifdef PRINT
+			printf("-----Memory required:-----\n");
+#endif
+			double total = 0;
+			total = double(size) / ((size_t)1024 * 1024 * 1024);
+			total *= (2 + 2); // 2 for 2D problems - FFT + PARDISO
+			total += double(size2D) / ((size_t)1024 * 1024 * 1024);
+			total += double(2 * size_nopml) / ((size_t)1024 * 1024 * 1024);
+			total *= 8;
+			total *= 2;
+
+#ifdef PRINT
+			printf("Initial = %lf GB\n", total);
+#endif
+
+			total = double(size) / ((size_t)1024 * 1024 * 1024);
+			total *= (niter + 1) + 4;
+			total += double(6 * size_nopml) / ((size_t)1024 * 1024 * 1024);
+			total *= 8;
+			total *= 2;
+
+#ifdef PRINT
+			printf("FGMRES = %lf GB\n", total);
+#endif
+
 
 #ifdef TEST_AVE
 			stype *x_sol_nopml_direct = alloc_arr<stype>(size_nopml);
@@ -363,9 +368,9 @@ int main()
 			printf("Grid steps: hx = %lf hy = %lf hz = %lf\n", x.h, y.h, z.h);
 #endif
 			// Method Runge (for 3 diff grids)
-		// f(2h) - f(h)
-		// ------------
-		// f(h) - f(h/2)
+	        // f(2h) - f(h)
+		    // ------------
+		    // f(h) - f(h/2)
 
 			bool make_runge_count;
 			bool make_beta3D_count;
@@ -425,7 +430,6 @@ int main()
 			//GenRHSandSolution(x, y, z, x_orig, f, source);
 
 			GenRHSandSolutionViaSound3D(x, y, z, x_orig, f, source);
-
 #endif
 
 			//#define TEST3D
@@ -434,7 +438,9 @@ int main()
 			TestFGMRES();
 #endif
 
-#ifdef PRINT
+#ifdef COMPUTE_RESIDUAL
+			dtype *g = alloc_arr<dtype>(size);
+			dtype *g_nopml = alloc_arr<dtype>(size_nopml);
 			printf("---Residual exact solution---\n");
 			ComputeResidual(x, y, z, (double)kk, x_orig, f, g, RelRes);
 			printf("-----------\n");
@@ -447,6 +453,8 @@ int main()
 			printf("-----------\n");
 			printf("Residual in 3D psys dom  |A * x_sol - f| = %e\n", RelRes);
 			printf("-----------\n");
+			free(g);
+			free(g_nopml);
 #endif
 
 #ifndef PERF
@@ -471,7 +479,7 @@ int main()
 			// ------------ FGMRES-------------
 			all_time = omp_get_wtime();
 
-			FGMRES(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
+			FGMRES(x, y, z, niter, restart, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
 			//BCGSTAB(x, y, z, niter, source, x_sol, x_orig, f, thresh, diff_sol, beta_eq);
 			// BcgSTAB 
 
@@ -763,7 +771,9 @@ int main()
 	// NON Homogenious domain
 	// method Runge
 
+#ifdef HOMO
 			reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
+#endif
 			reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 			reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
@@ -795,7 +805,11 @@ int main()
 			char file1[255]; sprintf(file1, "Charts3DHeteroOT/%d/model_ft", x.n_nopml);
 			char file2[255]; sprintf(file2, "Charts3DHeteroOT/%d/real/helm_ft", x.n_nopml);
 			char file3[255]; sprintf(file3, "Charts3DHeteroOT/%d/imag/helm_ft", x.n_nopml);
+#ifdef HOMO
 			output(file1, pml_flag, x, y, z, x_orig_nopml, x_sol_nopml, diff_sol);
+#else
+			output_hetero(file1, pml_flag, x, y, z, x_sol_nopml, diff_sol);
+#endif
 #endif
 
 #ifdef GNUPLOT
@@ -809,15 +823,15 @@ int main()
 
 
 #endif
-
-
 			free(f);
-			free(g);
-
-			free(x_orig_nopml);
-			free(x_sol_nopml);
 			free(f_nopml);
-			free(g_nopml);
+			free(x_sol);
+			free(x_sol_nopml);
+#ifdef HOMO
+			free(x_orig_nopml);
+			free(x_orig);
+#endif
+
 
 #ifdef TEST_AVE
 

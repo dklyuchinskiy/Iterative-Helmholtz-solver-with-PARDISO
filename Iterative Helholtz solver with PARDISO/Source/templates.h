@@ -54,7 +54,7 @@ void print_vec(int size, int *vec1, double *vec2, char *name);
 void NormalizeVector(int size, dtype* v, dtype* out, double& norm);
 void GenRHSandSolutionViaSound3D(size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f, point source);
 dtype u_ex_complex_sound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
-void FGMRES(size_m x, size_m y, size_m z, int m, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double& diff_sol, double beta_eq);
+void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double& diff_sol, double beta_eq);
 void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype* x_sol, dtype* x_orig, const dtype* f, double thresh, double& diff_sol, double beta_eq);
 void check_norm_circle(size_m x, size_m y, size_m z, const dtype* x_orig_nopml, const dtype* x_sol_nopml, point source, double thresh);
 void print_2Dcsr_mat(size_m x, size_m y, zcsr* D2csr);
@@ -82,6 +82,7 @@ void HeteroSoundSpeed3DExtensionToPML(size_m x, size_m y, size_m z, dtype *sound
 void RecMultLStructWork2(int n, int m, cmnode* Astr, dtype* X, int ldx, dtype beta, dtype* Y, int ldy, dtype* work1, int lwork1, int smallsize);
 float* ReadData();
 void SetSoundSpeed3DFromFile(size_m x, size_m y, size_m z, dtype* sound3D, point source);
+void output_hetero(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_pard, double diff_sol);
 
 void ModifyNumericalSolution(int size_nopml, dtype *x_sol_nopml, dtype* x_orig_nopml);
 void ReadSolution(int size, dtype *x_sol, char *);

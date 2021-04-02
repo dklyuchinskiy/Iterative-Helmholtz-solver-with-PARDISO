@@ -174,8 +174,8 @@ enum class DIAG13
 
 // for PARDISO settings
 //#define SYMMETRY
-//#define DIAG_PATTERN 3
-#define DIAG_PATTERN 9
+#define DIAG_PATTERN 3
+//#define DIAG_PATTERN 9
 
 //#define HOMO
 //#define SAVE_MEM
