@@ -100,6 +100,10 @@ void take_coord2D(int n1, int n2, int l, int& i, int& j);
 map<vector<int>, double> dense_to_sparse(int m, int n, double *DD, int ldd, int *i_ind, int *j_ind, double *d);
 map<vector<int>, double> block3diag_to_CSR(int n1, int n2, int blocks, double *BL, int ldbl, double *A, int lda, double *BR, int ldbr, dcsr* Acsr);
 map<vector<int>, double> concat_maps(const map<vector<int>, double>& map1, const map<vector<int>, double>& map2);
+void output1D_hetero(char *str, bool pml_flag, size_m x, dtype* x_pard);
+void gnuplot1D_hetero(char *splot, char *sout, bool pml_flag, size_m x);
+void PrintProjection1DHetero(size_m x, size_m y, dtype *x_prd, int freq);
+void gnuplot(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m y, size_m z);
 
 dtype zdot(int size, dtype* v1, dtype* v2);
 void ComputeResidual(size_m x, size_m y, size_m z, double kw, const dtype* u, const dtype *f, dtype* f_res, double &RelRes);

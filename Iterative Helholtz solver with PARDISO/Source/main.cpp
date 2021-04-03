@@ -140,10 +140,6 @@ int main()
 			int n2 = 220 + 2 * y.pml_pts;
 			int n3 = 103 + 2 * z.spg_pts;
 
-			int n = n1 * n2;		// size of blocks
-			int NB = n3;			// number of blocks
-
-
 			// FGMRES or BcGSTAB number of iterations/niter
 			int niter = 10;
 			int restart = 10;
@@ -152,27 +148,21 @@ int main()
 			y.n = n2;
 			z.n = n3;
 
-			int size = n * NB;		// size of vector x and f: n1 * n2 * n3
-			int size2D = n;
+			int size = n1 * n2 * n3;		// size of vector x and f: n1 * n2 * n3
+			int size2D = n1 * n2;
+
 			int smallsize = 1600;
 			double thresh = 1e-4;	// stop level of algorithm by relative error
 			int ItRef = 200;		// Maximal number of iterations in refirement
 			char bench[255] = "display"; // parameter into solver to show internal results
-			int sparse_size = n + 2 * (n - 1) + 2 * (n - n1);
-			int non_zeros_in_3diag = n + (n - 1) * 2 + (n - n1) * 2 - (n1 - 1) * 2;
 			int ione = 1;
-			int success = 0;
-			int itcount = 0;
 			double RelRes = 0;
 			double diff_sol = 0;
 			double norm = 0;
 			bool pml_flag = 1;
 			int i1, j1, k1;
 			double norm_re, norm_im;
-
 			char str1[255], str2[255], str3[255];
-
-
 			double timer1, timer2, all_time;
 
 			x.n_nopml = n1 - 2 * x.pml_pts;
@@ -491,9 +481,8 @@ int main()
 			printf("size = %d size_no_pml = %d\n", size, size_nopml);
 #endif
 
-#if 0
+#ifndef HOMO
 			// for printing with gnuplot (1D projections in sponge direction)
-			dtype* z_sol1D_ex = alloc_arr<dtype>(z.n);
 			dtype* z_sol1D_prd = alloc_arr<dtype>(z.n);
 
 			// output 1D - Z direction
@@ -506,25 +495,25 @@ int main()
 				if (j == y.n / 2 || j == y.n / 4 || j == y.n * 3 / 4)
 				{
 					sprintf(str1, "Charts3DHeteroOT/%d/projZ/model_pml1Dz_sec%d_h%d", x.n_nopml, j, (int)x.h);
-					sprintf(str2, "Charts3DHeteroOT/%d/projZ/model_pml1Dz_diff_sec%d_h%d", x.n_nopml, j, (int)x.h);
+					sprintf(str2, "Charts3DHeteroOT/%d/projZ/model_pml1Dz_sec%d_h%d", x.n_nopml, j, (int)x.h);
 
 					for (int k = 0; k < z.n; k++)
 					{
-						z_sol1D_ex[k] = x_orig[j + x.n * j + size2D * k];
 						z_sol1D_prd[k] = x_sol[j + x.n * j + size2D * k];
 					}
 
-					output1D(str1, pml_flag, z, z_sol1D_ex, z_sol1D_prd);
-					gnuplot1D(str1, str2, pml_flag, 0, z);
+					output1D_hetero(str1, pml_flag, z, z_sol1D_prd);
+					gnuplot1D_hetero(str1, str2, pml_flag, z);
 				}
 			}
 
 			printf("Print 1D projections...\n");
 			for (int k = 0; k < z.n; k++)
 			{
-				PrintProjection1D(x, y, &x_orig[k * size2D], &x_sol[k * size2D], k);
+				PrintProjection1DHetero(x, y, &x_sol[k * size2D], k);
 			}
 #endif
+			free(z_sol1D_prd);
 
 			// 4.89e-11 - за 25 итераций
 
@@ -777,31 +766,12 @@ int main()
 			reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 			reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
-//#define MAKE_RUNGE_3D
-//#define MAKE_BETA_3Ds
-
-#if !defined(MAKE_RUNGE_3D) && !defined(MAKE_BETA_3D)
-			RelRes = dznrm2(&size_nopml, x_sol_nopml, &ione);
-			printf("norm x_sol = %lf\n", RelRes);
-
-			char str[255];
-			sprintf(str, "sol3D_N%d.dat", x.n_nopml);
-			FILE *file = fopen(str, "w");
-
-			for (int i = 0; i < size_nopml; i++)
-				fprintf(file, "%18.16lf %18.16lf\n", x_sol_nopml[i].real(), x_sol_nopml[i].imag());
-
-			fclose(file);
-
-			//return 0;
-#endif
-
 #define OUTPUT
 #define GNUPLOT
 
 #ifdef OUTPUT
 			printf("Output results to file...\n");
-
+			pml_flag = true;
 			char file1[255]; sprintf(file1, "Charts3DHeteroOT/%d/model_ft", x.n_nopml);
 			char file2[255]; sprintf(file2, "Charts3DHeteroOT/%d/real/helm_ft", x.n_nopml);
 			char file3[255]; sprintf(file3, "Charts3DHeteroOT/%d/imag/helm_ft", x.n_nopml);
@@ -823,6 +793,23 @@ int main()
 
 
 #endif
+			//#define MAKE_RUNGE_3D
+            //#define MAKE_BETA_3Ds
+			printf("Output full 3D solution into file...\n");
+#if !defined(MAKE_RUNGE_3D) && !defined(MAKE_BETA_3D)
+			RelRes = dznrm2(&size_nopml, x_sol_nopml, &ione);
+			printf("norm x_sol = %lf\n", RelRes);
+
+			char str[255];
+			sprintf(str, "sol3D_N%d.dat", x.n_nopml);
+			FILE *file = fopen(str, "w");
+
+			for (int i = 0; i < size_nopml; i++)
+				fprintf(file, "%18.16lf %18.16lf\n", x_sol_nopml[i].real(), x_sol_nopml[i].imag());
+
+			fclose(file);
+#endif
+
 			free(f);
 			free(f_nopml);
 			free(x_sol);

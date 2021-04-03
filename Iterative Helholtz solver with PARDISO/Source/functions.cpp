@@ -517,6 +517,44 @@ void PrintProjection1D(size_m x, size_m y, dtype *x_ex, dtype *x_prd, int freq)
 	free_arr(x_sol1D_prd);
 }
 
+void PrintProjection1DHetero(size_m x, size_m y, dtype *x_prd, int freq)
+{
+	char *str1 = alloc_arr<char>(255);
+	char *str2 = alloc_arr<char>(255);
+	bool pml_flag = false;
+
+	dtype* x_sol1D_prd = alloc_arr<dtype>(x.n);
+
+	// output 1D - X direction
+	for (int j = 0; j < y.n; j++)
+	{
+		if (j == y.n / 2)
+		{
+			sprintf(str1, "Charts3DHeteroOT/%d/projX/model_pml1Dx_freq%d_sec%d_h%d", x.n_nopml, freq, j, (int)x.h);
+			sprintf(str2, "Charts3DHeteroOT/%d/projX/model_pml1Dx_freq%d_sec%d_h%d", x.n_nopml, freq, j, (int)x.h);
+
+			output1D_hetero(str1, pml_flag, x, &x_prd[x.n * j]);
+			gnuplot1D_hetero(str1, str2, pml_flag, x);
+		}
+	}
+
+	// output 1D - Y direction
+	sprintf(str1, "Charts3DHeteroOT/%d/projY/model_pml1Dy_freq%d_sec%d_h%d", y.n_nopml, freq, x.n / 2, (int)x.h);
+	sprintf(str2, "Charts3DHeteroOT/%d/projY/model_pml1Dy_freq%d_sec%d_h%d", y.n_nopml, freq, x.n / 2, (int)x.h);
+
+	for (int j = 0; j < y.n; j++)
+	{
+		x_sol1D_prd[j] = x_prd[x.n / 2 + j * x.n];
+	}
+
+	output1D_hetero(str1, pml_flag, y, x_sol1D_prd);
+	gnuplot1D_hetero(str1, str2, pml_flag, y);
+
+	free_arr(x_sol1D_prd);
+	free(str1);
+	free(str2);
+}
+
 double check_norm_circle_3D(int job, size_m xx, size_m yy, size_m zz, int start_x, int end_x, const dtype* x_orig, const dtype* x_sol, point source, double thresh)
 {
 	int n1 = xx.n;
@@ -5150,6 +5188,29 @@ void output1D(char *str, bool pml_flag, size_m x, dtype* x_orig, dtype* x_pard)
 
 }
 
+void output1D_hetero(char *str, bool pml_flag, size_m x, dtype* x_pard)
+{
+	char name[255];
+	int Nx;
+
+	if (pml_flag == true)
+	{
+		Nx = x.n - 2 * x.pml_pts;
+	}
+	else
+	{
+		Nx = x.n;
+	}
+
+	sprintf(name, "%s.dat", str);
+	FILE *file = fopen(name, "w");
+	for (int i = 0; i < Nx; i++)
+		fprintf(file, "%lf %12.10lf %12.10lf\n", i * x.h,
+			x_pard[i].real(), x_pard[i].imag());
+	fclose(file);
+
+}
+
 void output1D(char *str, bool pml_flag, size_m x, double* x_re, double* x_im)
 {
 	char name[255];
@@ -5333,6 +5394,48 @@ void gnuplot1D(char *splot, char *sout, bool pml_flag, int col, size_m x)
 		fprintf(file1, "exit\n");
 		fclose(file1);
 	}
+
+	system(str);
+}
+
+void gnuplot1D_hetero(char *splot, char *sout, bool pml_flag, size_m x)
+{
+	char *str = alloc_arr<char>(255);
+	int Nx;
+	double L;
+	if (pml_flag == true)
+	{
+		Nx = x.n - 2 * x.pml_pts;
+	}
+	else
+	{
+		Nx = x.n;
+	}
+
+	L = Nx * x.h;
+	FILE* file1;
+	//sprintf(str, "run.plt", numb++);
+
+
+	str = "run_pard_proj1D.plt";
+
+	file1 = fopen(str, "w");
+
+	//fprintf(file1, "reset\nclear\n");
+	fprintf(file1, "set term png font \"Times-Roman, 16\"\n");
+	//fprintf(file, "set view map\n");
+	fprintf(file1, "set xrange[0:%lf]\n", L);
+	//fprintf(file1, "set yrange[-50:50]\n");
+
+	fprintf(file1, "set output '%s_re.png'\n", sout);
+	fprintf(file1, "plot '%s.dat' u 1:%d w linespoints pt 7 pointsize 1 notitle\n\n", splot, 2);
+
+	fprintf(file1, "set output '%s_im.png'\n", sout);
+	fprintf(file1, "plot '%s.dat' u 1:%d w linespoints pt 7 pointsize 1 notitle\n\n", splot, 3);
+
+	fprintf(file1, "exit\n");
+	fclose(file1);
+
 
 	system(str);
 }
