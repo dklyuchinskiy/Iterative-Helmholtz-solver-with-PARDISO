@@ -284,7 +284,6 @@ void LowRankApproxStruct(int n2, int n1 /* size of A21 = A */,
 	//printf("time SVD = %lf\n", time);
 #else
 	dtype *U = (dtype*)malloc(n2 * n2 * sizeof(dtype)); int ldu = n2;
-
 	// Workspace Query
 	zgesvd("All", "All", &n2, &n1, A, &lda, S, U, &ldu, VT, &ldvt, &wkopt, &lwork, &ropt, &info);
 	lwork = (int)wkopt.real();
@@ -368,7 +367,7 @@ void SymRecCompressStruct(int n /* order of A */, dtype *A /* init matrix */, co
 		n2 = (int)ceil(n / 2.0); // округление в большую сторону
 		n1 = n - n2; // n2 > n1
 
-					 // LowRank A21
+		// LowRank A21
 		LowRankApproxStruct(n2, n1, &A[n1 + lda * 0], lda, ACstr, eps, method);
 
 #ifdef DEBUG

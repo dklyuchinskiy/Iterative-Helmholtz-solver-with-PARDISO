@@ -129,7 +129,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 
 	non_zeros = non_zeros_in_2Dblock13diag;
 #endif
-
 	point sourcePML = { x.l / 2.0, y.l / 2 };
 	printf("SOURCE in 2D WITH PML AT: (%lf, %lf)\n", sourcePML.x, sourcePML.y);
 
@@ -251,7 +250,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 			count++;
 			continue;
 
-			system("pause");
+			//system("pause");
 			// источник в каждой задаче в середине 
 			//GenSparseMatrixOnline2D("FT", i, x, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
 		}
@@ -301,13 +300,20 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 			printf("Solved k = %d beta2 = (%lf, %lf)\n", k, kwave_beta2.real(), kwave_beta2.imag());
 #else
 			dtype kwave_beta2 = 0;
-			printf("Solved k = %d\n", k);
 #endif
-
 			// Factorization of matrices
 			DirFactFastDiagStructOnline(x, y, Gstr[k], &B[k * (size2D - x.n)], sound2D, kww, beta_eq, work_HODLR, lwork_HODLR, thresh, smallsize);
+			double mem_cur = Test_NonZeroElementsInFactors(x, y, Gstr[k], &B[k * (size2D - x.n)], thresh, smallsize);
 			solves[k] = true;
 			count++;
+
+			mem_cur += (size2D - x.n); // 5th diagonal B
+			mem_cur *= 8; // bytes
+			mem_cur *= 2;
+			mem_pard += mem_cur;
+
+			printf("Solved k = %d. ", k);
+			printf("Mem = %lf Gb. Full_memory = %lf Gb\n", mem_cur / ((size_t)1024 * 1024 * 1024), mem_pard / ((size_t)1024 * 1024 * 1024));
 
 			// источник в каждой задаче в середине 
 			//GenSparseMatrixOnline2D("FT", i, x, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
@@ -316,8 +322,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 		{
 			solves[k] = false;
 		}
-		mem_pard = 0;
 	}
+	free(work_HODLR);
 	time = omp_get_wtime() - time;
 	printf("Time of factorization: %lf\n", time);
 	system("pause");

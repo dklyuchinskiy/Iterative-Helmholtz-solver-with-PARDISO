@@ -65,7 +65,7 @@ int main()
 //	for (double beta_eq = 0.05; beta_eq <= 1.01; beta_eq += 0.05)
 	//	for (int spg_pts = 20; spg_pts <= 100; spg_pts += 20)
 		{
-			int spg_pts = 25;
+			int spg_pts = 50;
 			double beta_eq = 0.5;
 
 			printf("*********************************************\n");
@@ -136,9 +136,9 @@ int main()
 			// OT 330, 330, 155 - 30m
 			// OT 660, 660, 309 - 15m
 
-			int n1 = 220 + 2 * x.pml_pts;		    // number of point across the directions
-			int n2 = 220 + 2 * y.pml_pts;
-			int n3 = 103 + 2 * z.spg_pts;
+			int n1 = 660 + 2 * x.pml_pts;		    // number of point across the directions
+			int n2 = 660 + 2 * y.pml_pts;
+			int n3 = 309 + 2 * z.spg_pts;
 
 			// FGMRES or BcGSTAB number of iterations/niter
 			int niter = 10;
@@ -259,8 +259,8 @@ int main()
 			printf("Extra data...\n");
 			ExtraData(x, y, z);
 			printf("Extra data DONE\n");
-#endif
 			system("pause");
+#endif		
 			int n_nopml = x.n_nopml * y.n_nopml;
 			int size_nopml = n_nopml * z.n_nopml;
 			int size2D_nopml = n_nopml;
@@ -280,7 +280,6 @@ int main()
 			dtype *x_sol2D = alloc_arr<dtype>(x.n * y.n);
 			Solve2DSparseHelmholtz(x, y, z, f2D, x_sol2D, thresh, beta_eq);
 #endif
-			system("pause");
 			// Solution and right hand side
 #ifdef HOMO
 			dtype *x_orig = alloc_arr<dtype>(size);
@@ -296,9 +295,7 @@ int main()
 			dtype *f = alloc_arr<dtype>(size);
 			dtype *f_nopml = alloc_arr<dtype>(size_nopml);
 
-#ifdef PRINT
 			printf("-----Memory required:-----\n");
-#endif
 			double total = 0;
 			total = double(size) / ((size_t)1024 * 1024 * 1024);
 			total *= (2 + 2); // 2 for 2D problems - FFT + PARDISO
@@ -306,21 +303,14 @@ int main()
 			total += double(2 * size_nopml) / ((size_t)1024 * 1024 * 1024);
 			total *= 8;
 			total *= 2;
-
-#ifdef PRINT
 			printf("Initial = %lf GB\n", total);
-#endif
 
 			total = double(size) / ((size_t)1024 * 1024 * 1024);
-			total *= (niter + 1) + 4;
+			total *= (niter + 1) + 4 + 2;
 			total += double(6 * size_nopml) / ((size_t)1024 * 1024 * 1024);
 			total *= 8;
 			total *= 2;
-
-#ifdef PRINT
 			printf("FGMRES = %lf GB\n", total);
-#endif
-
 
 #ifdef TEST_AVE
 			stype *x_sol_nopml_direct = alloc_arr<stype>(size_nopml);

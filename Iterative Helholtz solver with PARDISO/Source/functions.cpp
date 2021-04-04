@@ -1455,6 +1455,7 @@ void SetSoundSpeed3DFromFile(size_m x, size_m y, size_m z, dtype* sound3D, point
 	fclose(fp);
 	printf("DATA OT IS READ!\n");
 
+#if 0
 	char str1[255]; sprintf(str1, "SoundSpeed3D_OT_ReadedFromFile_N%d_%d_%d.dat", n1, n2, n3);
 	FILE *file = fopen(str1, "w");
 
@@ -1464,9 +1465,9 @@ void SetSoundSpeed3DFromFile(size_m x, size_m y, size_m z, dtype* sound3D, point
 				fprintf(file, "%lf %lf %lf %f\n", j * y.h, k * x.h, i * z.h, data_ss[j * n3 * n2 + k * n3 + i]);
 
 	fclose(file);
+#endif
 
 	printf("DATA OT IS PRINTED!\n");
-	system("pause");
 
 	int Nz = z.n;
 	int Ny = y.n;
@@ -1477,6 +1478,9 @@ void SetSoundSpeed3DFromFile(size_m x, size_m y, size_m z, dtype* sound3D, point
 				for (int k = z.spg_pts; k < Nz - z.spg_pts; k++)
 				    sound3D[k * Nx * Ny + j * Nx + i] = data_ss[(j - y.pml_pts) * n3 * n1 + (i - x.pml_pts) * n3 + (k - z.spg_pts)];
 		    		//sound3D[j * Nz * Nx + i * Nz + k] = data_ss[(j - y.pml_pts) * n3 * n2 + (i - x.pml_pts) * n3 + (k - z.spg_pts)];
+
+	free(data_ss);
+	printf("DATA OT IS REFACTORED!\n");
 
 #ifndef HOMO
 	double sound_min = sound3D[z.spg_pts * Nx  * Ny + y.pml_pts * Nx + x.pml_pts].real();
@@ -1614,6 +1618,7 @@ void ExtraData(size_m x, size_m y, size_m z)
 	fp = fopen(fname_out, "wb");
 	fwrite(data_new, sizeof(float), size_new, fp);
 	fclose(fp);
+	free(data_new);
 
 #if 0
 	printf("DATA OT IS PRINTED!\n");
@@ -2719,7 +2724,7 @@ void HeteroSoundSpeed3DExtensionToPML(size_m x, size_m y, size_m z, dtype *sound
 	system("PrintSS.plt");
 #endif
 
-#if 1
+#if 0
 	char str[255]; sprintf(str, "SoundSpeed3D_Extended_N%d_%d_%d.dat", x.n_nopml, y.n_nopml, z.n_nopml);
 	FILE* file = fopen(str, "w");
 
@@ -2739,7 +2744,7 @@ void HeteroSoundSpeed3DExtensionToPML(size_m x, size_m y, size_m z, dtype *sound
 
 	fclose(file);
 #endif
-
+	printf("DATA OT IS EXTENDED AND PRINTED\n");
 }
 
 dtype IntegralNorm(int size, dtype *vec, double h)
@@ -3254,19 +3259,24 @@ void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, d
 		{
 			Acsr->ia[l1] = count + 1;
 			take_coord2D(x.n, y.n, l1, j1, k1);
+#ifdef SYMMETRY
+			dtype alp = alpha(x, j1) * alpha(y, k1);
+#else
+			dtype alp = 1;
+#endif
 
 			l2 = l1 - x.n;	
 			if (l2 >= 0)
 			{
 				Acsr->ja[count] = l2 + 1;
-				Acsr->values[count++] = beta2D_pml(x, y, -2, kwave_beta2, j1, k1);
+				Acsr->values[count++] = beta2D_pml(x, y, -2, kwave_beta2, j1, k1) / alp;
 			}
 
 			l2 = l1 - 1;
 			if (l2 >= 0 && l1 % x.n != 0)
 			{
 				Acsr->ja[count] = l2 + 1;
-				Acsr->values[count++] = beta2D_pml(x, y, -1, kwave_beta2, j1, k1);
+				Acsr->values[count++] = beta2D_pml(x, y, -1, kwave_beta2, j1, k1) / alp;
 			}
 
 			l2 = l1;
@@ -3274,14 +3284,14 @@ void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, d
 			{
 				Acsr->ja[count] = l2 + 1;
 				freqs[count2++] = count;
-				Acsr->values[count++] = beta2D_pml(x, y, 0, kwave_beta2, j1, k1);
+				Acsr->values[count++] = beta2D_pml(x, y, 0, kwave_beta2, j1, k1) / alp;
 			}
 
 			l2 = l1 + 1;
 			if (l2 < size && l2 % x.n != 0)
 			{
 				Acsr->ja[count] = l2 + 1;
-				Acsr->values[count++] = beta2D_pml(x, y, 1, kwave_beta2, j1, k1);
+				Acsr->values[count++] = beta2D_pml(x, y, 1, kwave_beta2, j1, k1) / alp;
 			}
 
 
@@ -3289,7 +3299,7 @@ void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, d
 			if (l2 < size)
 			{
 				Acsr->ja[count] = l2 + 1;
-				Acsr->values[count++] = beta2D_pml(x, y, 2, kwave_beta2, j1, k1);
+				Acsr->values[count++] = beta2D_pml(x, y, 2, kwave_beta2, j1, k1) / alp;
 			}
 		}
 
@@ -3302,10 +3312,16 @@ void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, d
 	}
 	else
 	{
-#pragma omp parallel for simd schedule(static)
-		for (int i = 0; i < size; i++)
-			Acsr->values[freqs[i]] += kwave_beta2;
-
+		for (int l = 0; l < size; l++)
+		{
+#ifdef SYMMETRY
+			take_coord2D(x.n, y.n, l, j1, k1);
+			dtype alp = alpha(x, j1) * alpha(y, k1);
+#else
+			dtype alp = 1;
+#endif
+			Acsr->values[freqs[l]] += kwave_beta2 / alp;
+		}
 		//printf("SUCCESSED 2D generation for frequency %d!\n", w);
 	}
 

@@ -2836,7 +2836,7 @@ void Test_DirSolveFactDiagStructBlockRanks(size_m x, size_m y, cmnode** Gstr)
 
 }
 
-void Test_NonZeroElementsInFactors(size_m x, size_m y, cmnode **Gstr, dtype* B, double thresh, int smallsize)
+double Test_NonZeroElementsInFactors(size_m x, size_m y, cmnode **Gstr, dtype* B, double thresh, int smallsize)
 {
 	long long non_zeros_exact = 0;
 	long long non_zeros_HSS = 0;
@@ -2854,7 +2854,8 @@ void Test_NonZeroElementsInFactors(size_m x, size_m y, cmnode **Gstr, dtype* B, 
 	int loc_size = x.n;
 	long long zeros_ideal = 0;
 
-	printf("Compression level: %d, Compression size: %d\n", compr_level, compr_size);
+	printf("-------------------------------------------------------------\n");
+	//printf("Compression level: %d, Compression size: %d\n", compr_level, compr_size);
 	for (int j = 0; j < compr_level; j++)
 	{
 		loc_size = ceil(loc_size / 2.0);
@@ -2864,9 +2865,11 @@ void Test_NonZeroElementsInFactors(size_m x, size_m y, cmnode **Gstr, dtype* B, 
 	}
 
 	printf("Compression level: %d, Compression size: %d\n", compr_level, compr_size);
-	printf("non_zeros_exact: %ld\nnon_zeros_HSS: %ld\n", non_zeros_exact, non_zeros_HSS);
+	printf("non_zeros_exact: %ld, memory = %lf Gb\n", non_zeros_exact, non_zeros_exact * 8.0 * 2.0 / ((size_t)1024 * 1024 * 1024));
+    printf("non_zeros_HSS  : %ld, memory = %lf Gb\n", non_zeros_HSS, non_zeros_HSS * 8.0 * 2.0 / ((size_t)1024 * 1024 * 1024));
 	printf("coefficient of compression: %lf (ideal: %lf)\n",  (double)non_zeros_exact / non_zeros_HSS, (double)non_zeros_exact/(non_zeros_exact - zeros_ideal));
-	
+
+	return (double)non_zeros_HSS;
 }
 
 void Test_UnsymmLUfact2(int n, double eps, char* method, int smallsize)
