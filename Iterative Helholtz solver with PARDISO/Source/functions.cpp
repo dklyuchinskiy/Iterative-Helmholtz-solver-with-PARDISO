@@ -533,7 +533,9 @@ void PrintProjection1DHetero(size_m x, size_m y, dtype *x_prd, int freq)
 			sprintf(str1, "Charts3DHeteroOT/%d/projX/model_pml1Dx_freq%d_sec%d_h%d", x.n_nopml, freq, j, (int)x.h);
 			sprintf(str2, "Charts3DHeteroOT/%d/projX/model_pml1Dx_freq%d_sec%d_h%d", x.n_nopml, freq, j, (int)x.h);
 
+#ifdef CALC
 			output1D_hetero(str1, pml_flag, x, &x_prd[x.n * j]);
+#endif
 			gnuplot1D_hetero(str1, str2, pml_flag, x);
 		}
 	}
@@ -547,7 +549,9 @@ void PrintProjection1DHetero(size_m x, size_m y, dtype *x_prd, int freq)
 		x_sol1D_prd[j] = x_prd[x.n / 2 + j * x.n];
 	}
 
+#ifdef CALC
 	output1D_hetero(str1, pml_flag, y, x_sol1D_prd);
+#endif
 	gnuplot1D_hetero(str1, str2, pml_flag, y);
 
 	free_arr(x_sol1D_prd);

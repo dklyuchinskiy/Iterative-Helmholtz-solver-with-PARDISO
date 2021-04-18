@@ -456,6 +456,8 @@ int main()
 			for (int i = 0; i < size; i++)
 				if (abs(f[i]) != 0) printf("f_FFT[%d] = %lf %lf\n", i, f[i].real(), f[i].imag());
 #endif
+
+#ifdef CALC
 			// ------------ FGMRES-------------
 			all_time = omp_get_wtime();
 
@@ -464,11 +466,12 @@ int main()
 			// BcgSTAB 
 
 			all_time = omp_get_wtime() - all_time;
-
-			//-------------------------------------------
 #ifdef PRINT
-			printf("Time: %lf\n", all_time);
-			printf("size = %d size_no_pml = %d\n", size, size_nopml);
+			printf("FGMRES is finished!\nTime: %lf\n", all_time);
+#endif
+			//-------------------------------------------
+#else
+			printf("FGMRES is not run!\n");
 #endif
 
 #ifndef HOMO
@@ -492,7 +495,9 @@ int main()
 						z_sol1D_prd[k] = x_sol[j + x.n * j + size2D * k];
 					}
 
+#ifdef CALC
 					output1D_hetero(str1, pml_flag, z, z_sol1D_prd);
+#endif
 					gnuplot1D_hetero(str1, str2, pml_flag, z);
 				}
 			}
@@ -758,13 +763,12 @@ int main()
 
 #define OUTPUT
 #define GNUPLOT
-
-#ifdef OUTPUT
-			printf("Output results to file...\n");
 			pml_flag = true;
 			char file1[255]; sprintf(file1, "Charts3DHeteroOT/%d/model_ft", x.n_nopml);
 			char file2[255]; sprintf(file2, "Charts3DHeteroOT/%d/real/helm_ft", x.n_nopml);
 			char file3[255]; sprintf(file3, "Charts3DHeteroOT/%d/imag/helm_ft", x.n_nopml);
+#if defined(OUTPUT) && defined(CALC)
+			printf("Output results to file...\n");
 #ifdef HOMO
 			output(file1, pml_flag, x, y, z, x_orig_nopml, x_sol_nopml, diff_sol);
 #else
@@ -785,6 +789,7 @@ int main()
 #endif
 			//#define MAKE_RUNGE_3D
             //#define MAKE_BETA_3Ds
+#ifdef CALC
 			printf("Output full 3D solution into file...\n");
 #if !defined(MAKE_RUNGE_3D) && !defined(MAKE_BETA_3D)
 			RelRes = dznrm2(&size_nopml, x_sol_nopml, &ione);
@@ -798,6 +803,7 @@ int main()
 				fprintf(file, "%18.16lf %18.16lf\n", x_sol_nopml[i].real(), x_sol_nopml[i].imag());
 
 			fclose(file);
+#endif
 #endif
 
 			free(f);

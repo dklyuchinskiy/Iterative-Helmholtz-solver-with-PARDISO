@@ -164,6 +164,7 @@ enum class DIAG13
 #define PML
 #define GMRES_SIZE 128
 
+#define CALC
 //#define HODLR
 #ifdef HODLR
 #define SYMMETRY
