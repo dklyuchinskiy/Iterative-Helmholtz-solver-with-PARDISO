@@ -357,7 +357,7 @@ void GenerateDiagonal1DBlockHODLR(int j, size_m x, size_m y, dtype *DD, int lddd
 void GenerateSubdiagonalB(size_m x, size_m y, dtype *B)
 {
 	int n = x.n;
-	for (int blk = 0; blk < y.n - 1; blk++) // y,n = PML + Ny + PML
+	for (int blk = 0; blk < y.n - 1; blk++) // y.n = PML + Ny + PML
 	{
 		for (int i = 0; i < n; i++)
 		{

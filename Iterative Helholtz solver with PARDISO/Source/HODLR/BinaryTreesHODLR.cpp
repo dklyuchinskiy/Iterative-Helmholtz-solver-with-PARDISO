@@ -65,22 +65,26 @@ int MaxDepth(cmnode* root)
 
 }
 
-int CountElementsInMatrixTree(int n, cmnode* root)
+size_t CountElementsInMatrixTree(int n, ntype* root)
 {
 	if (root->left == NULL && root->right == NULL)
 	{
-		return n * n;
+		return (size_t)n * n;
 	}
 	else
 	{
 		int n2 = ceil(n / 2.0);
 		int n1 = n - n2;
-		int ld = 0, rd = 0;
+		size_t ld = 0, rd = 0;
 
 		if (root->left != NULL) ld = CountElementsInMatrixTree(n1, root->left);
 		if (root->right != NULL) rd = CountElementsInMatrixTree(n2, root->right);
 
+#ifdef SYMMETRY
 		return ld + rd + root->p * (n1 + n2);
+#else
+		return ld + rd + (size_t)root->A21->p * (n1 + n2) + (size_t)root->A12->p * (n1 + n2);
+#endif
 	}
 }
 
@@ -236,6 +240,38 @@ void UnsymmPrintRanksInWidthList(cumnode *root)
 	}
 }
 
+void UnsymmMaxRankInWidthList(int &max_a21, int &max_a12, cumnode *root)
+{
+	if (root == NULL)
+	{
+		return;
+	}
+	struct my_queue2* q; // Создаем очередь
+	init(q);
+	push(q, root); // Вставляем корень в очередь
+
+#ifdef DEBUG
+	print_queue(q);
+#endif
+	while (!my_empty(q)) // пока очередь не пуста
+	{
+		cumnode* temp = front(q); // Берем первый элемент в очереди
+		pop(q);  // Удаляем первый элемент в очереди
+
+		if (temp->A21->p > max_a21 && temp->A21->p > 0) max_a21 = temp->A21->p;
+		if (temp->A12->p > max_a12 && temp->A12->p > 0) max_a12 = temp->A12->p;
+
+		if (temp->left != NULL)
+			push(q, temp->left);  // Вставляем  в очередь левого потомка
+
+		if (temp->right != NULL)
+			push(q, temp->right);  // Вставляем  в очередь правого потомка
+#ifdef DEBUG
+		print_queue(q);
+#endif
+	}
+}
+
 void PrintStruct(int n, cmnode *root)
 {
 	if (root == NULL)
@@ -312,7 +348,6 @@ void LowRankApproxStruct(int n2, int n1 /* size of A21 = A */,
 #pragma omp parallel for simd schedule(static)
 		for (int i = 0; i < n2; i++)
 			U[i + ldu * j] *= S[j];
-
 #endif
 	}
 
@@ -335,7 +370,6 @@ void LowRankApproxStruct(int n2, int n1 /* size of A21 = A */,
 	printf("LowRankStructure function after SVD: n2 = %d, n1 = %d, p = %d\n", n2, n1, Astr->p);
 	//	print(n2, Astr->p, Astr->U, n2, "U");
 	//	print(Astr->p, n1, Astr->VT, Astr->p, "VT");
-
 #endif
 	free_arr(VT);
 	free_arr(work);
@@ -446,7 +480,7 @@ void DiagMultStruct(int n, cmnode* Astr, dtype *d, int smallsize)
 			for (int i = 0; i < n2; i++)
 				Astr->U[i + n2 * j] *= d[n1 + i]; // вторая часть массива D
 
-												  // VT * D - каждый j-ый столбец умножается на элемент вектора d[j]
+	    // VT * D - каждый j-ый столбец умножается на элемент вектора d[j]
 #pragma omp parallel for schedule(static)
 		for (int j = 0; j < n1; j++)
 #pragma omp simd
@@ -454,6 +488,57 @@ void DiagMultStruct(int n, cmnode* Astr, dtype *d, int smallsize)
 				Astr->VT[i + Astr->p * j] *= d[j];
 		// так так вектора матрицы V из разложения A = U * V лежат в транспонированном порядке,
 		// то матрицу D стоит умножать на VT слева
+	}
+}
+
+void UnsymmDiagMultStruct(int n, cumnode* Astr, dtype *d, int smallsize)
+{
+	if (n <= smallsize)
+	{
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < n; j++)
+#pragma omp simd
+			for (int i = 0; i < n; i++)
+			{
+				Astr->A21->A[i + j * n] *= d[j]; // справа D - каждый j - ый столбец A умножается на d[j]
+				Astr->A21->A[i + j * n] *= d[i]; // слева D - каждая строка A умножается на d[j]
+			}
+	}
+	else
+	{
+		int n2 = (int)ceil(n / 2.0);
+		int n1 = n - n2;
+
+		UnsymmDiagMultStruct(n1, Astr->left, &d[0], smallsize);
+		UnsymmDiagMultStruct(n2, Astr->right, &d[n1], smallsize);
+
+		// D * U - каждая i-ая строка U умножается на элемент вектора d[i]
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < Astr->A21->p; j++)
+#pragma omp simd
+			for (int i = 0; i < n2; i++)
+				Astr->A21->U[i + n2 * j] *= d[n1 + i]; // вторая часть массива D
+
+		// VT * D - каждый j-ый столбец умножается на элемент вектора d[j]
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < n1; j++)
+#pragma omp simd
+			for (int i = 0; i < Astr->A21->p; i++)
+				Astr->A21->VT[i + Astr->A21->p * j] *= d[j];
+		// так так вектора матрицы V из разложения A = U * V лежат в транспонированном порядке,
+		// то матрицу D стоит умножать на VT слева
+
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < Astr->A12->p; j++)
+#pragma omp simd
+			for (int i = 0; i < n1; i++)
+				Astr->A12->U[i + n1 * j] *= d[i];
+
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < n2; j++)
+#pragma omp simd
+			for (int i = 0; i < Astr->A12->p; i++)
+				Astr->A12->VT[i + Astr->A12->p * j] *= d[n1 + j];
 	}
 }
 
@@ -969,7 +1054,7 @@ void RecMultLStructWork2(int n, int m, cmnode* Astr, dtype* X, int ldx, dtype be
 	{
 		int n2 = (int)ceil(n / 2.0); // rounding up
 		int n1 = n - n2;
-		int full_memory = 2 * m * Astr->p;
+		// lwork = 2 * m * Astr->p;
 
 		dtype* inter1 = work; // column major - lda = column
 		dtype* inter2 = &work[Astr->p * m];
@@ -989,6 +1074,42 @@ void RecMultLStructWork2(int n, int m, cmnode* Astr, dtype* X, int ldx, dtype be
 		// second multiply low-rank VT^T * inter1 to get (n2 x m) = (n2 x p) * (p x m)
 		zgemm("No", "No", &Astr->p, &m, &n1, &fone, Astr->VT, &Astr->p, &X[0 + 0 * ldx], &ldx, &zero, inter2, &Astr->p);
 		zgemm("No", "No", &n2, &m, &Astr->p, &fone, Astr->U, &n2, inter2, &Astr->p, &fone, &Y[n1 + ldy * 0], &ldy);
+	}
+}
+
+void UnsymmRecMultLStructWork2(int n, int m, cumnode* Astr, dtype* X, int ldx, dtype beta, dtype* Y, int ldy, dtype* work, int lwork, int smallsize)
+{
+	dtype zero = 0.0;
+	dtype fone = 1.0;
+
+	if (n <= smallsize)
+	{
+		zgemm("No", "No", &n, &m, &n, &fone, Astr->A21->A, &n, X, &ldx, &beta, Y, &ldy);
+	}
+	else
+	{
+		int n2 = (int)ceil(n / 2.0); // rounding up
+		int n1 = n - n2;
+		// lwork = m * (Astr->A12->p + Astr->A21->p);
+
+		dtype* inter1 = work; // column major - lda = column
+		dtype* inter2 = &work[Astr->A12->p * m];
+
+		UnsymmRecMultLStructWork2(n1, m, Astr->left, &X[0 + ldx * 0], ldx, beta, &Y[0 + ldy * 0], ldy, work, lwork, smallsize);
+
+		// Y21 = A21 * (A12 * X(n1...m, :))
+		// first multiply low-rank VT * X(1...n1, :) to get (p x m) = (p x n2) * (n2 x m)
+		// second multiply low-rank U * inter1 to get (n1 x m) = (n1 x p) * (p x m)
+		zgemm("No", "No", &Astr->A12->p, &m, &n2, &fone, Astr->A12->VT, &Astr->A12->p, &X[n1 + 0 * ldx], &ldx, &zero, inter1, &Astr->A12->p);
+		zgemm("No", "No", &n1, &m, &Astr->A12->p, &fone, Astr->A12->U, &n1, inter1, &Astr->A12->p, &fone, &Y[0 + ldy * 0], &ldy);
+
+		UnsymmRecMultLStructWork2(n2, m, Astr->right, &X[n1 + ldx * 0], ldx, beta, &Y[n1 + ldy * 0], ldy, work, lwork, smallsize);
+
+		// A12 = A21*T = A12*T * (A21*T * X(1...n1, :))
+		// first multiply low-rank UT * X(1...n1, :) to get (p x m) = (p x n1) * (n1 x m)
+		// second multiply low-rank VT^T * inter1 to get (n2 x m) = (n2 x p) * (p x m)
+		zgemm("No", "No", &Astr->A21->p, &m, &n1, &fone, Astr->A21->VT, &Astr->A21->p, &X[0 + 0 * ldx], &ldx, &zero, inter2, &Astr->A21->p);
+		zgemm("No", "No", &n2, &m, &Astr->A21->p, &fone, Astr->A21->U, &n2, inter2, &Astr->A21->p, &fone, &Y[n1 + ldy * 0], &ldy);
 	}
 }
 
@@ -1479,13 +1600,12 @@ void UnsymmAddSubroutine(int n2, int n1, dtype alpha, cmnode* Astr, dtype beta, 
 	Cstr->U = alloc_arr2<dtype>(n2 * p2);
 	zgemm("No", "No", &n2, &p2, &p1, &alpha_loc, Y21, &ldy21, Y, &p1, &beta_loc, Cstr->U, &n2); // mn
 
-																									 // C{1,2} = U12';
+	// C{1,2} = U12';
 	dtype *Y12_tr = alloc_arr2<dtype>(p2 * n1);
 	Mat_Trans(n1, p2, Y12, ldy12, Y12_tr, p2);
 
 	Cstr->VT = alloc_arr2<dtype>(p2 * n1); Cstr->p = p2;
 	zlacpy("All", &p2, &n1, Y12_tr, &p2, Cstr->VT, &p2);
-
 
 	free_arr(Y21str->U);
 	free_arr(Y21str->VT);
@@ -1530,7 +1650,6 @@ void UnsymmAddStruct(int n, dtype alpha, cumnode* Astr, dtype beta, cumnode* Bst
 		UnsymmAddStruct(n1, alpha, Astr->left, beta, Bstr->left, Cstr->left, smallsize, eps, method);
 		UnsymmAddStruct(n2, alpha, Astr->right, beta, Bstr->right, Cstr->right, smallsize, eps, method);
 	}
-
 }
 
 
@@ -2332,7 +2451,6 @@ void UnsymmCompRecInvStruct(int n, cumnode* Astr, cumnode* &Bstr, int smallsize,
 		int n2 = (int)ceil(n / 2.0); // n2 > n1
 		int n1 = n - n2;
 
-
 		Bstr->A12 = (cmnode*)malloc(sizeof(cmnode));
 		Bstr->A21 = (cmnode*)malloc(sizeof(cmnode));
 
@@ -2343,7 +2461,6 @@ void UnsymmCompRecInvStruct(int n, cumnode* Astr, cumnode* &Bstr, int smallsize,
 		dtype *X22 = alloc_arr2<dtype>(n2 * n2); int ldx22 = n2;
 		dtype *Y = alloc_arr2<dtype>(p2 * p1);
 		cumnode *X11str, *X22str;
-
 
 		Bstr->A21->U = alloc_arr2<dtype>(n2 * p2);
 		Bstr->A21->VT = alloc_arr2<dtype>(p2 * n1);
@@ -2593,7 +2710,7 @@ void LowRankToUnsymmHSS(int n, int r, dtype *U, int ldu, dtype *VT, int ldvt, cu
 // Solver
 #if 1
 void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, dtype *f, zcsr* Dcsr, double thresh, int smallsize, int ItRef, char *bench,
-	/* output */ 	cmnode** &Gstr, dtype *x_sol, int &success, double &RelRes, int &itcount, double beta_eq)
+	/* output */ 	ntype** &Gstr, dtype *x_sol, int &success, double &RelRes, int &itcount, double beta_eq)
 {
 #ifndef ONLINE
 	if (D == NULL)
@@ -2698,7 +2815,7 @@ void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, 
 
 /* Функция вычисления разложения симметричной блочно-диагональной матрицы с использование сжатого формата.
 Внедиагональные блоки предполагаются диагональными матрицами */
-void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, dtype *sound2D, double kww, double beta_eq, dtype *work, int lwork,
+void DirFactFastDiagStructOnline(size_m x, size_m y, ntype** &Gstr, dtype *B, dtype *sound2D, double kww, double beta_eq, dtype *work, int lwork,
 	double eps, int smallsize)
 {
 	int n = x.n;
@@ -2712,7 +2829,7 @@ void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, d
 		printf("**********************************\n");
 #endif
 
-	cmnode *DCstr;
+	ntype *DCstr;
 	dtype *DD = work; int lddd = n;
 
 	// Gen diagonal B
@@ -2721,14 +2838,14 @@ void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, d
 	Clear(n, n, DD, lddd);
 	tt = omp_get_wtime();
 	GenerateDiagonal1DBlockHODLR(0, x, y, DD, lddd, sound2D, kww, beta_eq);
-	SymRecCompressStruct(n, DD, lddd, DCstr, smallsize, eps, "SVD");
+	REC_COMPRESS_STRUCT(n, DD, lddd, DCstr, smallsize, eps, "SVD");
 	tt = omp_get_wtime() - tt;
 #ifdef DISPLAY
 	printf("Compressing D(0) time: %lf\n", tt);
 #endif
-	Gstr = (cmnode**)malloc(nbr * sizeof(cmnode*));
+	Gstr = (ntype**)malloc(nbr * sizeof(ntype*));
 	tt = omp_get_wtime();
-	SymCompRecInvStruct(n, DCstr, Gstr[0], smallsize, eps, "SVD");
+	COMP_REC_INV_STRUCT(n, DCstr, Gstr[0], smallsize, eps, "SVD");
 	tt = omp_get_wtime() - tt;
 #ifdef DISPLAY
 	printf("Computing G(1) time: %lf\n", tt);
@@ -2737,49 +2854,55 @@ void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, d
 	//printf("Block %d. ", 0);
 	//	Test_RankEqual(DCstr, Gstr[0]);
 
-	FreeNodes(n, DCstr, smallsize);
+	FREE_NODES(n, DCstr, smallsize);
 
 	for (int k = 1; k < nbr; k++)
 	{
-		cmnode *DCstr, *TDstr, *TD1str;
+		ntype *DCstr, *TDstr, *TD1str;
 
 		Clear(n, n, DD, lddd);
 
 		tt = omp_get_wtime();
+#if 1
 		GenerateDiagonal1DBlockHODLR(k, x, y, DD, lddd, sound2D, kww, beta_eq);
-		SymRecCompressStruct(n, DD, lddd, DCstr, smallsize, eps, "SVD");
+		REC_COMPRESS_STRUCT(n, DD, lddd, DCstr, smallsize, eps, "SVD");
+#else
+		GenerateDiagonal1DBlockHODLR(k, x, y, DD, lddd, sound2D, kww, beta_eq);
+		REC_COMPRESS_STRUCT(n, DD, lddd, Gstr[k], smallsize, eps, "SVD");
+		continue;
+#endif
 		tt = omp_get_wtime() - tt;
 #ifdef DISPLAY
 		printf("Compressing D(%d) time: %lf\n", k, tt);
 #endif
 
 		tt = omp_get_wtime();
-		CopyStruct(n, Gstr[k - 1], TD1str, smallsize);
+		COPY_STRUCT(n, Gstr[k - 1], TD1str, smallsize);
 
-		DiagMultStruct(n, TD1str, &B[ind(k - 1, n)], smallsize);
+		DIAG_MULT_STRUCT(n, TD1str, &B[ind(k - 1, n)], smallsize);
 		tt = omp_get_wtime() - tt;
 #ifdef DISPLAY
 		printf("Mult D(%d) time: %lf\n", k, tt);
 #endif
 
 		tt = omp_get_wtime();
-		AddStruct(n, 1.0, DCstr, -1.0, TD1str, TDstr, smallsize, eps, "SVD");
+		ADD_STRUCT(n, 1.0, DCstr, -1.0, TD1str, TDstr, smallsize, eps, "SVD");
 		tt = omp_get_wtime() - tt;
 #ifdef DISPLAY
 		printf("Add %d time: %lf\n", k, tt);
 #endif
 
 		tt = omp_get_wtime();
-		SymCompRecInvStruct(n, TDstr, Gstr[k], smallsize, eps, "SVD");
+		COMP_REC_INV_STRUCT(n, TDstr, Gstr[k], smallsize, eps, "SVD");
 		tt = omp_get_wtime() - tt;
 #ifdef DISPLAY
 		printf("Computing G(%d) time: %lf\n", k, tt);
 #endif
 
 		tt = omp_get_wtime();
-		FreeNodes(n, DCstr, smallsize);
-		FreeNodes(n, TDstr, smallsize);
-		FreeNodes(n, TD1str, smallsize);
+		FREE_NODES(n, DCstr, smallsize);
+		FREE_NODES(n, TDstr, smallsize);
+		FREE_NODES(n, TD1str, smallsize);
 		tt = omp_get_wtime() - tt;
 #ifdef DISPLAY
 		printf("Memory deallocation G(%d) time: %lf\n\n", k, tt);
@@ -2793,9 +2916,8 @@ void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, d
 #endif
 }
 
-void DirSolveFastDiagStruct(int n1, int n2, cmnode** Gstr, dtype* B, const dtype* f, dtype* x, dtype* work, int lwork, double eps, int smallsize)
+void DirSolveFastDiagStruct(int n1, int n2, ntype** Gstr, dtype* B, const dtype* f, dtype* x, dtype* work, int lwork, double eps, int smallsize)
 {
-#if 1
 	int n = n1;
 	int nbr = n2;
 	int size2D = n * nbr;
@@ -2810,13 +2932,14 @@ void DirSolveFastDiagStruct(int n1, int n2, cmnode** Gstr, dtype* B, const dtype
 
 	zcopy(&n, f, &ione, tb, &ione);
 
-	int lwork1 = n * n / 2;
+	int lwork1 = 2 * n;
 	//int levels = ceil(log2(ceil((double)n / smallsize))) + 1;
 	//int lwork2 = 2 * n * 1 * levels;
 
 	for (int k = 1; k < nbr; k++)
 	{
-		RecMultLStructWork2(n, 1, Gstr[k - 1], &tb[ind(k - 1, n)], size2D, zero, y, n, &work[size2D + n], lwork1, smallsize);
+		REC_MUL_STRUCT_WORK2(n, 1, Gstr[k - 1], &tb[ind(k - 1, n)], size2D, zero, y, n, &work[size2D + n], lwork1, smallsize);
+		//REC_MUL_STRUCT_WORK2(n, 1, Gstr[k - 1], &tb[ind(k - 1, n)], size2D, y, n, smallsize);
 		//RecMultLStructWork(n, 1, Gstr[k - 1], &tb[ind(k - 1, n)], size2D, y, n, &work[size2D + n], lwork1, &work[size2D + n + lwork1], lwork2, smallsize);
 		//RecMultLStruct(n, 1, Gstr[k - 1], &tb[ind(k - 1, n)], size2D, y, n, smallsize);
 		DenseDiagMult(n, &B[ind(k - 1, n)], y, y);
@@ -2824,7 +2947,8 @@ void DirSolveFastDiagStruct(int n1, int n2, cmnode** Gstr, dtype* B, const dtype
 		OpTwoMatrices(n, 1, &f[ind(k, n)], y, &tb[ind(k, n)], n, '-');
 	}
 
-	RecMultLStructWork2(n, 1, Gstr[nbr - 1], &tb[ind(nbr - 1, n)], size2D, zero, &x[ind(nbr - 1, n)], size2D, &work[size2D + n], lwork1, smallsize);
+	REC_MUL_STRUCT_WORK2(n, 1, Gstr[nbr - 1], &tb[ind(nbr - 1, n)], size2D, zero, &x[ind(nbr - 1, n)], size2D, &work[size2D + n], lwork1, smallsize);
+	//REC_MUL_STRUCT_WORK2(n, 1, Gstr[nbr - 1], &tb[ind(nbr - 1, n)], size2D, &x[ind(nbr - 1, n)], size2D, smallsize);
 	//RecMultLStructWork(n, 1, Gstr[nbr - 1], &tb[ind(nbr - 1, n)], size2D, &x[ind(nbr - 1, n)], size2D, &work[size2D + n], lwork1, &work[size2D + n + lwork1], lwork2, smallsize);
 	//RecMultLStruct(n, 1, Gstr[nbr - 1], &tb[ind(nbr - 1, n)], size2D, &x[ind(nbr - 1, n)], size2D, smallsize);
 
@@ -2834,11 +2958,11 @@ void DirSolveFastDiagStruct(int n1, int n2, cmnode** Gstr, dtype* B, const dtype
 
 		zaxpby(&n, &fone, &tb[ind(k, n)], &ione, &mone, y, &ione);
 
-		RecMultLStructWork2(n, 1, Gstr[k], y, n, zero, &x[ind(k, n)], size2D, &work[size2D + n], lwork1, smallsize);
+		REC_MUL_STRUCT_WORK2(n, 1, Gstr[k], y, n, zero, &x[ind(k, n)], size2D, &work[size2D + n], lwork1, smallsize);
+		//REC_MUL_STRUCT_WORK2(n, 1, Gstr[k], y, n, &x[ind(k, n)], size2D, smallsize);
 		//RecMultLStructWork(n, 1, Gstr[k], y, n, &x[ind(k, n)], size2D, &work[size2D + n], lwork1, &work[size2D + n + lwork1], lwork2, smallsize);
 		//RecMultLStruct(n, 1, Gstr[k], y, n, &x[ind(k, n)], size2D, smallsize);
 	}
-#endif
 }
 
 void alloc_dense_node(int n, cmnode* &Cstr)
@@ -2872,7 +2996,13 @@ void alloc_dense_unsymm_node(int n, cumnode* &Cstr)
 	Cstr->left = NULL;
 	Cstr->right = NULL;
 	alloc_dense_node(n, Cstr->A21);
-	alloc_dense_simple_node(n, Cstr->A12);
+}
+
+void free_dense_unsymm_node(int n, cumnode* &Cstr)
+{
+	 free_arr(Cstr->A21->A);
+	 free_arr(Cstr->A21);
+	 free_arr(Cstr->A12);
 }
 
 void FreeNodes(int n, cmnode* &Astr, int smallsize)
@@ -2886,11 +3016,11 @@ void FreeNodes(int n, cmnode* &Astr, int smallsize)
 		int n2 = (int)ceil(n / 2.0); // n2 > n1
 		int n1 = n - n2;
 
-		free_arr(Astr->U);
-		free_arr(Astr->VT);
-
 		FreeNodes(n1, Astr->left, smallsize);
 		FreeNodes(n2, Astr->right, smallsize);
+
+		free_arr(Astr->U);
+		free_arr(Astr->VT);
 	}
 
 	free_arr(Astr);
@@ -2900,14 +3030,15 @@ void FreeUnsymmNodes(int n, cumnode* &Astr, int smallsize)
 {
 	if (n <= smallsize)
 	{
-		free_arr(Astr->A21->A);
-		free_arr(Astr->A21);
-		free_arr(Astr->A12);
+		free_dense_unsymm_node(n, Astr);
 	}
 	else
 	{
 		int n2 = (int)ceil(n / 2.0); // n2 > n1
 		int n1 = n - n2;
+
+		FreeUnsymmNodes(n1, Astr->left, smallsize);
+		FreeUnsymmNodes(n2, Astr->right, smallsize);
 
 		free_arr(Astr->A21->U);
 		free_arr(Astr->A21->VT);
@@ -2915,8 +3046,8 @@ void FreeUnsymmNodes(int n, cumnode* &Astr, int smallsize)
 		free_arr(Astr->A12->U);
 		free_arr(Astr->A12->VT);
 
-		FreeUnsymmNodes(n1, Astr->left, smallsize);
-		FreeUnsymmNodes(n2, Astr->right, smallsize);
+		free_arr(Astr->A21);
+		free_arr(Astr->A12);
 	}
 
 	free_arr(Astr);

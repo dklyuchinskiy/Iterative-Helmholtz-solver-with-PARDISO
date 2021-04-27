@@ -79,7 +79,7 @@ DIAG5 CheckDiag5Pts(size_m x, size_m y, int l1, int l2);
 DIAG9 CheckDiag9Pts(size_m x, size_m y, int l1, int l2);
 void nullifyPML3D(size_m x, size_m y, size_m z, int size1, dtype* vect);
 void HeteroSoundSpeed3DExtensionToPML(size_m x, size_m y, size_m z, dtype *sound3D);
-void RecMultLStructWork2(int n, int m, cmnode* Astr, dtype* X, int ldx, dtype beta, dtype* Y, int ldy, dtype* work1, int lwork1, int smallsize);
+void RecMultLStructWork2(int n, int m, ntype* Astr, dtype* X, int ldx, dtype beta, dtype* Y, int ldy, dtype* work1, int lwork1, int smallsize);
 float* ReadData();
 void SetSoundSpeed3DFromFile(size_m x, size_m y, size_m z, dtype* sound3D, point source);
 void output_hetero(char *str, bool pml_flag, size_m x, size_m y, size_m z, dtype* x_pard, double diff_sol);
@@ -223,8 +223,8 @@ void SetRHS3D(size_m xx, size_m yy, size_m zz, dtype* fD, point source, int& l);
 void Multiply3DSparseUsingFT(size_m x, size_m y, size_m z, int *iparm, int *perm, size_t *pt, zcsr** &D2csr, const dtype *u, dtype* f_sol, double thresh);
 
 //
-void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, cmnode* **G, dtype *B, bool *solves, const dtype *f, dtype* x_sol, double thresh, int smallsize);
-void ApplyCoeffMatrixA_HODLR(size_m x, size_m y, size_m z, cmnode* **G, dtype *B, bool *solves, const dtype *w, const dtype* deltaL, dtype* g, double thresh, int smallsize);
+void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, ntype* **G, dtype *B, bool *solves, const dtype *f, dtype* x_sol, double thresh, int smallsize);
+void ApplyCoeffMatrixA_HODLR(size_m x, size_m y, size_m z, ntype* **G, dtype *B, bool *solves, const dtype *w, const dtype* deltaL, dtype* g, double thresh, int smallsize);
 
 // Bessel and Hankel functions
 void ZBESI(REAL ZR, REAL ZI, REAL FNU, int KODE, int N, REAL *CYR, REAL *CYI, int *NZ, int *IERR);

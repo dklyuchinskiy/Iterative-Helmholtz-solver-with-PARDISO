@@ -20,11 +20,12 @@ void TestAll()
 
 	printf("***** TEST LIBRARY FUNCTIONS *******\n");
 	printf("****Complex precision****\n");
-#if 0
+#if 1
 	runner.RunTest(Shell_LowRankApprox, Test_LowRankApproxStruct, "Test_LowRankApprox");
 	runner.RunTest(Shell_SymRecCompress, Test_SymRecCompressStruct, "Test_SymRecCompress");
 	runner.RunTest(Shell_SymRecCompress, Test_UnsymmRecCompressStruct, "Test_UnsymmRecCompress");
 	runner.RunTest(Shell_DiagMult, Test_DiagMultStruct, "Test_DiagMult");
+	runner.RunTest(Shell_DiagMult, Test_UnsymmDiagMultStruct, "Test_UnsymmDiagMult");
 	runner.RunTest(Shell_RecMultL, Test_RecMultLStruct, "Test_RecMultL");
 	runner.RunTest(Shell_RecMultL, Test_UnsymmRecMultLStruct, "Test_UnsymmRecMultL");
 	runner.RunTest(Shell_RecMultL, Test_UnsymmRecMultRStruct, "Test_UnsymmRecMultR");
@@ -60,8 +61,6 @@ void TestAll()
 	//	runner.RunTest(Shell_FFT1D_Complex, Test_Poisson_FT1D_Real, "Test_Poisson_FT1D_Real");
 	//  runner.RunTest(Shell_FFT1D_Complex, Test_Poisson_FT1D_Complex, "Test_Poisson_FT1D_Complex");
 #endif
-
-	runner.RunTest(Shell_RecMultL, Test_RecMultLStruct, "Test_RecMultL");
 
 	printf("********************\n");
 	printf("ALL TESTS: %d\nPASSED: %d \nFAILED: %d\n", runner.GetAll(), runner.GetPassed(), runner.GetFailed());
@@ -152,7 +151,7 @@ void Shell_RecMultL(ptr_test_mult_diag func, const string& test_name, int &numb,
 	int smallsize = 3;
 
 	for (double eps = 1e-2; eps > 1e-9; eps /= 10)
-		for (int n = 3; n <= 24; n++)
+		for (int n = 4; n <= 24; n++)
 			for (int k = 1; k <= 12; k++)
 			{
 				try
@@ -675,6 +674,64 @@ void Test_DiagMultStruct(int n, double eps, char *method, int smallsize)
 	free_arr(d);
 }
 
+void Test_UnsymmDiagMultStruct(int n, double eps, char *method, int smallsize)
+{
+	//printf("*****Test for DiagMultStruct  n = %d ******* ", n);
+	dtype *Hd = alloc_arr2<dtype>(n * n); // diagonal Hd = D * H * D
+	dtype *H1 = alloc_arr2<dtype>(n * n); // compressed H
+	dtype *H2 = alloc_arr2<dtype>(n * n); // recovered H after D * H1 * D
+	dtype *d = alloc_arr2<dtype>(n);
+	char str[255];
+
+	double norm = 0;
+	int ldh = n;
+
+	for (int j = 0; j < n; j++)
+	{
+		d[j] = j + 1;
+	}
+
+	Hilbert(n, n, H1, ldh);
+	Hilbert(n, n, Hd, ldh);
+
+	for (int j = 0; j < n; j++)
+		for (int i = 0; i < n; i++)
+		{
+			Hd[i + ldh * j] *= d[j];
+			Hd[i + ldh * j] *= d[i];
+		}
+#ifdef DEBUG
+	print(n, n, H1, ldh, "Initial H");
+#endif
+
+	cumnode *HCstr;
+	// Compress H1 to structured form
+	UnsymmRecCompressStruct(n, H1, ldh, HCstr, smallsize, eps, method);
+
+	// Compressed H1 = D * H * D
+	UnsymmDiagMultStruct(n, HCstr, d, smallsize);
+
+	// Recove H1 to uncompressed form
+	UnsymmResRestoreStruct(n, HCstr, H2, ldh, smallsize);
+
+#ifdef DEBUG
+	print(n, n, Hd, ldh, "Initial Hd = D * H * D");
+	print(n, n, H2, ldh, "Recovered H2 = (D * H * D)comp");
+#endif
+
+	// Compare Hd and H2
+	norm = rel_error_complex(n, n, H2, Hd, ldh, eps);
+
+	sprintf(str, "Struct: n = %d ", n);
+	AssertLess(norm, eps, str);
+
+	FreeUnsymmNodes(n, HCstr, smallsize);
+	free_arr(Hd); // diagonal Hd = D * H * D
+	free_arr(H1); // compressed H
+	free_arr(H2); // recovered H after D * H1 * D
+	free_arr(d);
+}
+
 void Test_RecMultLStruct(int n, int k, double eps, char *method, int smallsize)
 {
 	//printf("*****Test for RecMultLStruct  n = %d k = %d ******* ", n, k);
@@ -684,10 +741,6 @@ void Test_RecMultLStruct(int n, int k, double eps, char *method, int smallsize)
 	dtype *Y1 = alloc_arr2<dtype>(n * k); // after multiplication woth compressed
 
 	int levels = ceil(log2(ceil((double)n / smallsize))) + 1;
-	int lwork1 = n * n / 2;
-	int lwork2 = 2 * n * k * levels;
-	dtype *work1 = alloc_arr2<dtype>(lwork1);
-	dtype *work2 = alloc_arr2<dtype>(lwork2);
 	char str[255];
 
 	double norm = 0;
@@ -713,9 +766,16 @@ void Test_RecMultLStruct(int n, int k, double eps, char *method, int smallsize)
 	// Compress H
 	SymRecCompressStruct(n, H, ldh, Hstr, smallsize, eps, method);
 
+	// Memory allocation
+	int lwork1 = 2 * k * Hstr->p;
+	int lwork2 = 2 * n * k * levels;
+	dtype *work1 = alloc_arr2<dtype>(lwork1);
+	dtype *work2 = alloc_arr2<dtype>(lwork2);
+
 	// RecMult Y1 = comp(H) * X
 	//RecMultLStruct(n, k, Hstr, X, ldx, Y1, ldy, work1, lwork1, work2, lwork2, smallsize);
-	RecMultLStructWork(n, k, Hstr, X, ldx, Y1, ldy, work1, lwork1, work2, lwork2, smallsize);
+	//RecMultLStructWork(n, k, Hstr, X, ldx, Y1, ldy, work1, lwork1, work2, lwork2, smallsize);
+	RecMultLStructWork2(n, k, Hstr, X, ldx, beta, Y1, ldy, work1, lwork1, smallsize);
 
 	norm = rel_error_complex(n, k, Y1, Y, ldy, eps);
 	sprintf(str, "Struct: n = %d k = %d ", n, k);
@@ -767,9 +827,15 @@ void Test_UnsymmRecMultLStruct(int n, int k, double eps, char *method, int small
 	// Compress H
 	UnsymmRecCompressStruct(n, H, ldh, Hstr, smallsize, eps, method);
 
-	// RecMult Y1 = comp(H) * X
-	UnsymmRecMultLStruct(n, k, Hstr, X, ldx, Y1, ldy, smallsize);
+	// Memory allocation
+	int max_p21 = 0, max_p12 = 0;
+	UnsymmMaxRankInWidthList(max_p21, max_p12, Hstr);
+	int lwork = k * (max_p21 + max_p12);
+	dtype *work = alloc_arr2<dtype>(lwork);
 
+	// RecMult Y1 = comp(H) * X
+	//UnsymmRecMultLStruct(n, k, Hstr, X, ldx, Y1, ldy, smallsize);
+	UnsymmRecMultLStructWork2(n, k, Hstr, X, ldx, beta, Y1, ldy, work, lwork, smallsize);
 	norm = rel_error_complex(n, k, Y1, Y, ldy, eps);
 	sprintf(str, "Struct: n = %d k = %d ", n, k);
 	AssertLess(norm, eps, str);
@@ -784,11 +850,9 @@ void Test_UnsymmRecMultLStruct(int n, int k, double eps, char *method, int small
 	free_arr(X);
 	free_arr(Y);
 	free_arr(Y1);
+	free_arr(work);
 }
 
-/*\D2\E5\F1\F2 \ED\E0 \F1\F0\E0\E2\ED\E5\ED\E8\E5 \F0\E5\E7\F3\EB\FC\F2\E0\F2\EE\E2 \F3\EC\ED\EE\E6\E5\ED\E8\FF Y = X * H \F1\E6\E8\EC\E0\E5\EC\EE\E9 \EC\E0\F2\F0\E8\F6\FB H \ED\E0 \EF\F0\EE\E8\E7\E2\EE\EB\FC\ED\F3\FE X.
-\D1\F0\E0\E2\ED\E8\E2\E0\FE\F2\F1\FF \F0\E5\E7\F3\EB\FC\F2\E0\F2\FB \F1\EE \F1\E6\E0\F2\E8\E5\EC \E8 \E1\E5\E7
-(k x n) * (n x n) */
 void Test_UnsymmRecMultRStruct(int n, int k, double eps, char *method, int smallsize)
 {
 	//printf("*****Test for RecMultLStruct  n = %d k = %d ******* ", n, k);
@@ -2790,6 +2854,74 @@ void Test_DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** Gstr, dtype *
 
 }
 
+void Test_DirFactFastDiagStructOnlineHODLR(size_m x, size_m y, ntype** Gstr, dtype *B, dtype *sound2D, double kww, double beta_eq, double eps, int smallsize)
+{
+	printf("Testing factorization...\n");
+	int n = x.n;
+	int size = n * y.n;
+	int nbr = y.n;
+	char bench[255] = "No";
+	dtype *DD = alloc_arr<dtype>(n * n); int lddd = n;
+	dtype *DR = alloc_arr<dtype>(n * n); int lddr = n;
+	double norm = 0;
+
+	double timer = 0;
+	timer = omp_get_wtime();
+
+	GenerateDiagonal1DBlockHODLR(0, x, y, DD, lddd, sound2D, kww, beta_eq);
+
+	ntype *DCstr;
+	COMP_REC_INV_STRUCT(n, Gstr[0], DCstr, smallsize, eps, "SVD");
+	RES_RESTORE_STRUCT(n, DCstr, DR, lddr, smallsize);
+
+	norm = rel_error_complex(n, n, DR, DD, lddd, eps);
+
+	if (norm > eps) printf("Block %d. Norm %12.10e > eps %12.10lf : FAILED\n", 0, norm, eps);
+
+	free_arr(DR);
+	free_arr(DD);
+	FREE_NODES(n, DCstr, smallsize);
+
+	for (int k = 1; k < nbr; k++)
+	{
+		dtype *DR = alloc_arr<dtype>(n * n); int lddr = n;
+		dtype *HR = alloc_arr<dtype>(n * n); int ldhr = n;
+		dtype *DD = alloc_arr<dtype>(n * n); int lddd = n;
+		ntype *DCstr, *Hstr;
+
+		GenerateDiagonal1DBlockHODLR(k, x, y, DD, lddd, sound2D, kww, beta_eq);
+
+		COMP_REC_INV_STRUCT(n, Gstr[k], DCstr, smallsize, eps, "SVD");
+		RES_RESTORE_STRUCT(n, DCstr, DR, lddr, smallsize);
+
+		COPY_STRUCT(n, Gstr[k - 1], Hstr, smallsize);	
+		DIAG_MULT_STRUCT(n, Hstr, &B[ind(k - 1, n)], smallsize);
+		RES_RESTORE_STRUCT(n, Hstr, HR, ldhr, smallsize);
+
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < n; j++)
+#pragma omp simd
+			for (int i = 0; i < n; i++)
+				HR[i + ldhr * j] = HR[i + ldhr * j] + DR[i + lddr * j];
+
+		//norm = rel_error_complex(n / 2, n / 2, &HR[n / 2 + ldhr * n / 2], &DD[n / 2 + lddd * n / 2], lddd, eps);
+		norm = rel_error_complex(n, n, HR, DD, lddd, eps);
+
+		if (norm > eps) printf("Block %d. Norm %12.10e > eps %12.10lf : FAILED\n", k, norm, eps);
+		else printf("Block %d. Norm %12.10e > eps %12.10lf : PASSED\n", k, norm, eps);
+
+		//	system("pause");
+
+		FREE_NODES(n, DCstr, smallsize);
+		FREE_NODES(n, Hstr, smallsize);
+		free_arr(DR);
+		free_arr(HR);
+		free_arr(DD);
+	}
+	timer = omp_get_wtime() - timer;
+	printf("Time: %lf\n", timer);
+}
+
 void Test_TransferBlock3Diag_to_CSR(int n1, int n2, zcsr* Dcsr, dtype* x_orig, dtype *f, double eps)
 {
 	int n = n1;
@@ -2836,23 +2968,30 @@ void Test_DirSolveFactDiagStructBlockRanks(size_m x, size_m y, cmnode** Gstr)
 
 }
 
-double Test_NonZeroElementsInFactors(size_m x, size_m y, cmnode **Gstr, dtype* B, double thresh, int smallsize)
+size_t Test_NonZeroElementsInFactors(size_m x, size_m y, ntype **Gstr, dtype* B, double thresh, int smallsize)
 {
-	long long non_zeros_exact = 0;
-	long long non_zeros_HSS = 0;
+	size_t non_zeros_exact = 0;
+	size_t non_zeros_HSS = 0;
 
-	//non_zeros_exact = (x.n * x.n) * y.n + 2 * x.n * (y.n - 1);
+	// including off-diagonals
+#if 0
+	non_zeros_exact = (x.n * x.n) * y.n + 2 * x.n * (y.n - 1);
+#else
 	non_zeros_exact = (x.n * x.n) * y.n;
+#endif
 
 	for(int k = 0; k < y.n; k++)
 		non_zeros_HSS += CountElementsInMatrixTree(x.n, Gstr[k]);
 
-	//non_zeros_HSS += 2 * (y.n - 1) * x.n;
+#if 0
+	// including off-diagonals
+	non_zeros_HSS += 2 * (y.n - 1) * x.n;
+#endif
 
 	int compr_size = ceil((double)x.n / smallsize);
 	int compr_level = ceil(log(compr_size) / log(2));
 	int loc_size = x.n;
-	long long zeros_ideal = 0;
+	size_t zeros_ideal = 0;
 
 	printf("-------------------------------------------------------------\n");
 	//printf("Compression level: %d, Compression size: %d\n", compr_level, compr_size);
@@ -2860,16 +2999,16 @@ double Test_NonZeroElementsInFactors(size_m x, size_m y, cmnode **Gstr, dtype* B
 	{
 		loc_size = ceil(loc_size / 2.0);
 		compr_size = ceil((double)x.n / loc_size);
-		zeros_ideal += (loc_size * loc_size * compr_size) * y.n;
+		zeros_ideal += ((size_t)loc_size * loc_size * compr_size) * y.n;
 		printf("loc_size: %d, compr_size: %d, zeros_ideal: %d\n", loc_size, compr_size, zeros_ideal);
 	}
 
 	printf("Compression level: %d, Compression size: %d\n", compr_level, compr_size);
-	printf("non_zeros_exact: %ld, memory = %lf Gb\n", non_zeros_exact, non_zeros_exact * 8.0 * 2.0 / ((size_t)1024 * 1024 * 1024));
-    printf("non_zeros_HSS  : %ld, memory = %lf Gb\n", non_zeros_HSS, non_zeros_HSS * 8.0 * 2.0 / ((size_t)1024 * 1024 * 1024));
+	printf("non_zeros_exact: %ld, memory = %lf Gb\n", non_zeros_exact, non_zeros_exact * 8.0 * 2.0 / E9);
+    printf("non_zeros_HSS  : %ld, memory = %lf Gb\n", non_zeros_HSS, non_zeros_HSS * 8.0 * 2.0 / E9);
 	printf("coefficient of compression: %lf (ideal: %lf)\n",  (double)non_zeros_exact / non_zeros_HSS, (double)non_zeros_exact/(non_zeros_exact - zeros_ideal));
 
-	return (double)non_zeros_HSS;
+	return non_zeros_HSS;
 }
 
 void Test_UnsymmLUfact2(int n, double eps, char* method, int smallsize)

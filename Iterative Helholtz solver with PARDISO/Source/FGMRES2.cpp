@@ -1,7 +1,6 @@
 #include "templates.h"
 #include "TemplatesForMatrixConstruction.h"
 #include "TestSuite.h"
-#include "HODLR/TestSuiteHODLR.h"
 
 void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double &diff_sol, double beta_eq)
 {
@@ -53,7 +52,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 
 	//-------- PARDISO ----------
 	// Calling the solver
-	int mtype = 13;
+	int mtype = 13; // complex and unsymmetric
+	//int mtype = 6; // complex and symmetric
 	int *iparm = alloc_arr<int>(64 * z.n);
 	int *perm = alloc_arr<int>(size2D * z.n);
 	size_t *pt = alloc_arr<size_t>(64 * z.n);
@@ -74,12 +74,9 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 	//	SetSoundSpeed2D(x, y, z, sound3D, sound2D, source);
 #if 1
 	// Gen velocity of sound in 3D domain
-
-#ifdef HOMO
-	SetSoundSpeed3D(x, y, z, sound3D, source);
-#else
+	//SetSoundSpeed3D(x, y, z, sound3D, source);
 	SetSoundSpeed3DFromFile(x, y, z, sound3D, source);
-#endif
+
 	// Extension of 3D sound speed to PML zone
 	HeteroSoundSpeed3DExtensionToPML(x, y, z, sound3D);
 
@@ -98,6 +95,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 
 	char str2[255] = "sound_speed_deltaL";
 	//	output(str2, false, x, y, z, sound3D, deltaL)
+
 	free(sound3D);
 
 	printf("-----Step 1. Memory allocation for 2D problems\n");
@@ -198,8 +196,9 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 #ifdef SAVE_MEM
 		if (kww < ratio * k2)
 #else
-		//if (1)
-		if (k < 5)
+		if (1)
+	    //if (k < 5)
+		//if (k == z.n / 2 || k == z.n / 2 - 1 || kk == z.n / 2 + 1)
 #endif
 		{
 			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } -kww;
@@ -268,8 +267,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 #else
 	//int smallsize = x.n / 2 - 10;
 	int smallsize = 50;
-
-	// for unsymmetric case there should be two diagonals
 	dtype *B = alloc_arr<dtype>(((size_t)size2D - x.n) * z.n); // for right diagonal
 	bool *solves = alloc_arr<bool>(z.n);
 	int lwork_HODLR = x.n * x.n;
@@ -299,8 +296,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 		if (nu == 2) ratio = 15;
 		else ratio = 3;
 
-		if (k < 2)
-		//if (1)
+		if (1)
+		//if (k < 5)
 		//if (kww < ratio * k2)
 		{
 			// only for homogeneous domain
@@ -312,19 +309,18 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 #endif
 			// Factorization of matrices
 			DirFactFastDiagStructOnline(x, y, Gstr[k], &B[k * (size2D - x.n)], sound2D, kww, beta_eq, work_HODLR, lwork_HODLR, thresh, smallsize);
-			//Test_DirFactFastDiagStructOnlineHODLR(x, y, Gstr[k], &B[k * (size2D - x.n)], sound2D, kww, beta_eq, thresh, smallsize);
-			size_t mem_cur = Test_NonZeroElementsInFactors(x, y, Gstr[k], &B[k * (size2D - x.n)], thresh, smallsize);
+			double mem_cur = Test_NonZeroElementsInFactors(x, y, Gstr[k], &B[k * (size2D - x.n)], thresh, smallsize);
+
 			solves[k] = true;
 			count++;
 
-			mem_cur += 2 * (size2D - x.n); // 4th and 5th diagonal B
+			mem_cur += (size2D - x.n); // 5th diagonal B
 			mem_cur *= 8; // bytes
-			mem_cur *= 2; // complex
+			mem_cur *= 2;
 			mem_pard += mem_cur;
 
 			printf("Solved k = %d. ", k);
-			printf("Mem = %lf Gb. Full_memory = %lf Gb\n", mem_cur / E9, mem_pard / E9);
-			system("pause");
+			printf("Mem = %lf Gb. Full_memory = %lf Gb\n", mem_cur / ((size_t)1024 * 1024 * 1024), mem_pard / ((size_t)1024 * 1024 * 1024));
 
 			// источник в каждой задаче в середине 
 			//GenSparseMatrixOnline2D("FT", i, x, y, z, Bc_mat, n1, Dc, n1, Bc_mat, n1, D2csr);
@@ -340,20 +336,18 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 	system("pause");
 #endif
 
-#ifndef HODLR
-	double mem = 2.0 * non_zeros / E9;
-	mem += ((double)size2D + 1) / E9;
+	double mem = 2.0 * non_zeros / ((size_t)1024 * 1024 * 1024);
+	mem += ((double)size2D + 1) / ((size_t)1024 * 1024 * 1024);
 	mem *= count;
-	mem += ((double)z.n * size2D) / E9;
+	mem += ((double)z.n * size2D) / ((size_t)1024 * 1024 * 1024);
 
 	mem *= 8; // bytes
 	mem *= 2;
 
 	printf("Memory for %d 2D matrices: %lf Gb\n", count, mem);
 
-	mem_pard /= (1024.0 * 1024.0);
+	mem_pard /= ((size_t)1024 * 1024);
 	printf("Memory for %d PARDISO factor + analysis 2D matrices: %lf Gb\n", count, mem_pard);
-#endif
 
 #ifndef PERF
 	system("pause");
@@ -367,9 +361,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 	dtype* V = alloc_arr<dtype>((size_t)size * (m + 1)); int ldv = size;
 	dtype* w = alloc_arr<dtype>(size);
 
-	// additional vector
+	// residual vector
 	dtype *work_vec = alloc_arr<dtype>(size);
-	dtype *x_init = alloc_arr<dtype>(size);
 
 	// Hessenberg matrix
 	dtype *H = alloc_arr<dtype>((m + 1) * m); int ldh = m + 1;
@@ -377,6 +370,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 
 	// the vector of right-hand side for the system with Hessenberg matrix
 	dtype *eBeta = alloc_arr<dtype>(m + 1); int ldb = m + 1;
+
+	dtype *Ax0_nopml = alloc_arr<dtype>(size);
 
 	// resid
 #ifdef COMP_RESID
@@ -426,22 +421,19 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 
 #pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < size; i++)
-		x_init[i] = 0;
+		x0[i] = 0;
 
 	for (int restart = 0; restart < rest; restart++)
 	{
 		printf("------RESTART = %d------\n", restart);
 
 		// 1. First step. Compute r_0 and its norm
-		zcopy(&size, x_init, &ione, x0, &ione);
-
 		// Multiply matrix A in CSR format by vector x_0 to obtain f1
 #ifndef HODLR
 		ApplyCoeffMatrixA_CSR(x, y, z, iparm, perm, pt, D2csr, x0, deltaL, w, beta_eq, thresh);
 #else
 		ApplyCoeffMatrixA_HODLR(x, y, z, Gstr, B, solves, x0, deltaL, w, thresh, smallsize);
 #endif
-
 		norm = dznrm2(&size, w, &ione);
 		printf("norm ||Ax0|| = %e\n", norm);
 
@@ -511,9 +503,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 
 			printf("size of basis: %d\n", iterCount);
 
-			// init vector x0
-			zcopy(&size, x_init, &ione, x0, &ione);
-
 			// Set eBeta
 			for (int i = 0; i < m + 1; i++)
 				eBeta[i] = 0;
@@ -553,8 +542,10 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 		//	printf("Residual in 3D with PML |(I - deltaL * L^{-1}) * x_sol - f| = %lf\n", RelRes);
 		//	printf("-----------\n");
 
-			reducePML3D(x, y, z, size, w, size_nopml, work_vec);
-			Res = dznrm2(&size_nopml, work_vec, &ione);
+			//reducePML3D(x, y, z, size, w, size_nopml, work_vec);
+			//Res = dznrm2(&size_nopml, work_vec, &ione);
+			reducePML3D(x, y, z, size, w, size_nopml, Ax0_nopml);
+			Res = dznrm2(&size_nopml, Ax0_nopml, &ione);
 			RelRes = Res / norm_f;
 
 			printf("-----------\n");
@@ -625,7 +616,6 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 			printf("Time of iteration = %lf\n", time);
 		}
 #endif
-		zcopy(&size, x0, &ione, x_init, &ione);
 
 		FILE* conv = fopen("conv.plt", "w");
 		fprintf(conv, "set term png font \"Times - Roman, 16\" \n \
@@ -649,6 +639,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 		}
 #endif
 	} // End of iterations
+	free_arr(work);
 	fclose(output);
 #ifdef COMP_RESID
 	ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);
@@ -674,13 +665,12 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 	free_arr(f_sol);
 	free_arr(x_gmres_nopml);
 #endif
-	free_arr(work);
+
 	free_arr(H);
 	free_arr(Hgels);
 	free_arr(w);
 	free_arr(V);
 	free_arr(x0);
-	free_arr(x_init);
 	free_arr(work_vec);
 #ifdef HOMO
 	free_arr(x_orig_nopml);

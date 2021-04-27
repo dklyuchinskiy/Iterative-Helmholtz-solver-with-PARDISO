@@ -34,15 +34,16 @@ in sparse CSR format to save memory.
 #if 1
 int main()
 {
+#ifdef HODLR
 	//TestAll();
 	//system("pause");
-	//return;
+#endif
 
 #ifdef _OPENMP
 	int nthr = omp_get_max_threads();
 	printf("Max_threads: %d threads\n", nthr);
 	//omp_set_dynamic(0);
-	nthr = 12;
+	nthr = 1;
 	omp_set_num_threads(nthr);
 	mkl_set_num_threads(nthr);
 	printf("Run in parallel on %d threads\n", nthr);
@@ -65,7 +66,7 @@ int main()
 //	for (double beta_eq = 0.05; beta_eq <= 1.01; beta_eq += 0.05)
 	//	for (int spg_pts = 20; spg_pts <= 100; spg_pts += 20)
 		{
-			int spg_pts = 50;
+			int spg_pts = 20;
 			double beta_eq = 0.5;
 
 			printf("*********************************************\n");
@@ -77,7 +78,6 @@ int main()
 #ifndef PERF
 			TestAll();
 #endif
-
 			//Test2DLaplaceLevander4th(); // laplace + manufactored laplace and helmholtz
 			//Test2DHelmholtzLevander4th(); // exact helm
 			//Test2DHelmholtzTuning9Pts();
@@ -141,7 +141,7 @@ int main()
 			int n3 = 309 + 2 * z.spg_pts;
 
 			// FGMRES or BcGSTAB number of iterations/niter
-			int niter = 10;
+			int niter = 5;
 			int restart = 10;
 
 			x.n = n1;
@@ -288,26 +288,22 @@ int main()
 			dtype *x_orig = NULL;
 			dtype *x_orig_nopml = NULL;
 #endif
-
 			dtype *x_sol = alloc_arr<dtype>(size);	
-			dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
-
 			dtype *f = alloc_arr<dtype>(size);
-			dtype *f_nopml = alloc_arr<dtype>(size_nopml);
 
 			printf("-----Memory required:-----\n");
 			double total = 0;
-			total = double(size) / ((size_t)1024 * 1024 * 1024);
+			total = double(size) / E9;
 			total *= (2 + 2); // 2 for 2D problems - FFT + PARDISO
-			total += double(size2D) / ((size_t)1024 * 1024 * 1024);
-			total += double(2 * size_nopml) / ((size_t)1024 * 1024 * 1024);
+			total += double(size2D) / E9;
+			total += double(2 * size_nopml) / E9;
 			total *= 8;
 			total *= 2;
 			printf("Initial = %lf GB\n", total);
 
-			total = double(size) / ((size_t)1024 * 1024 * 1024);
-			total *= (niter + 1) + 4 + 2;
-			total += double(6 * size_nopml) / ((size_t)1024 * 1024 * 1024);
+			total = double(size) / E9;
+			total *= (niter + 1) + 3 + 2;
+			total += double(6 * size_nopml) / E9;
 			total *= 8;
 			total *= 2;
 			printf("FGMRES = %lf GB\n", total);
@@ -474,6 +470,10 @@ int main()
 			printf("FGMRES is not run!\n");
 #endif
 
+			//#define OUTPUT
+			//#define GNUPLOT
+
+#if defined(OUTPUT) && defined(GNUPLOT)
 #ifndef HOMO
 			// for printing with gnuplot (1D projections in sponge direction)
 			dtype* z_sol1D_prd = alloc_arr<dtype>(z.n);
@@ -507,9 +507,10 @@ int main()
 			{
 				PrintProjection1DHetero(x, y, &x_sol[k * size2D], k);
 			}
-#endif
 			free(z_sol1D_prd);
 
+#endif
+#endif		
 			// 4.89e-11 - за 25 итераций
 
 #ifdef HOMO
@@ -560,8 +561,12 @@ int main()
 #endif
 
 			reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
+#ifdef HOMO
+			dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
+			dtype *f_nopml = alloc_arr<dtype>(size_nopml);
 			reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 			reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
+#endif
 
 			//	ResidCSR(x_nopml, y_nopml, z_nopml, Dcsr_nopml, x_sol_nopml, f_nopml, g_nopml, RelRes);
 			//	printf("-----------\n");
@@ -758,22 +763,26 @@ int main()
 #ifdef HOMO
 			reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
 #endif
+			dtype *x_sol_nopml = alloc_arr<dtype>(size_nopml);
+			dtype *f_nopml = alloc_arr<dtype>(size_nopml);
 			reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 			reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
-#define OUTPUT
-#define GNUPLOT
 			pml_flag = true;
 			char file1[255]; sprintf(file1, "Charts3DHeteroOT/%d/model_ft", x.n_nopml);
 			char file2[255]; sprintf(file2, "Charts3DHeteroOT/%d/real/helm_ft", x.n_nopml);
 			char file3[255]; sprintf(file3, "Charts3DHeteroOT/%d/imag/helm_ft", x.n_nopml);
-#if defined(OUTPUT) && defined(CALC)
+#if defined(OUTPUT)
+#if def(CALC)
 			printf("Output results to file...\n");
 #ifdef HOMO
 			output(file1, pml_flag, x, y, z, x_orig_nopml, x_sol_nopml, diff_sol);
 #else
 			output_hetero(file1, pml_flag, x, y, z, x_sol_nopml, diff_sol);
 #endif
+#endif
+#else
+			printf("No output results\n");
 #endif
 
 #ifdef GNUPLOT
@@ -789,6 +798,7 @@ int main()
 #endif
 			//#define MAKE_RUNGE_3D
             //#define MAKE_BETA_3Ds
+#ifdef OUTPUT
 #ifdef CALC
 			printf("Output full 3D solution into file...\n");
 #if !defined(MAKE_RUNGE_3D) && !defined(MAKE_BETA_3D)
@@ -805,7 +815,7 @@ int main()
 			fclose(file);
 #endif
 #endif
-
+#endif
 			free(f);
 			free(f_nopml);
 			free(x_sol);

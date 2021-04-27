@@ -46,6 +46,7 @@ void Test_UnsymmCompRecInvStruct(int n, double eps, char *method, int smallsize)
 void Test_UnsymmCompUpdate3Struct(int n, int k1, int k2, dtype alpha, double eps, char* method, int smallsize);
 void Test_UnsymmCompUpdate2Struct(int n, int k, dtype alpha, double eps, char* method, int smallsize);
 void Test_UnsymmAddStruct(int n, dtype alpha, dtype beta, double eps, char *method, int smallsize);
+void Test_UnsymmDiagMultStruct(int n, double eps, char *method, int smallsize);
 void Test_UnsymmRecMultLStruct(int n, int k, double eps, char *method, int smallsize);
 void Test_UnsymmRecMultRStruct(int n, int k, double eps, char *method, int smallsize);
 void Test_UnsymmLUfact(int n, double eps, char* method, int smallsize);
@@ -76,6 +77,7 @@ void Shell_SymCompUpdate5LowRankStruct(ptr_test_update func, const string& test_
 void Test_DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** Gstr, dtype *B, double thresh, int smallsize);
 void Test_TransferBlock3Diag_to_CSR(int n1, int n2, dcsr* Dcsr, dtype* x_orig, dtype *f, double eps);
 void Test_DirSolveFactDiagStructBlockRanks(size_m x, size_m y, cmnode** Gstr);
+void Test_DirFactFastDiagStructOnlineHODLR(size_m x, size_m y, ntype** Gstr, dtype *B, dtype *sound2D, double kww, double beta_eq, double eps, int smallsize);
 
 // Others
 void TestRowInterchange(int n, int m, double eps);

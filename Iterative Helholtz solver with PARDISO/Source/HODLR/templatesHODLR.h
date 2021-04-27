@@ -21,7 +21,7 @@ void Block3DSPDSolveFast(int n1, int n2, int n3, double *D, int ldd, double *B, 
 void DirFactFastDiag(int n1, int n2, int n3, double *D, int ldd, double *B, double *G, int ldg, double eps, int smallsize, char *bench);
 void DirSolveFastDiag(int n1, int n2, int n3, double *G, int ldg, double *B, double *f, double *x, double eps, int smallsize);
 void GenMatrixandRHSandSolution2(size_m x, size_m y, size_m z, double *D, int ldd, double *B, double *x1, double *f, double thresh);
-double Test_NonZeroElementsInFactors(size_m x, size_m y, cmnode **Gstr, dtype* B, double thresh, int smallsize);
+size_t Test_NonZeroElementsInFactors(size_m x, size_m y, ntype **Gstr, dtype* B, double thresh, int smallsize);
 
 // Support
 
@@ -71,7 +71,7 @@ void CopyStruct(int n, cmnode* Gstr, cmnode* &TD1str, int smallsize);
 void FreeNodes(int n, cmnode* &Astr, int smallsize);
 void alloc_dense_node(int n, cmnode* &Cstr);
 void PrintStruct(int n, cmnode *root);
-int CountElementsInMatrixTree(int n, cmnode* root);
+size_t CountElementsInMatrixTree(int n, ntype* root);
 
 // BinaryTrees.cpp
 
@@ -82,6 +82,7 @@ void SymRecCompressStruct(int n, dtype *A, const int lda, cmnode* &ACstr, const 
 void DiagMultStruct(int n, cmnode* Astr, dtype *d, int small_size);
 void RecMultLStruct(int n, int m, cmnode* Astr, dtype *X, int ldx, dtype *Y, int ldy, int smallsize);
 void RecMultLStructWork(int n, int m, cmnode* Astr, dtype *X, int ldx, dtype *Y, int ldy, dtype *work1, int lwork1, dtype *work2, int lwork2, int smallsize);
+void RecMultLStructWork2(int n, int m, cmnode* Astr, dtype* X, int ldx, dtype beta, dtype* Y, int ldy, dtype* work, int lwork, int smallsize);
 void AddStruct(int n, dtype alpha, cmnode* Astr, dtype beta, cmnode* Bstr, cmnode* &Cstr, int smallsize, double eps, char *method);
 void SymUpdate4Subroutine(int n2, int n1, dtype alpha, cmnode* Astr, const dtype *Y, int ldy, cmnode* &Bstr, int smallsize, double eps, char* method);
 void SymCompUpdate2Struct(int n, int k, cmnode* Astr, dtype alpha, dtype *Y, int ldy, dtype *V, int ldv, cmnode* &Bstr, int smallsize, double eps, char* method);
@@ -98,10 +99,12 @@ void Hilbert6(int m, int n, dtype *H, int ldh);
 void Hilbert7LowRank(int m, int n, dtype *H, int ldh);
 void alloc_dense_simple_node(int n, cmnode* &Cstr);
 
+
 // Unsymm
 void UnsymmLUfact(int n, cumnode* Astr, int *ipiv, int smallsize, double eps, char* method);
 void UnsymmRecMultLStruct(int n, int m, cumnode* Astr, dtype *X, int ldx, dtype *Y, int ldy, int smallsize);
 void UnsymmRecMultRStruct(int n, int m, cumnode* Astr, dtype *X, int ldx, dtype *Y, int ldy, int smallsize);
+void UnsymmRecMultLStructWork2(int n, int m, cumnode* Astr, dtype* X, int ldx, dtype beta, dtype* Y, int ldy, dtype* work, int lwork, int smallsize);
 void UnsymmUpdate2Subroutine(int n2, int n1, int k, cmnode* Astr, dtype alpha, dtype *Y, int ldy, dtype *V1, int ldv1, dtype *V2, int ldv2, cmnode* &Bstr, int smallsize, double eps, char* method);
 void UnsymmCompUpdate2Struct(int n, int k, cumnode* Astr, dtype alpha, dtype *Y, int ldy, dtype *V, int ldv, cumnode* &Bstr, int smallsize, double eps, char* method);
 void UnsymmCompRecInvStruct(int n, cumnode* Astr, cumnode* &Bstr, int smallsize, double eps, char *method);
@@ -112,6 +115,8 @@ void UnsymmAddSubroutine(int n2, int n1, dtype alpha, cmnode* Astr, dtype beta, 
 void UnsymmUpdate3Subroutine(int n2, int n1, int k1, int k2, cmnode* Astr, dtype alpha, dtype *Y, int ldy, dtype *V1, int ldv1, dtype* V2, int ldv2, cmnode* &Bstr, int smallsize, double eps, char* method);
 void UnsymmCompUpdate3Struct(int n, int k1, int k2, cumnode* Astr, dtype alpha, dtype *Y, int ldy, dtype *V1, int ldv1, dtype *V2, int ldv2, cumnode* &Bstr, int smallsize, double eps, char* method);
 void UnsymmCopyStruct(int n, cumnode* Astr, cumnode* Bstr, int smallsize);
+void UnsymmDiagMultStruct(int n, cumnode* Astr, dtype *d, int small_size);
+void UnsymmMaxRankInWidthList(int &max_a21, int &max_a12, cumnode *root);
 void CopyLfactor(int n, cumnode* Astr, cumnode* &Lstr, int smallsize);
 void CopyRfactor(int n, cumnode* Astr, cumnode* &Rstr, int smallsize);
 void CopyUnsymmStruct(int n, cumnode* Astr, cumnode* &Bstr, int smallsize);
@@ -149,9 +154,9 @@ void SymUpdate5Subroutine(int n2, int n1, dtype alpha, cmnode* Astr, const dtype
 
 // Solver
 void Block3DSPDSolveFastStruct(size_m x, size_m y, dtype *D, int ldd, dtype *B, dtype *f, zcsr* Dcsr, double thresh, int smallsize, int ItRef, char *bench,
-	cmnode** &Gstr, dtype *x_sol, int &success, double &RelRes, int &itcount, double beta_eq);
-void DirFactFastDiagStructOnline(size_m x, size_m y, cmnode** &Gstr, dtype *B, dtype *sound2D, double kww, double beta_eq, dtype *work, int lwork, double eps, int smallsize);
-void DirSolveFastDiagStruct(int n1, int n2, cmnode* *Gstr, dtype *B, const dtype *f, dtype *x, dtype *work, int lwork, double eps, int smallsize);
+	ntype** &Gstr, dtype *x_sol, int &success, double &RelRes, int &itcount, double beta_eq);
+void DirFactFastDiagStructOnline(size_m x, size_m y, ntype** &Gstr, dtype *B, dtype *sound2D, double kww, double beta_eq, dtype *work, int lwork, double eps, int smallsize);
+void DirSolveFastDiagStruct(int n1, int n2, ntype* *Gstr, dtype *B, const dtype *f, dtype *x, dtype *work, int lwork, double eps, int smallsize);
 void GenerateDiagonal1DBlockHODLR(int j, size_m x, size_m y, dtype *DD, int lddd, dtype *sound2D, double kww, double beta_eq);
 
 void GenerateDiagonal2DBlock(int part_of_field, size_m x, size_m y, size_m z, dtype *DD, int lddd);

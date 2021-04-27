@@ -5521,15 +5521,13 @@ void ApplyCoeffMatrixA_CSR(size_m x, size_m y, size_m z, int *iparm, int *perm, 
 
 	// g:= w - g
 	OpTwoMatrices(size, 1, w, g, g, size, '-');
-
 }
 
 #ifdef HODLR
-void ApplyCoeffMatrixA_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dtype *B, bool *solves, const dtype *w, const dtype* deltaL, dtype* g, double thresh, int smallsize)
+void ApplyCoeffMatrixA_HODLR(size_m x, size_m y, size_m z, ntype* **Gstr, dtype *B, bool *solves, const dtype *w, const dtype* deltaL, dtype* g, double thresh, int smallsize)
 {
 	// Function for applying (I - deltaL * L_0 ^{-1}) * w = g
 	int size = x.n * y.n * z.n;
-
 #if 0
 	printf("check right-hand-side f\n");
 	for (int i = 0; i < size; i++)
@@ -5537,7 +5535,6 @@ void ApplyCoeffMatrixA_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dtype
 
 	system("pause");
 #endif
-
 	// Solve the preconditioned system: L_0 ^ {-1} * w = g
 	Solve3DSparseUsingFT_HODLR(x, y, z, Gstr, B, solves, w, g, thresh, smallsize);
 
@@ -5546,7 +5543,6 @@ void ApplyCoeffMatrixA_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dtype
 
 	// g:= w - g
 	OpTwoMatrices(size, 1, w, g, g, size, '-');
-
 }
 #endif
 
@@ -5979,6 +5975,7 @@ void Solve3DSparseUsingFT_CSR(size_m x, size_m y, size_m z, int *iparm, int *per
 
 #ifdef PRINT
 	printf("time elapsed for 2D problems: %lf sec\n", time);
+	printf("average time for one 2D problem: %lf\n", time / count);
 	printf("Backward 1D FFT's of %d x %d times to each point of 2D solution\n", x.n_nopml, y.n_nopml);
 #endif
 	for (int w = 0; w < size2D; w++)
@@ -6004,7 +6001,7 @@ void Solve3DSparseUsingFT_CSR(size_m x, size_m y, size_m z, int *iparm, int *per
 }
 
 #ifdef HODLR
-void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dtype* B, bool *solves, const dtype *f, dtype* x_sol, double thresh, int smallsize)
+void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, ntype* **Gstr, dtype* B, bool *solves, const dtype *f, dtype* x_sol, double thresh, int smallsize)
 {
 	//#define PRINT
 #ifdef PRINT
@@ -6017,9 +6014,7 @@ void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dt
 	MKL_LONG status;
 	double norm = 0;
 	int lwork = size2D + x.n;
-	//int levels = ceil(log2(ceil((double)x.n / smallsize))) + 1;
-	int lwork1 = x.n * x.n / 2;
-	//int lwork2 = 2 * x.n * 1 * levels;
+	int lwork1 = 2 * x.n;
 
 	dtype *x_sol_hss = alloc_arr2<dtype>(size);
 	dtype *f_FFT = alloc_arr2<dtype>(size);
@@ -6166,6 +6161,7 @@ void Solve3DSparseUsingFT_HODLR(size_m x, size_m y, size_m z, cmnode* **Gstr, dt
 	time = omp_get_wtime() - time;
 
 	printf("time elapsed for 2D problems: %lf sec\n", time);
+	printf("average time for one 2D problem: %lf sec\n", time / count);
 
 #ifdef PRINT
 	printf("Backward 1D FFT's of %d x %d times to each point of 2D solution\n", x.n_nopml, y.n_nopml);

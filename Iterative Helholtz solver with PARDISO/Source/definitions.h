@@ -165,13 +165,23 @@ enum class DIAG13
 #define GMRES_SIZE 128
 
 #define CALC
-//#define HODLR
+
+#define HODLR
 #ifdef HODLR
-#define SYMMETRY
+//#define SYMMETRY
 #else
 #define PRINT
 #endif
 
+//#define SYMMETRY
+
+#ifdef SYMMETRY
+#define ntype cmnode
+#else
+#define ntype cumnode
+#endif
+
+#define E9 (1024.0 * 1024.0 * 1024.0)
 
 // for PARDISO settings
 //#define SYMMETRY
@@ -197,6 +207,27 @@ enum class DIAG13
 
 //#define LENGTH 8
 #define PERF
+
+#ifdef SYMMETRY
+#define ADD_STRUCT           AddStruct
+#define DIAG_MULT_STRUCT     DiagMultStruct
+#define REC_COMPRESS_STRUCT  SymRecCompressStruct
+#define COMP_REC_INV_STRUCT  SymCompRecInvStruct
+#define REC_MUL_STRUCT_WORK2 RecMultLStructWork2
+#define RES_RESTORE_STRUCT   SymResRestoreStruct
+#define FREE_NODES           FreeNodes
+#define COPY_STRUCT          CopyStruct
+#else
+#define ADD_STRUCT           UnsymmAddStruct
+#define DIAG_MULT_STRUCT     UnsymmDiagMultStruct
+#define REC_COMPRESS_STRUCT  UnsymmRecCompressStruct
+#define COMP_REC_INV_STRUCT  UnsymmCompRecInvStruct
+#define REC_MUL_STRUCT_WORK2 UnsymmRecMultLStructWork2
+//#define REC_MUL_STRUCT_WORK2 UnsymmRecMultLStruct
+#define RES_RESTORE_STRUCT   UnsymmResRestoreStruct
+#define FREE_NODES           FreeUnsymmNodes
+#define COPY_STRUCT          CopyUnsymmStruct
+#endif
 
 
 // velocity model

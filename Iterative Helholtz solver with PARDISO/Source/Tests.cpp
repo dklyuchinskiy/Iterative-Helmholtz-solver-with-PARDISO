@@ -86,7 +86,7 @@ void Test2DHelmholtzHODLR()
 	double *G = alloc_arr(size * n);
 	int ldg = size;
 #else
-	cmnode **Gstr;
+	ntype **Gstr;
 #endif
 
 	// Solution, right hand side and block B
@@ -239,7 +239,7 @@ void Test2DHelmholtzHODLR()
 #endif
 	
 	for (int i = y.n - 1; i >= 0; i--)
-		FreeNodes(n, Gstr[i], smallsize);
+		FREE_NODES(n, Gstr[i], smallsize);
 
 	free(Gstr);
 
