@@ -517,7 +517,7 @@ void PrintProjection1D(size_m x, size_m y, dtype *x_ex, dtype *x_prd, int freq)
 	free_arr(x_sol1D_prd);
 }
 
-void PrintProjection1DHetero(size_m x, size_m y, dtype *x_prd, int freq)
+void PrintProjection1DHetero(char *outName, size_m x, size_m y, dtype *x_prd, int freq)
 {
 	char *str1 = alloc_arr<char>(255);
 	char *str2 = alloc_arr<char>(255);
@@ -530,8 +530,8 @@ void PrintProjection1DHetero(size_m x, size_m y, dtype *x_prd, int freq)
 	{
 		if (j == y.n / 2)
 		{
-			sprintf(str1, "Charts3DHeteroOT/%d/projX/model_pml1Dx_freq%d_sec%d_h%d", x.n_nopml, freq, j, (int)x.h);
-			sprintf(str2, "Charts3DHeteroOT/%d/projX/model_pml1Dx_freq%d_sec%d_h%d", x.n_nopml, freq, j, (int)x.h);
+			sprintf(str1, "%s/%d/projX/model_pml1Dx_freq%d_sec%d_h%d", outName, x.n_nopml, freq, j, (int)x.h);
+			sprintf(str2, "%s/%d/projX/model_pml1Dx_freq%d_sec%d_h%d", outName, x.n_nopml, freq, j, (int)x.h);
 
 #ifdef CALC
 			output1D_hetero(str1, pml_flag, x, &x_prd[x.n * j]);
@@ -541,8 +541,8 @@ void PrintProjection1DHetero(size_m x, size_m y, dtype *x_prd, int freq)
 	}
 
 	// output 1D - Y direction
-	sprintf(str1, "Charts3DHeteroOT/%d/projY/model_pml1Dy_freq%d_sec%d_h%d", y.n_nopml, freq, x.n / 2, (int)x.h);
-	sprintf(str2, "Charts3DHeteroOT/%d/projY/model_pml1Dy_freq%d_sec%d_h%d", y.n_nopml, freq, x.n / 2, (int)x.h);
+	sprintf(str1, "%s/%d/projY/model_pml1Dy_freq%d_sec%d_h%d", outName, y.n_nopml, freq, x.n / 2, (int)x.h);
+	sprintf(str2, "%s/%d/projY/model_pml1Dy_freq%d_sec%d_h%d", outName, y.n_nopml, freq, x.n / 2, (int)x.h);
 
 	for (int j = 0; j < y.n; j++)
 	{
@@ -1352,7 +1352,8 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 	int Nz = z.n;
 	printf("z.spg_pts = %d\n", z.spg_pts);
 
-#if 0
+	// Model 1
+#if 1
 	// ratio 3
 	double c3 = 600;
 	double c2 = (1500 - c3) / y.l;
@@ -1369,13 +1370,16 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 	x.c2 = c2;
 	x.c3 = c3;
 #endif
-	   // c(x,y,z) = c0 + c1 * sin(c2 * x) + c3 * y
-		// c(0,0,0) = 600
-		// c(0,max) = 1500;
-		// c(max,0) = 2000;
-		// c(max,max) = 3000;
+
 
 #if 0
+	// Model 2
+    // c(x,y,z) = c0 + c1 * sin(c2 * x) + c3 * y
+    // c(0,0,0) = 600
+    // c(0,max) = 1500;
+    // c(max,0) = 2000;
+    // c(max,max) = 3000;
+
 	double c0 = 600.0;
 	double c1 = 1500.0;
 	double c3 = (1500.0 - c0) / LENGTH_Y;
@@ -1414,8 +1418,11 @@ void SetSoundSpeed3D(size_m x, size_m y, size_m z, dtype* sound3D, point source)
 	double sound_min = sound3D[z.spg_pts * n + y.pml_pts * Nx + x.pml_pts].real();
 	double sound_max = sound3D[(Nz - z.spg_pts - 1) * n + (Ny - y.pml_pts - 1) * Nx + (Nx - x.pml_pts - 1)].real();
 
-	//printf("Sound speed: %lf * x + %lf * y + %lf\n", x.c1, x.c2, x.c3);
+#if 1
+	printf("Sound speed: %lf * x + %lf * y + %lf\n", x.c1, x.c2, x.c3);
+#else
 	printf("Sound speed: %lf + %lf * sin(%lf * x) + %lf * y\n", x.c0, x.c1, x.c2, x.c3);
+#endif
 	printf("Sound speed: min = %lf, max = %lf\nRatio: %lf\n", sound_min, sound_max, sound_max / sound_min);
 	system("pause");
 #endif

@@ -75,7 +75,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 #if 1
 	// Gen velocity of sound in 3D domain
 
-#ifdef HOMO
+#ifndef OVERTRUST
 	SetSoundSpeed3D(x, y, z, sound3D, source);
 #else
 	SetSoundSpeed3DFromFile(x, y, z, sound3D, source);
@@ -178,7 +178,9 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 #define MKL_FFT
 
 #ifdef MKL_FFT
-		if (k < z.n / 2 - 1)
+		//if (k < z.n / 2)
+		//if (k < z.n / 2 - 1)
+		if(1)
 		{
 			kww = 4.0 * double(PI) * double(PI) * k * k / (z.l * z.l);
 		}
@@ -193,13 +195,14 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 		D2csr[k] = (zcsr*)malloc(sizeof(zcsr));
 
 		if (nu == 2) ratio = 15;
-		else ratio = 3;
+		else ratio = 5;
 
+#define SAVE_MEM
 #ifdef SAVE_MEM
 		if (kww < ratio * k2)
 #else
-		//if (1)
-		if (k < 5)
+		if (1)
+		//if (k < 5)
 #endif
 		{
 			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } -kww;
@@ -428,9 +431,12 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 	for (int i = 0; i < size; i++)
 		x_init[i] = 0;
 
+	int FINISH = 0;
+
 	for (int restart = 0; restart < rest; restart++)
 	{
 		printf("------RESTART = %d------\n", restart);
+		if (FINISH) continue;
 
 		// 1. First step. Compute r_0 and its norm
 		zcopy(&size, x_init, &ione, x0, &ione);
@@ -618,7 +624,11 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 			fprintf(output, "%d %e %e %lf\n", restart * m + j, Res, RelRes, diff_sol);
 			//if (diff_sol < RES_EXIT) break;
 #endif
-		    if (RelRes < REL_RES_EXIT) break;
+			if (RelRes < REL_RES_EXIT)
+			{
+				FINISH = 1;
+				break;
+			}
 
 			printf("--------------------------------------------------------------------------------\n");
 			time = omp_get_wtime() - time;

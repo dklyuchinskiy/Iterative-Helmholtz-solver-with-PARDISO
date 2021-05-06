@@ -66,7 +66,7 @@ int main()
 //	for (double beta_eq = 0.05; beta_eq <= 1.01; beta_eq += 0.05)
 	//	for (int spg_pts = 20; spg_pts <= 100; spg_pts += 20)
 		{
-			int spg_pts = 20;
+			int spg_pts = 25;
 			double beta_eq = 0.5;
 
 			printf("*********************************************\n");
@@ -136,13 +136,13 @@ int main()
 			// OT 330, 330, 155 - 30m
 			// OT 660, 660, 309 - 15m
 
-			int n1 = 660 + 2 * x.pml_pts;		    // number of point across the directions
-			int n2 = 660 + 2 * y.pml_pts;
-			int n3 = 309 + 2 * z.spg_pts;
+			int n1 = 100 + 2 * x.pml_pts;		    // number of point across the directions
+			int n2 = 100 + 2 * y.pml_pts;
+			int n3 = 100 + 2 * z.spg_pts;
 
 			// FGMRES or BcGSTAB number of iterations/niter
-			int niter = 5;
-			int restart = 10;
+			int niter = 10;
+			int restart = 15;
 
 			x.n = n1;
 			y.n = n2;
@@ -470,16 +470,25 @@ int main()
 			printf("FGMRES is not run!\n");
 #endif
 
-			//#define OUTPUT
-			//#define GNUPLOT
+#define OUTPUT
+#define GNUPLOT
 
+#if defined(OVERTRUST)
+			char outName[255] = "Charts3DHeteroOT";
+#elif defined(HOMO)
+			char outName[255] = "Charts3D";
+#else
+			char outName[255] = "Charts3DHetero";
+#endif
+
+#define PROJ
 #if defined(OUTPUT) && defined(GNUPLOT)
+#if defined(PROJ)
 #ifndef HOMO
 			// for printing with gnuplot (1D projections in sponge direction)
 			dtype* z_sol1D_prd = alloc_arr<dtype>(z.n);
 
 			// output 1D - Z direction
-			//char str1[255], str2[255];
 			printf("Prepare 1D projections...\n");
 			pml_flag = 0;
 
@@ -487,8 +496,8 @@ int main()
 			{
 				if (j == y.n / 2 || j == y.n / 4 || j == y.n * 3 / 4)
 				{
-					sprintf(str1, "Charts3DHeteroOT/%d/projZ/model_pml1Dz_sec%d_h%d", x.n_nopml, j, (int)x.h);
-					sprintf(str2, "Charts3DHeteroOT/%d/projZ/model_pml1Dz_sec%d_h%d", x.n_nopml, j, (int)x.h);
+					sprintf(str1, "%s/%d/projZ/model_pml1Dz_sec%d_h%d", outName, x.n_nopml, j, (int)x.h);
+					sprintf(str2, "%s/%d/projZ/model_pml1Dz_sec%d_h%d", outName, x.n_nopml, j, (int)x.h);
 
 					for (int k = 0; k < z.n; k++)
 					{
@@ -505,12 +514,13 @@ int main()
 			printf("Print 1D projections...\n");
 			for (int k = 0; k < z.n; k++)
 			{
-				PrintProjection1DHetero(x, y, &x_sol[k * size2D], k);
+				PrintProjection1DHetero(outName, x, y, &x_sol[k * size2D], k);
 			}
 			free(z_sol1D_prd);
 
 #endif
-#endif		
+#endif
+#endif
 			// 4.89e-11 - за 25 итераций
 
 #ifdef HOMO
@@ -769,11 +779,11 @@ int main()
 			reducePML3D(x, y, z, size, f, size_nopml, f_nopml);
 
 			pml_flag = true;
-			char file1[255]; sprintf(file1, "Charts3DHeteroOT/%d/model_ft", x.n_nopml);
-			char file2[255]; sprintf(file2, "Charts3DHeteroOT/%d/real/helm_ft", x.n_nopml);
-			char file3[255]; sprintf(file3, "Charts3DHeteroOT/%d/imag/helm_ft", x.n_nopml);
+			char file1[255]; sprintf(file1, "%s/%d/model_ft", outName, x.n_nopml);
+			char file2[255]; sprintf(file2, "%s/%d/real/helm_ft", outName, x.n_nopml);
+			char file3[255]; sprintf(file3, "%s/%d/imag/helm_ft", outName, x.n_nopml);
 #if defined(OUTPUT)
-#if def(CALC)
+#if defined(CALC)
 			printf("Output results to file...\n");
 #ifdef HOMO
 			output(file1, pml_flag, x, y, z, x_orig_nopml, x_sol_nopml, diff_sol);
@@ -793,7 +803,6 @@ int main()
 #else
 			printf("No printing results...\n");
 #endif
-
 
 #endif
 			//#define MAKE_RUNGE_3D

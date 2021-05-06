@@ -102,7 +102,7 @@ map<vector<int>, double> block3diag_to_CSR(int n1, int n2, int blocks, double *B
 map<vector<int>, double> concat_maps(const map<vector<int>, double>& map1, const map<vector<int>, double>& map2);
 void output1D_hetero(char *str, bool pml_flag, size_m x, dtype* x_pard);
 void gnuplot1D_hetero(char *splot, char *sout, bool pml_flag, size_m x);
-void PrintProjection1DHetero(size_m x, size_m y, dtype *x_prd, int freq);
+void PrintProjection1DHetero(char *outName, size_m x, size_m y, dtype *x_prd, int freq);
 void gnuplot(char *splot, char *sout, bool pml_flag, int col, size_m x, size_m y, size_m z);
 
 dtype zdot(int size, dtype* v1, dtype* v2);

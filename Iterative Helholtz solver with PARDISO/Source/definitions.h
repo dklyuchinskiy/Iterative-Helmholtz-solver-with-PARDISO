@@ -166,7 +166,8 @@ enum class DIAG13
 
 #define CALC
 
-#define HODLR
+
+//#define HODLR
 #ifdef HODLR
 //#define SYMMETRY
 #else
@@ -174,7 +175,6 @@ enum class DIAG13
 #endif
 
 //#define SYMMETRY
-
 #ifdef SYMMETRY
 #define ntype cmnode
 #else
@@ -188,11 +188,13 @@ enum class DIAG13
 #define DIAG_PATTERN 3
 //#define DIAG_PATTERN 9
 
+//#define OVERTRUST
 //#define HOMO
+
 //#define SAVE_MEM
 //#define CHECK_ACCURACY // 2D problems
 //#define PRINT_TEST
-#define RES_EXIT	1e-8
+#define RES_EXIT	    1e-8
 #define REL_RES_EXIT    1e-4
 
 //#define ORDER4
@@ -237,7 +239,7 @@ enum class DIAG13
 
 //#define C3 0.7
 
-#if 1
+#if 0
 
 #if 0
 // grid 80, 160, 320
@@ -253,7 +255,7 @@ enum class DIAG13
 #define LENGTH_Z 4635
 #endif
 #else
-// grid 50, 100, 200
+// grid 50, 100, 200, 400
 #define LENGTH_X LENGTH
 #define LENGTH_Y LENGTH
 #define LENGTH_Z LENGTH
