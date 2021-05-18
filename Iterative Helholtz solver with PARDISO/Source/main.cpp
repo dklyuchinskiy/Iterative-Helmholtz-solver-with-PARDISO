@@ -35,8 +35,8 @@ in sparse CSR format to save memory.
 int main()
 {
 #ifdef HODLR
-	//TestAll();
-	//system("pause");
+	TestAll();
+	system("pause");
 #endif
 
 #ifdef _OPENMP

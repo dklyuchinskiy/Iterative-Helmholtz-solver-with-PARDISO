@@ -138,6 +138,7 @@ void AddSymmHSSDiag(int n, cmnode *Aout, dtype *Diag, int smallsize);
 void SolveTriangSystemA21(int p, int n, dtype* VT, int ldvt, cmnode* R, int smallsize, double eps, char *method);
 void SymCompUpdate5LowRankStruct(int n, int k, cmnode* Astr, dtype alpha, dtype *Y, int ldy, dtype *V, int ldv, int smallsize, double eps, char* method);
 void LowRankToSymmHSS(int n, int r, dtype *U, int ldu, cmnode *&Aout, int smallsize);
+void UnsymmDiagMultStruct2(int n, cumnode* Astr, dtype *d1, dtype *d2, int smallsize);
 
 void alloc_dense_unsymm_node(int n, cumnode* &Cstr);
 void FreeUnsymmNodes(int n, cumnode* &Astr, int smallsize);

@@ -542,6 +542,58 @@ void UnsymmDiagMultStruct(int n, cumnode* Astr, dtype *d, int smallsize)
 	}
 }
 
+void UnsymmDiagMultStruct2(int n, cumnode* Astr, dtype *d1, dtype *d2, int smallsize)
+{
+	// d содержит 2 диагонали размера n каждая
+	if (n <= smallsize)
+	{
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < n; j++)
+#pragma omp simd
+			for (int i = 0; i < n; i++)
+			{
+				Astr->A21->A[i + j * n] *= d2[j]; // справа D2 - каждый j - ый столбец A умножается на d[j]
+				Astr->A21->A[i + j * n] *= d1[i]; // слева  D1 - каждая строка A умножается на d[j]
+			}
+	}
+	else
+	{
+		int n2 = (int)ceil(n / 2.0);
+		int n1 = n - n2;
+
+		UnsymmDiagMultStruct2(n1, Astr->left, &d1[0], &d2[0], smallsize);
+		UnsymmDiagMultStruct2(n2, Astr->right, &d1[n1], &d2[n1], smallsize);
+
+		// D1 * U - каждая i-ая строка U умножается на элемент вектора d[i]
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < Astr->A21->p; j++)
+#pragma omp simd
+			for (int i = 0; i < n2; i++)
+				Astr->A21->U[i + n2 * j] *= d1[n1 + i]; // вторая часть массива D
+
+		// VT * D2 - каждый j-ый столбец умножается на элемент вектора d[j]
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < n1; j++)
+#pragma omp simd
+			for (int i = 0; i < Astr->A21->p; i++)
+				Astr->A21->VT[i + Astr->A21->p * j] *= d2[j];
+		// так так вектора матрицы V из разложения A = U * V лежат в транспонированном порядке,
+		// то матрицу D стоит умножать на VT слева
+
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < Astr->A12->p; j++)
+#pragma omp simd
+			for (int i = 0; i < n1; i++)
+				Astr->A12->U[i + n1 * j] *= d1[i];
+
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < n2; j++)
+#pragma omp simd
+			for (int i = 0; i < Astr->A12->p; i++)
+				Astr->A12->VT[i + Astr->A12->p * j] *= d2[n1 + j];
+	}
+}
+
 /* G = XT * A * X, where A - compressed n * n, X - dense n * m, Y - dense m * m */
 void DenseMultStruct(int n, int m, cmnode* Astr, dtype *U, int ldu, dtype *G, int ldg, int smallsize)
 {

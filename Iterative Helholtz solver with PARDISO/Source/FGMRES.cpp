@@ -179,8 +179,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 
 #ifdef MKL_FFT
 		//if (k < z.n / 2)
-		//if (k < z.n / 2 - 1)
-		if(1)
+		if (k < z.n / 2 - 1)
+		//if(1)
 		{
 			kww = 4.0 * double(PI) * double(PI) * k * k / (z.l * z.l);
 		}
@@ -197,7 +197,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 		if (nu == 2) ratio = 15;
 		else ratio = 5;
 
-#define SAVE_MEM
+//#define SAVE_MEM
 #ifdef SAVE_MEM
 		if (kww < ratio * k2)
 #else

@@ -47,6 +47,7 @@ void Test_UnsymmCompUpdate3Struct(int n, int k1, int k2, dtype alpha, double eps
 void Test_UnsymmCompUpdate2Struct(int n, int k, dtype alpha, double eps, char* method, int smallsize);
 void Test_UnsymmAddStruct(int n, dtype alpha, dtype beta, double eps, char *method, int smallsize);
 void Test_UnsymmDiagMultStruct(int n, double eps, char *method, int smallsize);
+void Test_UnsymmDiagMultStruct2(int n, double eps, char *method, int smallsize);
 void Test_UnsymmRecMultLStruct(int n, int k, double eps, char *method, int smallsize);
 void Test_UnsymmRecMultRStruct(int n, int k, double eps, char *method, int smallsize);
 void Test_UnsymmLUfact(int n, double eps, char* method, int smallsize);

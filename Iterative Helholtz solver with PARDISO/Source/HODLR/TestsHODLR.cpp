@@ -26,6 +26,7 @@ void TestAll()
 	runner.RunTest(Shell_SymRecCompress, Test_UnsymmRecCompressStruct, "Test_UnsymmRecCompress");
 	runner.RunTest(Shell_DiagMult, Test_DiagMultStruct, "Test_DiagMult");
 	runner.RunTest(Shell_DiagMult, Test_UnsymmDiagMultStruct, "Test_UnsymmDiagMult");
+	runner.RunTest(Shell_DiagMult, Test_UnsymmDiagMultStruct2, "Test_UnsymmDiagMult2");
 	runner.RunTest(Shell_RecMultL, Test_RecMultLStruct, "Test_RecMultL");
 	runner.RunTest(Shell_RecMultL, Test_UnsymmRecMultLStruct, "Test_UnsymmRecMultL");
 	runner.RunTest(Shell_RecMultL, Test_UnsymmRecMultRStruct, "Test_UnsymmRecMultR");
@@ -732,6 +733,67 @@ void Test_UnsymmDiagMultStruct(int n, double eps, char *method, int smallsize)
 	free_arr(d);
 }
 
+void Test_UnsymmDiagMultStruct2(int n, double eps, char *method, int smallsize)
+{
+	//printf("*****Test for DiagMultStruct  n = %d ******* ", n);
+	dtype *Hd = alloc_arr2<dtype>(n * n); // diagonal Hd = D1 * H * D2
+	dtype *H1 = alloc_arr2<dtype>(n * n); // compressed H
+	dtype *H2 = alloc_arr2<dtype>(n * n); // recovered H after D1 * H1 * D2
+	dtype *d1 = alloc_arr2<dtype>(n);
+	dtype *d2 = alloc_arr2<dtype>(n);
+	char str[255];
+
+	double norm = 0;
+	int ldh = n;
+
+	for (int j = 0; j < n; j++)
+	{
+		d1[j] = j + 1.0;
+		d2[j] = 2.0 * j + 1.0;
+	}
+
+	Hilbert(n, n, H1, ldh);
+	Hilbert(n, n, Hd, ldh);
+
+	for (int j = 0; j < n; j++)
+		for (int i = 0; i < n; i++)
+		{
+			Hd[i + ldh * j] *= d2[j];
+			Hd[i + ldh * j] *= d1[i];
+		}
+#ifdef DEBUG
+	print(n, n, H1, ldh, "Initial H");
+#endif
+
+	cumnode *HCstr;
+	// Compress H1 to structured form
+	UnsymmRecCompressStruct(n, H1, ldh, HCstr, smallsize, eps, method);
+
+	// Compressed H1 = D1 * H * D2
+	UnsymmDiagMultStruct2(n, HCstr, d1, d2, smallsize);
+
+	// Recove H1 to uncompressed form
+	UnsymmResRestoreStruct(n, HCstr, H2, ldh, smallsize);
+
+#ifdef DEBUG
+	print(n, n, Hd, ldh, "Initial Hd = D1 * H * D2");
+	print(n, n, H2, ldh, "Recovered H2 = (D1 * H * D2)comp");
+#endif
+
+	// Compare Hd and H2
+	norm = rel_error_complex(n, n, H2, Hd, ldh, eps);
+
+	sprintf(str, "Struct: n = %d ", n);
+	AssertLess(norm, eps, str);
+
+	FreeUnsymmNodes(n, HCstr, smallsize);
+	free_arr(Hd); // diagonal Hd = D1 * H * D2
+	free_arr(H1); // compressed H
+	free_arr(H2); // recovered H after D1 * H1 * D2
+	free_arr(d1);
+	free_arr(d2);
+}
+
 void Test_RecMultLStruct(int n, int k, double eps, char *method, int smallsize)
 {
 	//printf("*****Test for RecMultLStruct  n = %d k = %d ******* ", n, k);
@@ -828,9 +890,13 @@ void Test_UnsymmRecMultLStruct(int n, int k, double eps, char *method, int small
 	UnsymmRecCompressStruct(n, H, ldh, Hstr, smallsize, eps, method);
 
 	// Memory allocation
+#if 0
 	int max_p21 = 0, max_p12 = 0;
 	UnsymmMaxRankInWidthList(max_p21, max_p12, Hstr);
 	int lwork = k * (max_p21 + max_p12);
+#else
+	int lwork = 2 * n * k;
+#endif
 	dtype *work = alloc_arr2<dtype>(lwork);
 
 	// RecMult Y1 = comp(H) * X
