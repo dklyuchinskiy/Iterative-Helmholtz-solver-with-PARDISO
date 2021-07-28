@@ -54,9 +54,11 @@ void print_vec(int size, int *vec1, double *vec2, char *name);
 void NormalizeVector(int size, dtype* v, dtype* out, double& norm);
 void GenRHSandSolutionViaSound3D(size_m x, size_m y, size_m z, /* output */ dtype *u, dtype *f, point source);
 dtype u_ex_complex_sound3D(size_m xx, size_m yy, size_m zz, double x, double y, double z, point source);
+double precond_beta_x(double C, double x1, double x2, double x);
+void NullifySource2DNoPML(int n1, int n2, dtype *u, int isrc, int jsrc, int npoints);
 void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, dtype *x_sol, dtype* x_orig, const dtype *f, double thresh, double& diff_sol, double beta_eq);
 void BCGSTAB(size_m x, size_m y, size_m z, int m, const point source, dtype* x_sol, dtype* x_orig, const dtype* f, double thresh, double& diff_sol, double beta_eq);
-void check_norm_circle(size_m x, size_m y, size_m z, const dtype* x_orig_nopml, const dtype* x_sol_nopml, point source, double thresh);
+void check_norm_circle(size_m x, size_m y, size_m z, dtype* x_orig_nopml, dtype* x_sol_nopml, point source, double thresh);
 void print_2Dcsr_mat(size_m x, size_m y, zcsr* D2csr);
 void print_2Dcsr_mat2(size_m x, size_m y, zcsr* D2csr);
 void fprint(int m, int n, dtype *u, int ldu, char *mess);
@@ -179,7 +181,7 @@ void Solve2DSparseHelmholtz(size_m x, size_m y, size_m z, dtype *f2D, dtype *x_s
 dtype beta2D(size_m x, size_m y, int diag_case, int i, int j, double beta_eq);
 dtype beta1D(size_m x, int diag_case, double k2, int i, double beta_eq);
 void NullifySource2D(size_m x, size_m y, dtype *u, int src, int npoints);
-void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double spg, const dtype* x_orig_nopml, const dtype* x_sol_nopml,
+void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double spg, dtype* x_orig_nopml, dtype* x_sol_nopml,
 	double* x_orig_re, double* x_orig_im, double *x_sol_re, double *x_sol_im);
 void GenSparseMatrixOnline2DwithPMLFast(int w, size_m x, size_m y, zcsr* Acsr, dtype kwave_beta2, int* freqs);
 void compute_and_print_circle_norm(size_m x, size_m y, size_m z, dtype *x_orig, dtype *x_sol, point source, double thresh);

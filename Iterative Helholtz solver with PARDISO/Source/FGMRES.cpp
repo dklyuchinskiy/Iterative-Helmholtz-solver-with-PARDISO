@@ -45,10 +45,10 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 
 	//float *sound3D_OT = ReadData();
 
-	FILE *output;
+	FILE *out;
 	char str0[255];
 	sprintf(str0, "convergence_N%d_PML%d_Lx%d_FREQ%d_SPG%6.lf_BETA%5.3lf_FGMRES.dat", x.n_nopml, x.pml_pts, (int)LENGTH_X, (int)nu, z.h * 2 * z.spg_pts, beta_eq);
-	output = fopen(str0, "w");
+	out = fopen(str0, "w");
 
 
 	//-------- PARDISO ----------
@@ -97,7 +97,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 	//	output2D(str1, false, x, y, sound2D, sound2D);
 
 	char str2[255] = "sound_speed_deltaL";
-	//	output(str2, false, x, y, z, sound3D, deltaL)
+	output(str2, false, x, y, z, sound3D, deltaL, NULL);
 	free(sound3D);
 
 	printf("-----Step 1. Memory allocation for 2D problems\n");
@@ -205,7 +205,32 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 		//if (k < 5)
 #endif
 		{
-			dtype kwave_beta2 = k2 * dtype{ 1, beta_eq } -kww;
+			double x1_left = z.h * z.spg_pts;
+			double x1_right = z.h * (z.n - z.spg_pts);
+			double x2_left = 0;
+			double x2_right = z.n * z.h;
+			double xx = k * z.h;
+			
+			double beta_loc;
+
+#if 0
+			if (xx <= x1_left)
+			{
+				beta_loc = beta_eq - precond_beta_x(beta_eq, x1_left, x2_left, xx);
+			}
+			else if (xx >= x1_right) {
+				beta_loc = beta_eq - precond_beta_x(beta_eq, x1_right, x2_right, xx);
+			}
+			else {
+				beta_loc = beta_eq;
+			}
+#else
+			beta_loc = beta_eq;
+#endif
+
+			printf("k = %d beta_loc = %lf\n", k, beta_loc);
+			
+			dtype kwave_beta2 = k2 * dtype{ 1, beta_loc } -kww;
 #ifdef PRINT
 			printf("Solved k = %d beta2 = (%lf, %lf). ", k, kwave_beta2.real(), kwave_beta2.imag());
 #endif
@@ -227,8 +252,11 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 			dtype kxyz;
 
 #ifdef HOMO
-			//GenSparseMatrixOnline2DwithPML(k, x, y, D2csr[k], kwave_beta2, freqs);
+#if DIAG_PATTERN == 3
+			GenSparseMatrixOnline2DwithPMLFast(k, x, y, D2csr[k], kwave_beta2, freqs);
+#else
 			GenSparseMatrixOnline2DwithPMLand9Pts(k, x, y, D2csr[k], kwave_beta2, freqs);
+#endif
 #else
 			for (int j = 0; j < y.n; j++)
 				for (int i = 0; i < x.n; i++)
@@ -342,7 +370,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 	printf("Time of factorization: %lf\n", time);
 	system("pause");
 #endif
-
+	system("pause");
 #ifndef HODLR
 	double mem = 2.0 * non_zeros / E9;
 	mem += ((double)size2D + 1) / E9;
@@ -579,8 +607,8 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 			// 7. Test ||L0 * u_sol - w|| / ||w||
 			Multiply3DSparseUsingFT(x, y, z, iparm, perm, pt, D2csr, x_sol, f_sol, thresh);
 
-		//	zero_out<dtype>(size_nopml, f_sol_nopml);
-		//	zero_out<dtype>(size_nopml, x_gmres_nopml);
+			//	zero_out<dtype>(size_nopml, f_sol_nopml);
+			//	zero_out<dtype>(size_nopml, x_gmres_nopml);
 			reducePML3D(x, y, z, size, f_sol, size_nopml, f_sol_nopml);
 			reducePML3D(x, y, z, size, x0, size_nopml, x_gmres_nopml);
 
@@ -593,21 +621,16 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 #endif
 
 			// 8. Reduce pml
-#ifdef HOMO
-			printf("Nullify source...\n"); // comment for printing with gnuplot
-			NullifySource2D(x, y, &x_sol[z.n / 2 * size2D], size2D / 2, 1);
-			NullifySource2D(x, y, &x_orig[z.n / 2 * size2D], size2D / 2, 1);
-#endif
-
 			reducePML3D(x, y, z, size, x_sol, size_nopml, x_sol_nopml);
 #ifdef HOMO
 			reducePML3D(x, y, z, size, x_orig, size_nopml, x_orig_nopml);
+
 			norm = RelError(zlange, size_nopml, 1, x_sol_nopml, x_orig_nopml, size_nopml, thresh);
 			printf("Residual in 3D phys domain |x_sol - x_orig| / |x_orig| = %lf\n", norm);
-			printf("-----------\n");
 
-			fprintf(output, "%d %e %e %lf\n", j, Res, RelRes, norm);
-
+			fprintf(out, "%d %e %e %lf\n", j, Res, RelRes, norm);
+			printf("--------------------\n");
+	
 			check_norm_result2(x.n_nopml, y.n_nopml, z.n_nopml, j, 0, 2 * z.spg_pts * z.h, x_orig_nopml, x_sol_nopml, x_orig_re, x_orig_im, x_sol_re, x_sol_im);
 
 			norm_re = RelError(dlange, size_nopml, 1, x_sol_re, x_orig_re, size_nopml, thresh);
@@ -621,7 +644,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 			diff_sol = RelError(zlange, size_nopml, 1, x_sol_nopml, x_sol_prev_nopml, size_nopml, thresh);
 			MultVectorConst<dtype>(size_nopml, x_sol_nopml, 1.0, x_sol_prev_nopml);
 			printf("norm |u_k+1 - u_k|= %e\n", diff_sol);
-			fprintf(output, "%d %e %e %lf\n", restart * m + j, Res, RelRes, diff_sol);
+			fprintf(out, "%d %e %e %lf\n", restart * m + j, Res, RelRes, diff_sol);
 			//if (diff_sol < RES_EXIT) break;
 #endif
 			if (RelRes < REL_RES_EXIT)
@@ -659,7 +682,7 @@ void FGMRES(size_m x, size_m y, size_m z, int m, int rest, const point source, d
 		}
 #endif
 	} // End of iterations
-	fclose(output);
+	fclose(out);
 #ifdef COMP_RESID
 	ComputeResidual(x, y, z, (double)kk, x_sol, f, f_rsd, RelRes);
 

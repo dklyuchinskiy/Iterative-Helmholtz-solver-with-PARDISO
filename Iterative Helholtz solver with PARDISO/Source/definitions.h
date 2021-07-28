@@ -188,8 +188,9 @@ enum class DIAG13
 #define DIAG_PATTERN 3
 //#define DIAG_PATTERN 9
 
+//#define SOURCE_SHIFT
 //#define OVERTRUST
-//#define HOMO
+#define HOMO
 
 //#define SAVE_MEM
 //#define CHECK_ACCURACY // 2D problems

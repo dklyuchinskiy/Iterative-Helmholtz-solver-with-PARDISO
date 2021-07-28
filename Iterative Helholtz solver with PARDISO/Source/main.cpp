@@ -43,7 +43,7 @@ int main()
 	int nthr = omp_get_max_threads();
 	printf("Max_threads: %d threads\n", nthr);
 	//omp_set_dynamic(0);
-	nthr = 1;
+	nthr = 6;
 	omp_set_num_threads(nthr);
 	mkl_set_num_threads(nthr);
 	printf("Run in parallel on %d threads\n", nthr);
@@ -136,13 +136,19 @@ int main()
 			// OT 330, 330, 155 - 30m
 			// OT 660, 660, 309 - 15m
 
+#ifdef SOURCE_SHIFT
+			int n1 = 99 + 2 * x.pml_pts;		    // number of point across the directions
+			int n2 = 99 + 2 * y.pml_pts;
+			int n3 = 99 + 2 * z.spg_pts;
+#else
 			int n1 = 100 + 2 * x.pml_pts;		    // number of point across the directions
 			int n2 = 100 + 2 * y.pml_pts;
 			int n3 = 100 + 2 * z.spg_pts;
+#endif
 
 			// FGMRES or BcGSTAB number of iterations/niter
 			int niter = 10;
-			int restart = 15;
+			int restart = 5;
 
 			x.n = n1;
 			y.n = n2;
@@ -175,7 +181,7 @@ int main()
 			x_nopml.n_nopml = y_nopml.n_nopml = x_nopml.n;
 			z_nopml.n_nopml = z_nopml.n;
 
-#if 0
+#ifdef SOURCE_SHIFT
 			x.l = LENGTH_X + (double)(2 * x.pml_pts * LENGTH_X) / (x.n_nopml + 1);
 			y.l = LENGTH_Y + (double)(2 * y.pml_pts * LENGTH_Y) / (y.n_nopml + 1);
 			z.l = LENGTH_Z + (double)(2 * z.spg_pts * LENGTH_Z) / (z.n_nopml + 1);
@@ -183,6 +189,10 @@ int main()
 			x.h = x.l / (x.n + 1);  // x.n + 1 grid points of the whole domain
 			y.h = y.l / (y.n + 1);  // x.n - 1 - inner points
 			z.h = z.l / (z.n + 1);  // 2 points - for the boundaries
+
+			double xc = x.l;
+			double yc = y.l;
+			double zc = z.l;
 #else
 			x.l = LENGTH_X + (double)(2 * x.pml_pts * LENGTH_X) / (x.n_nopml);
 			y.l = LENGTH_Y + (double)(2 * y.pml_pts * LENGTH_Y) / (y.n_nopml);
@@ -191,13 +201,13 @@ int main()
 			x.h = x.l / (x.n);  // x.n grid points of the whole domain
 			y.h = y.l / (y.n);  // x.n - 2 - inner points
 			z.h = z.l / (z.n);  // 2 points - for the boundaries
-#endif
 			double xc = x.l;
 			double yc = y.l;
 			double zc = z.l;
 			if (n1 % 2 != 0) xc += x.h;
 			if (n2 % 2 != 0) yc += y.h;
 			if (n3 % 2 != 0) zc += z.h;
+#endif
 			point source = { xc / 2.0, yc / 2.0, zc / 2.0 };
 
 #define PRINT_INIT
@@ -710,8 +720,8 @@ int main()
 			check_test_3Dsolution_in1D(x.n_nopml, y.n_nopml, z.n_nopml, x_sol_nopml, x_orig_nopml, thresh);
 #endif
 
-//#define GNUPLOT
-//#define OUTPUT
+#define GNUPLOT
+#define OUTPUT
 
 #ifdef OUTPUT
 #ifndef HOMO

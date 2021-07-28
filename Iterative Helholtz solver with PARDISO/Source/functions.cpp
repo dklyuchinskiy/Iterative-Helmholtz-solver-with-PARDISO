@@ -430,7 +430,7 @@ void check_norm_result(int n1, int n2, int n3, dtype* x_orig_nopml, dtype* x_sol
 
 }
 
-void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double spg, const dtype* x_orig_nopml, const dtype* x_sol_nopml,
+void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double spg, dtype* x_orig_nopml, dtype* x_sol_nopml,
 	double* x_orig_re, double* x_orig_im, double *x_sol_re, double *x_sol_im)
 {
 	printf("------------ACCURACY CHECK---------\n");
@@ -438,9 +438,24 @@ void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double sp
 	int size2D = n1 * n2;
 	int size = size2D * n3;
 
+#ifdef SOURCE_SHIFT
+	int mid_x = n1 / 2;
+	int mid_y = n2 / 2;
+	int mid_z = n3 / 2;
+#else
+	int mid_x = n1 / 2 - 1;
+	int mid_y = n2 / 2 - 1;
+	int mid_z = n3 / 2 - 1;
+#endif
+
+	printf("Nullify source...\n"); // comment for printing with gnuplot
+
 	double eps1p = 0.01;
 	double *norms_re = alloc_arr<double>(n3);
 	double *norms_im = alloc_arr<double>(n3);
+
+	NullifySource2DNoPML(n1, n2, &x_sol_nopml[mid_z * size2D], mid_x, mid_y, 1);
+	NullifySource2DNoPML(n1, n2, &x_orig_nopml[mid_z * size2D], mid_x, mid_y, 1);
 
 #pragma omp parallel for simd schedule(static)
 	for (int i = 0; i < size; i++)
@@ -457,7 +472,7 @@ void check_norm_result2(int n1, int n2, int n3, int niter, double ppw, double sp
 		norms_re[k] = RelError(dlange, size2D, 1, &x_sol_re[k * size2D], &x_orig_re[k * size2D], size, eps1p);
 		norms_im[k] = RelError(dlange, size2D, 1, &x_sol_im[k * size2D], &x_orig_im[k * size2D], size, eps1p);
 		//if (niter == 11)
-			printf("i = %d norm = %lf norm_re = %lf norm_im = %lf\n", k, norm, norms_re[k], norms_im[k]);
+		printf("i = %d norm = %lf norm_re = %lf norm_im = %lf\n", k, norm, norms_re[k], norms_im[k]);
 	}
 
 #if 0
@@ -1778,23 +1793,33 @@ void GenerateDeltaL(size_m x, size_m y, size_m z, dtype* sound3D, dtype* sound2D
 	double L0 = z0;
 	double Ln = z.l - zN;
 
-	for (int k = z.spg_pts; k < nz - z.spg_pts; k++)
+	for (int k = z.spg_pts; k <= nz - z.spg_pts; k++)
 		for (int j = 0; j < ny; j++)
 			for (int i = 0; i < nx; i++)
 			{
 				ij = i + j * nx;
 				ijk = ij + k * size2D;
 				deltaL[ijk] = double(omega) * double(omega) * (dtype{ 1.0, beta_eq } / (sound2D[ij] * sound2D[ij]) - 1.0 / (sound3D[ijk] * sound3D[ijk]));
+			}
 
+	for (int k = 0; k < z.spg_pts; k++)
+		for (int j = 0; j < ny; j++)
+			for (int i = 0; i < nx; i++)
+			{
+				ij = i + j * nx;
+				ijk = ij + k * size2D;
 				zp = k * z.h;
-				if (k < z.spg_pts)
-				{
-					deltaL[ijk] = deltaL[ij + z.spg_pts * size2D] * exp(-(zp - z0) * (zp - z0) / (L0 * L0) / (sigma * sigma));
-				}
-				else if (k >= z.n - z.spg_pts)
-				{
-					deltaL[ijk] = deltaL[ij + (z.n - z.spg_pts) * size2D] * exp(-(zp - zN) * (zp - zN) / (Ln * Ln) / (sigma * sigma));
-				}
+				deltaL[ijk] = deltaL[ij + z.spg_pts * size2D] * exp(-(zp - z0) * (zp - z0) / (L0 * L0) / (sigma * sigma));
+			}
+	
+	for (int k = z.n - z.spg_pts + 1; k < z.n; k++)
+		for (int j = 0; j < ny; j++)
+			for (int i = 0; i < nx; i++)
+			{
+				ij = i + j * nx;
+				ijk = ij + k * size2D;
+				zp = k * z.h;
+			    deltaL[ijk] = deltaL[ij + (z.n - z.spg_pts) * size2D] * exp(-(zp - zN) * (zp - zN) / (Ln * Ln) / (sigma * sigma));	
 			}
 }
 
@@ -1850,6 +1875,11 @@ dtype alpha(size_m xyz, double i)
 		//return dtype{ double(omega) * double(omega), -double(omega) * d(x) } / (double(omega) * double(omega) + d(x) * d(x));
 	}
 	else return 1.0;
+}
+
+double precond_beta_x(double C, double x1, double x2, double x)
+{
+	return C * (x - x1) * (x - x1) / (x2 - x1) / (x2 - x1);
 }
 
 void SetPml3D(int blk3D, size_m x, size_m y, size_m z, int n, dtype* alpX, dtype* alpY, dtype* alpZ)
@@ -4505,7 +4535,19 @@ dtype u_ex_complex_sound3D(size_m xx, size_m yy, size_m zz, double x, double y, 
 
 	double r = sqrt(x * x + y * y + z * z);
 
-	if (r == 0) r = 0.005;
+	if (fabs(x) < EPS && fabs(y) < EPS && fabs(z) < EPS)
+	{
+#ifdef SOURCE_SHIFT
+		r = 0.005;
+#else
+		r += xx.h;
+#endif
+		int src_x = (int)((x + source.x) / xx.h);
+		int src_y = (int)((y + source.y) / yy.h);
+		int src_z = (int)((z + source.z) / zz.h);
+		printf("Solution near source is SET\n");
+		printf("3D source point: %d * size2D + %d * x.n + %d\n", src_z - 1, src_y - 1, src_x - 1);
+	}
 
 	dtype kk_loc = double(omega) / MakeSound3D(xx, yy, zz, x, y, z, source);
 
@@ -4529,6 +4571,8 @@ dtype F3D_ex_complex(size_m xx, size_m yy, size_m zz, double x, double y, double
 
 		double volume = -1.0 / (xx.h * yy.h * zz.h);
 		printf("volume = %lf\n", fabs(volume));
+		printf("RHS: i = j = k = %d\n", int(x / xx.h));
+
 		key = 0;
 
 		return volume;
@@ -5877,12 +5921,20 @@ void Solve3DSparseUsingFT_CSR(size_m x, size_m y, size_m z, int *iparm, int *per
 	printf("Solving set of 2D problems...\n");
 #endif
 	int count = 0;
-	point sourcePML = { x.l / 2, y.l / 2 };
-	int src = 0;
-
-	// Get source point coordinates
-	Get2DSrc(x, y, sourcePML, src);
-
+	
+	
+	//point sourcePML = { x.l / 2, y.l / 2 };
+	//int src = 0;
+	//Get source point coordinates
+	//Get2DSrc(x, y, sourcePML, src);
+	//for (int i = 0; i < size2D; i++)
+	//{
+//		if (f_FFT[k * size2D + i].real() == 0.0 && f_FFT[k * size2D + i].imag() == 0.0) zeros_rhs++;
+//	}
+//	if (zeros_rhs == size2D) {
+	//	printf("!!!ERROR input!!! All RHS IS ZERO in k = %d\n", k);
+	//	system("pause");
+	//}
 
 	time = omp_get_wtime();
 
@@ -5892,6 +5944,7 @@ void Solve3DSparseUsingFT_CSR(size_m x, size_m y, size_m z, int *iparm, int *per
 		{
 			count++;
 			int non_zeros_rhs = 0;
+			int zeros_rhs = 0;
 #ifdef CHECK_ACCURACY
 			dtype alpha_k = f_FFT[k * size2D + src] / (1.0 / (x.h * y.h));
 			for (int i = 0; i < size2D; i++)
@@ -6578,6 +6631,8 @@ void NullifySource2D(size_m x, size_m y, dtype *u, int src, int npoints)
 	jsrc = src / x.n;
 	isrc = src - x.n * jsrc;
 
+	//printf("mid_x = %d\nmid_y = %d\n", isrc, jsrc);
+
 	for (int l = 0; l <= npoints; l++)
 	{
 		u[isrc - l + x.n * jsrc] = 0;
@@ -6585,6 +6640,20 @@ void NullifySource2D(size_m x, size_m y, dtype *u, int src, int npoints)
 
 		u[isrc + x.n * (jsrc - l)] = 0;
 		u[isrc + x.n * (jsrc + l)] = 0;
+	}
+}
+
+void NullifySource2DNoPML(int n1, int n2, dtype *u, int isrc, int jsrc, int npoints)
+{
+	//printf("mid_x = %d\nmid_y = %d\n", isrc, jsrc);
+
+	for (int l = 0; l <= npoints; l++)
+	{
+		u[isrc - l + n1 * jsrc] = 0;
+		u[isrc + l + n1 * jsrc] = 0;
+
+		u[isrc + n1 * (jsrc - l)] = 0;
+		u[isrc + n1 * (jsrc + l)] = 0;
 	}
 }
 
